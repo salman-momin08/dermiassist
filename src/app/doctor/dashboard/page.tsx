@@ -1,6 +1,7 @@
+
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -10,7 +11,7 @@ import { CalendarCheck, Users, FileText, Bot, Loader2 } from "lucide-react"
 import { generateAiReportSummary } from "@/ai/flows/generate-ai-report-summary"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-const mockAppointments = [
+const initialAppointments = [
     {
         id: "APP001",
         patientName: "Liam Johnson",
@@ -48,6 +49,17 @@ const mockReportFullText = "Analysis Report: Acne Vulgaris. Generated on 2024-05
 export default function DoctorDashboardPage() {
     const [summary, setSummary] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [appointments, setAppointments] = useState(initialAppointments);
+
+    const pendingRequestsCount = useMemo(() => {
+        return appointments.filter(a => a.status === 'Pending').length;
+    }, [appointments]);
+
+    const handleRequest = (id: string, newStatus: 'Approved' | 'Declined') => {
+        // In a real app, this would be an API call.
+        // For now, we just filter it out of the list of pending requests.
+        setAppointments(prev => prev.filter(app => app.id !== id));
+    };
 
     const handleGenerateSummary = async () => {
         setIsLoading(true);
@@ -76,7 +88,7 @@ export default function DoctorDashboardPage() {
                         <CalendarCheck className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">3</div>
+                        <div className="text-2xl font-bold">{pendingRequestsCount}</div>
                         <p className="text-xs text-muted-foreground">New appointment requests await your review.</p>
                     </CardContent>
                 </Card>
@@ -119,7 +131,7 @@ export default function DoctorDashboardPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {mockAppointments.map(app => (
+                            {pendingRequestsCount > 0 ? appointments.filter(a => a.status === 'Pending').map(app => (
                                 <TableRow key={app.id}>
                                     <TableCell>
                                         <div className="font-medium">{app.patientName}</div>
@@ -155,11 +167,17 @@ export default function DoctorDashboardPage() {
                                         </Dialog>
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
-                                        <Button size="sm" variant="outline">Decline</Button>
-                                        <Button size="sm">Approve</Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleRequest(app.id, 'Declined')}>Decline</Button>
+                                        <Button size="sm" onClick={() => handleRequest(app.id, 'Approved')}>Approve</Button>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
+                                        No pending appointment requests.
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>
