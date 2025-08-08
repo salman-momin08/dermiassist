@@ -7,12 +7,13 @@ import { useAnalyses, type AnalysisReport } from '@/hooks/use-analyses';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles } from "lucide-react";
+import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { visualProgressAnalysis } from '@/ai/flows/visual-progress-analysis';
+import { generateHealingVideo } from '@/ai/flows/generate-healing-video';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AnalysisDetailPage({ params }: { params: { id: string } }) {
@@ -24,6 +25,10 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
+    const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+    const [videoUri, setVideoUri] = useState<string | null>(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+
 
     useEffect(() => {
         if (!isLoading) {
@@ -39,6 +44,7 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
             reader.onloadend = () => {
                 setProgressImage(reader.result as string);
                 setProgressSummary(null);
+                setVideoUri(null);
                 setError(null);
             };
             reader.readAsDataURL(selectedFile);
@@ -51,6 +57,7 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
         setIsComparing(true);
         setError(null);
         setProgressSummary(null);
+        setVideoUri(null);
 
         try {
             const result = await visualProgressAnalysis({
@@ -71,6 +78,39 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
             setIsComparing(false);
         }
     };
+    
+     const handleGenerateVideo = async () => {
+        if (!progressImage || !analysis) return;
+
+        setIsGeneratingVideo(true);
+        setError(null);
+        setVideoUri(null);
+
+        try {
+            const result = await generateHealingVideo({
+                originalPhotoDataUri: analysis.image,
+                newPhotoDataUri: progressImage,
+            });
+            setVideoUri(result.videoDataUri);
+        } catch (err) {
+            console.error("Video generation failed:", err);
+            setError("An unexpected error occurred while generating the video. Please try again.");
+            toast({
+                title: "Video Generation Failed",
+                description: "This is an experimental feature and may not always work. Please try again later.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsGeneratingVideo(false);
+        }
+    };
+
+    const resetDialog = () => {
+        setProgressImage(null);
+        setProgressSummary(null);
+        setError(null);
+        setVideoUri(null);
+    }
 
     if (isLoading) {
         return (
@@ -166,7 +206,7 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
                         </CardContent>
                     </Card>
 
-                    <Dialog onOpenChange={() => { setProgressImage(null); setProgressSummary(null); setError(null); }}>
+                    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if(!open) resetDialog(); }}>
                         <DialogTrigger asChild>
                             <Button className="w-full" variant="secondary">
                                 <LineChart className="mr-2 h-4 w-4" />
@@ -213,6 +253,17 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
                                         </AlertDescription>
                                     </Alert>
                                 )}
+                                {videoUri && (
+                                    <div className="mt-4">
+                                        <video src={videoUri} controls className="w-full rounded-lg" />
+                                    </div>
+                                )}
+                                {isGeneratingVideo && (
+                                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <span>Generating video... This may take a moment.</span>
+                                    </div>
+                                )}
                                  {error && (
                                     <Alert variant="destructive">
                                         <AlertTitle>Error</AlertTitle>
@@ -220,15 +271,19 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
                                     </Alert>
                                 )}
                             </div>
-                            <DialogFooter>
-                                <Button onClick={handleCompare} disabled={!progressImage || isComparing} className="w-full">
+                            <DialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <Button onClick={handleCompare} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full">
                                     {isComparing ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Comparing...
-                                        </>
+                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Comparing...</>
                                     ) : (
-                                        "Compare with Original"
+                                        <><Sparkles className="mr-2 h-4 w-4" />Analyze Progress</>
+                                    )}
+                                </Button>
+                                <Button onClick={handleGenerateVideo} disabled={!progressSummary || isGeneratingVideo} className="w-full" variant="secondary">
+                                    {isGeneratingVideo ? (
+                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating Video...</>
+                                    ) : (
+                                        <><Video className="mr-2 h-4 w-4" />Generate Healing Video</>
                                     )}
                                 </Button>
                             </DialogFooter>

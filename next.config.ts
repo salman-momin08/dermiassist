@@ -18,6 +18,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '4.5mb', // Increase for video generation data uris
+    },
+  },
 };
 
 export default nextConfig;
