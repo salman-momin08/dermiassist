@@ -1,0 +1,58 @@
+// This file is machine-generated - edit with care!
+
+'use server';
+
+/**
+ * @fileOverview A chatbot flow for answering frequently asked questions (FAQs).
+ * 
+ * - chatbotFAQ - A function that answers user questions based on pre-defined FAQs.
+ * - ChatbotFAQInput - The input type for the chatbotFAQ function.
+ * - ChatbotFAQOutput - The return type for the chatbotFAQ function.
+ */
+
+import {ai} from '@/ai/genkit';
+import {z} from 'genkit';
+
+const ChatbotFAQInputSchema = z.object({
+  question: z.string().describe('The user question.'),
+});
+export type ChatbotFAQInput = z.infer<typeof ChatbotFAQInputSchema>;
+
+const ChatbotFAQOutputSchema = z.object({
+  answer: z.string().describe('The answer to the user question.'),
+});
+export type ChatbotFAQOutput = z.infer<typeof ChatbotFAQOutputSchema>;
+
+export async function chatbotFAQ(input: ChatbotFAQInput): Promise<ChatbotFAQOutput> {
+  return chatbotFAQFlow(input);
+}
+
+const prompt = ai.definePrompt({
+  name: 'chatbotFAQPrompt',
+  input: {schema: ChatbotFAQInputSchema},
+  output: {schema: ChatbotFAQOutputSchema},
+  prompt: `You are a helpful chatbot assistant that answers questions about common skin conditions, dermatology, and the SkinWise platform.
+
+  Here are some frequently asked questions and their answers:
+  - What are common skin conditions? Some common skin conditions include acne, eczema, psoriasis, and rosacea.
+  - How does SkinWise work? SkinWise uses AI to analyze skin conditions based on uploaded images and user input, providing a detailed report and personalized recommendations.
+  - How can I find a doctor on SkinWise? You can find a list of certified doctors on the 'Find a Doctor' page and send them appointment requests.
+  - What kind of reports does SkinWise provide? SkinWise provides detailed reports including analysis of your skin, and do's and don'ts for skin cure. It includes uploaded image and user details
+  - Can I delete my account? Yes, you can delete your account in the profile settings under the 'delete account' button.
+  - What is the cost of SkinWise? SkinWise is free to use for basic skin analysis and reports. Premium features such as doctor consultations may require a subscription.
+
+  Now, answer the following question:
+  Question: {{{question}}}`, 
+});
+
+const chatbotFAQFlow = ai.defineFlow(
+  {
+    name: 'chatbotFAQFlow',
+    inputSchema: ChatbotFAQInputSchema,
+    outputSchema: ChatbotFAQOutputSchema,
+  },
+  async input => {
+    const {output} = await prompt(input);
+    return output!;
+  }
+);
