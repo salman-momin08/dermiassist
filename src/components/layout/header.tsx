@@ -1,4 +1,6 @@
 
+"use client"
+
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
@@ -25,6 +27,7 @@ export function AppHeader({ authenticated = false, role = 'patient' }: AppHeader
      <>
       <Link href="/doctor/dashboard" className="transition-colors hover:text-foreground/80 text-foreground/60">Dashboard</Link>
       <Link href="/doctor/cases" className="transition-colors hover:text-foreground/80 text-foreground/60">Patient Cases</Link>
+      <Link href="/doctor/chat" className="transition-colors hover:text-foreground/80 text-foreground/60">Chat</Link>
       <Link href="/doctor/profile" className="transition-colors hover:text-foreground/80 text-foreground/60">Profile</Link>
     </>
   );

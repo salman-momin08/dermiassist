@@ -63,8 +63,10 @@ export default function DoctorCasesPage() {
                                                         <FileText className="mr-2 h-4 w-4" />View Case Details
                                                     </Link>
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem>
-                                                     <MessageSquare className="mr-2 h-4 w-4" />Chat with Patient
+                                                <DropdownMenuItem asChild>
+                                                    <Link href="/doctor/chat" className="cursor-pointer">
+                                                        <MessageSquare className="mr-2 h-4 w-4" />Chat with Patient
+                                                    </Link>
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>

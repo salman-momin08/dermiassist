@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, User, Calendar, FileText, Bot, PlusCircle } from "lucide-react";
+import { ArrowLeft, User, Calendar, FileText, Bot, PlusCircle, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -114,8 +114,10 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
                                 <Button className="w-full" variant="outline">
                                     <FileText className="mr-2 h-4 w-4" /> View Full Medical History
                                 </Button>
-                                 <Button className="w-full">
-                                    <MessageSquare className="mr-2 h-4 w-4" /> Chat with Patient
+                                 <Button className="w-full" asChild>
+                                    <Link href="/doctor/chat">
+                                        <MessageSquare className="mr-2 h-4 w-4" /> Chat with Patient
+                                    </Link>
                                 </Button>
                              </div>
                         </CardContent>
@@ -143,6 +145,3 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
         </div>
     );
 }
-
-// You might need to add this import if it's missing
-import { MessageSquare } from "lucide-react";
