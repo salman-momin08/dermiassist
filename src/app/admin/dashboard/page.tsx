@@ -66,7 +66,7 @@ export default function AdminDashboardPage() {
     const [doctors, setDoctors] = useState(mockDoctorsData);
     const [userSearch, setUserSearch] = useState("");
     const [doctorSearch, setDoctorSearch] = useState("");
-    const [selectedUser, setSelectedUser] = useState<User | Doctor | null>(null);
+    const [selectedUser, setSelectedUser] = useState<User | (Doctor & {email?: string, role?: string}) | null>(null);
 
     const handleApprove = (doctorId: string) => {
         setDoctors(prevDoctors =>
@@ -356,8 +356,12 @@ export default function AdminDashboardPage() {
                                     <DropdownMenuContent align="end">
                                         <DialogTrigger asChild>
                                             <DropdownMenuItem onSelect={() => {
-                                                const userAsDoctor = users.find(u => u.id === 'usr_2' && doctor.name === 'Dr. Emily Carter') || users.find(u => u.name === doctor.name);
-                                                const doctorDetails = { ...doctor, email: userAsDoctor?.email || 'N/A', role: userAsDoctor?.role || 'doctor' };
+                                                const userRecord = users.find(u => u.name === doctor.name);
+                                                const doctorDetails = { 
+                                                    ...doctor,
+                                                    email: userRecord?.email,
+                                                    role: userRecord?.role,
+                                                };
                                                 setSelectedUser(doctorDetails);
                                              }}>
                                                 <UserIcon className="mr-2 h-4 w-4" /> View Profile
@@ -383,7 +387,7 @@ export default function AdminDashboardPage() {
                                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                         <AlertDialogDescription>
                                             This will reject the verification request for {doctor.name}. They will be removed from the list.
-                                        </AlertDialogDescription>
+                                        </Description>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
