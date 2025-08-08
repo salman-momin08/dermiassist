@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { CalendarCheck, Users, FileText, Bot, Loader2 } from "lucide-react"
+import { CalendarCheck, Users, FileText, Bot, Loader2, BookUser } from "lucide-react"
 import { generateAiReportSummary } from "@/ai/flows/generate-ai-report-summary"
+import { generateCaseFileSummary } from "@/ai/flows/generate-case-file-summary"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 const initialAppointments = [
@@ -21,7 +22,8 @@ const initialAppointments = [
         status: "Pending",
         reportId: "1",
         reportCondition: "Acne Vulgaris",
-        reportFullText: "Analysis Report: Acne Vulgaris. Generated on 2024-05-15. Severity: Mild. It is recommended to use a gentle cleanser twice a day and apply a non-comedogenic moisturizer. Consider using over-the-counter benzoyl peroxide treatments. Avoid picking or squeezing pimples to prevent scarring. If the condition persists or worsens, consult a dermatologist. Do's: Cleanse your face twice daily with a mild, non-abrasive cleanser. Use non-comedogenic (won't clog pores) skin care products and cosmetics. Drink plenty of water to stay hydrated. Don'ts: Avoid harsh scrubbing or over-washing your face. Do not pick, pop, or squeeze pimples. Limit your intake of high-glycemic foods and dairy products if you notice a link. Submitted Info: Pre-medication: None. Disease Duration: 3 months."
+        reportFullText: "Analysis Report: Acne Vulgaris. Generated on 2024-05-15. Severity: Mild. It is recommended to use a gentle cleanser twice a day and apply a non-comedogenic moisturizer. Consider using over-the-counter benzoyl peroxide treatments. Avoid picking or squeezing pimples to prevent scarring. If the condition persists or worsens, consult a dermatologist. Do's: Cleanse your face twice daily with a mild, non-abrasive cleanser. Use non-comedogenic (won't clog pores) skin care products and cosmetics. Drink plenty of water to stay hydrated. Don'ts: Avoid harsh scrubbing or over-washing your face. Do not pick, pop, or squeeze pimples. Limit your intake of high-glycemic foods and dairy products if you notice a link. Submitted Info: Pre-medication: None. Disease Duration: 3 months.",
+        previousNotes: "Initial consultation. Patient is new to the platform. No major concerns reported other than the current acne breakout."
     },
     {
         id: "APP002",
@@ -32,7 +34,8 @@ const initialAppointments = [
         status: "Pending",
         reportId: "2",
         reportCondition: "Eczema",
-        reportFullText: "Analysis Report: Eczema. Generated on 2024-04-22. Severity: Moderate. Recommendations include daily moisturizing with a thick cream, avoiding known triggers like certain fabrics or soaps, and using a humidifier. Short, lukewarm baths are advised. Do's: Moisturize daily. Wear soft, breathable clothing. Use a humidifier in dry or cold weather. Don'ts: Avoid long, hot baths or showers. Steer clear of harsh soaps and detergents. Try not to scratch the affected area to prevent infection. Submitted Info: Pre-medication: Hydrocortisone cream (1%). Disease Duration: 6 months."
+        reportFullText: "Analysis Report: Eczema. Generated on 2024-04-22. Severity: Moderate. Recommendations include daily moisturizing with a thick cream, avoiding known triggers like certain fabrics or soaps, and using a humidifier. Short, lukewarm baths are advised. Do's: Moisturize daily. Wear soft, breathable clothing. Use a humidifier in dry or cold weather. Don'ts: Avoid long, hot baths or showers. Steer clear of harsh soaps and detergents. Try not to scratch the affected area to prevent infection. Submitted Info: Pre-medication: Hydrocortisone cream (1%). Disease Duration: 6 months.",
+        previousNotes: "Follow-up for eczema management. Patient reports the hydrocortisone cream is providing some relief but flare-ups persist, especially in dry weather."
     },
     {
         id: "APP003",
@@ -49,8 +52,10 @@ const initialAppointments = [
 
 export default function DoctorDashboardPage() {
     const [summary, setSummary] = useState('');
+    const [caseFile, setCaseFile] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [appointments, setAppointments] = useState(initialAppointments);
+    const [activeDialog, setActiveDialog] = useState<'summary' | 'caseFile' | null>(null);
 
     const pendingRequestsCount = useMemo(() => {
         return appointments.filter(a => a.status === 'Pending').length;
@@ -73,6 +78,31 @@ export default function DoctorDashboardPage() {
             setIsLoading(false);
         }
     };
+    
+    const handleGenerateCaseFile = async (app: typeof appointments[0]) => {
+        setIsLoading(true);
+        setCaseFile('');
+        try {
+            const result = await generateCaseFileSummary({
+                patientName: app.patientName,
+                reportCondition: app.reportCondition,
+                reportFullText: app.reportFullText,
+                previousNotes: app.previousNotes,
+            });
+            setCaseFile(result.summary);
+        } catch (error) {
+            console.error("Failed to generate case file:", error);
+            setCaseFile("Could not generate case file at this time. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const closeDialog = () => {
+        setSummary('');
+        setCaseFile('');
+        setActiveDialog(null);
+    }
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -125,8 +155,7 @@ export default function DoctorDashboardPage() {
                             <TableRow>
                                 <TableHead>Patient</TableHead>
                                 <TableHead className="hidden sm:table-cell">Requested On</TableHead>
-                                <TableHead className="hidden md:table-cell">Mode</TableHead>
-                                <TableHead>AI Report</TableHead>
+                                <TableHead>AI Tools</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -135,23 +164,38 @@ export default function DoctorDashboardPage() {
                                 <TableRow key={app.id}>
                                     <TableCell>
                                         <div className="font-medium">{app.patientName}</div>
-                                        <div className="text-sm text-muted-foreground">{app.id}</div>
+                                        <div className="text-sm text-muted-foreground">{app.mode}</div>
                                     </TableCell>
                                     <TableCell className="hidden sm:table-cell">{app.requestDate}</TableCell>
-                                    <TableCell className="hidden md:table-cell"><Badge variant={app.mode === 'Online' ? 'default' : 'secondary'}>{app.mode}</Badge></TableCell>
                                     <TableCell>
-                                        <Dialog onOpenChange={(open) => {if(open) { handleGenerateSummary(app.reportFullText) } else { setSummary('') }}}>
-                                            <DialogTrigger asChild>
-                                                <Button variant="outline" size="sm">
-                                                    <Bot className="mr-2 h-4 w-4" />
-                                                    AI Summary
-                                                </Button>
-                                            </DialogTrigger>
+                                        <Dialog onOpenChange={(open) => !open && closeDialog()}>
+                                            <div className="flex items-center gap-2">
+                                                <DialogTrigger asChild>
+                                                    <Button variant="outline" size="sm" onClick={() => { setActiveDialog('summary'); handleGenerateSummary(app.reportFullText); }}>
+                                                        <Bot className="mr-2 h-4 w-4" />
+                                                        AI Summary
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogTrigger asChild>
+                                                    <Button variant="outline" size="sm" onClick={() => { setActiveDialog('caseFile'); handleGenerateCaseFile(app); }}>
+                                                        <BookUser className="mr-2 h-4 w-4" />
+                                                        Case File
+                                                    </Button>
+                                                </DialogTrigger>
+                                            </div>
                                             <DialogContent className="sm:max-w-md">
                                                 <DialogHeader>
-                                                    <DialogTitle>AI Report Summary for {app.reportCondition}</DialogTitle>
+                                                    <DialogTitle>
+                                                        {activeDialog === 'summary' 
+                                                            ? `AI Report Summary: ${app.reportCondition}`
+                                                            : `Case File: ${app.patientName}`
+                                                        }
+                                                    </DialogTitle>
                                                     <DialogDescription>
-                                                        This is a concise summary generated by AI for a quick overview.
+                                                         {activeDialog === 'summary' 
+                                                            ? `A concise summary generated by AI for a quick overview.`
+                                                            : `A comprehensive overview of the patient's case.`
+                                                        }
                                                     </DialogDescription>
                                                 </DialogHeader>
                                                 <ScrollArea className="max-h-[400px] my-4 pr-4">
@@ -160,7 +204,9 @@ export default function DoctorDashboardPage() {
                                                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                                         </div>
                                                     ) : (
-                                                        <p className="text-sm text-muted-foreground leading-relaxed">{summary}</p>
+                                                        <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                                                            {activeDialog === 'summary' ? summary : caseFile}
+                                                        </p>
                                                     )}
                                                 </ScrollArea>
                                             </DialogContent>
@@ -173,7 +219,7 @@ export default function DoctorDashboardPage() {
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
+                                    <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
                                         No pending appointment requests.
                                     </TableCell>
                                 </TableRow>
