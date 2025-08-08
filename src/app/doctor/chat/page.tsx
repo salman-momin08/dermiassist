@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Send, User } from 'lucide-react';
+import { Search, Send, User, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
+import { generateChatReply } from '@/ai/flows/generate-chat-reply';
+import { useToast } from '@/hooks/use-toast';
 
 const mockPatients = [
   { id: '1', name: 'Liam Johnson', lastMessage: 'Okay, thank you, doctor!', avatar: 'https://placehold.co/40x40.png', online: true },
@@ -18,7 +20,7 @@ const mockPatients = [
   { id: '4', name: 'Emma Brown', lastMessage: 'I have a question about the side effects.', avatar: 'https://placehold.co/40x40.png', online: false },
 ];
 
-const mockMessages = {
+const mockMessages: Record<string, { sender: 'patient' | 'doctor'; text: string }[]> = {
   '1': [
     { sender: 'patient', text: 'Hello Dr. Grant, I wanted to ask about the prescription.' },
     { sender: 'doctor', text: 'Hi Liam, of course. What is your question?' },
@@ -43,13 +45,69 @@ const mockMessages = {
 export default function DoctorChatPage() {
   const [selectedPatientId, setSelectedPatientId] = useState('1');
   const [searchQuery, setSearchQuery] = useState('');
+  const [messages, setMessages] = useState(mockMessages);
+  const [inputValue, setInputValue] = useState("");
+  const [suggestedReplies, setSuggestedReplies] = useState<string[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
 
   const selectedPatient = mockPatients.find(p => p.id === selectedPatientId);
-  const messages = mockMessages[selectedPatientId as keyof typeof mockMessages] || [];
+  const currentMessages = messages[selectedPatientId as keyof typeof messages] || [];
 
   const filteredPatients = mockPatients.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleSendMessage = () => {
+    if (!inputValue.trim()) return;
+
+    const newMessage = { sender: 'doctor' as const, text: inputValue };
+    const updatedMessages = {
+      ...messages,
+      [selectedPatientId]: [...currentMessages, newMessage],
+    };
+    setMessages(updatedMessages);
+    setInputValue("");
+    setSuggestedReplies([]);
+  };
+
+  const handleGenerateReplies = async () => {
+    if (!selectedPatient) return;
+    setIsGenerating(true);
+    setSuggestedReplies([]);
+    
+    const conversationHistory = currentMessages.map(m => `${m.sender === 'doctor' ? 'Doctor' : selectedPatient.name}: ${m.text}`).join('\n');
+    const lastPatientMessage = currentMessages.filter(m => m.sender === 'patient').pop()?.text;
+
+    if (!lastPatientMessage) {
+        toast({
+            title: "Cannot generate replies",
+            description: "There are no messages from the patient to reply to.",
+            variant: "destructive"
+        });
+        setIsGenerating(false);
+        return;
+    }
+
+    try {
+        const result = await generateChatReply({
+            patientName: selectedPatient.name,
+            conversationHistory,
+            lastPatientMessage,
+        });
+        setSuggestedReplies(result.replies);
+    } catch (error) {
+        console.error("Failed to generate replies:", error);
+        toast({
+            title: "AI Error",
+            description: "Could not generate suggested replies. Please try again.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsGenerating(false);
+    }
+  }
+
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -57,8 +115,8 @@ export default function DoctorChatPage() {
             <h1 className="text-3xl font-bold tracking-tight font-headline">Patient Chat</h1>
             <p className="text-muted-foreground">Communicate directly with your patients.</p>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <Card className="lg:col-span-1 flex flex-col h-[70vh]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <Card className="lg:col-span-1">
                 <CardHeader>
                     <CardTitle>Patients</CardTitle>
                     <div className="relative pt-2">
@@ -71,11 +129,11 @@ export default function DoctorChatPage() {
                         />
                     </div>
                 </CardHeader>
-                <ScrollArea className="flex-grow">
+                <ScrollArea className="h-[50vh]">
                     <CardContent className="p-0">
                         <div className="space-y-2">
                             {filteredPatients.map(patient => (
-                                <button key={patient.id} onClick={() => setSelectedPatientId(patient.id)} className={cn("w-full text-left p-4 hover:bg-muted/50", selectedPatientId === patient.id && "bg-muted")}>
+                                <button key={patient.id} onClick={() => { setSelectedPatientId(patient.id); setSuggestedReplies([]); }} className={cn("w-full text-left p-4 hover:bg-muted/50", selectedPatientId === patient.id && "bg-muted")}>
                                     <div className="flex items-center gap-4">
                                         <Avatar className="h-10 w-10 relative">
                                             <AvatarImage src={patient.avatar} alt={patient.name} data-ai-hint="person portrait"/>
@@ -84,7 +142,7 @@ export default function DoctorChatPage() {
                                         </Avatar>
                                         <div className="flex-grow">
                                             <p className="font-semibold">{patient.name}</p>
-                                            <p className="text-sm text-muted-foreground truncate">{patient.lastMessage}</p>
+                                            <p className="text-sm text-muted-foreground truncate">{messages[patient.id]?.slice(-1)[0]?.text || 'No messages yet'}</p>
                                         </div>
                                     </div>
                                 </button>
@@ -94,7 +152,7 @@ export default function DoctorChatPage() {
                 </ScrollArea>
             </Card>
 
-            <Card className="lg:col-span-2 flex flex-col h-[70vh]">
+            <Card className="lg:col-span-2">
                 {selectedPatient ? (
                     <>
                         <CardHeader className="flex-row items-center gap-4 space-y-0">
@@ -108,9 +166,9 @@ export default function DoctorChatPage() {
                             </div>
                         </CardHeader>
                         <Separator />
-                        <ScrollArea className="flex-grow p-6">
+                        <ScrollArea className="h-[50vh] p-6">
                             <div className="space-y-6">
-                                {messages.map((msg, index) => (
+                                {currentMessages.map((msg, index) => (
                                     <div key={index} className={cn("flex items-end gap-2", msg.sender === 'doctor' ? 'justify-end' : 'justify-start')}>
                                         {msg.sender === 'patient' && (
                                             <Avatar className="h-8 w-8">
@@ -130,17 +188,48 @@ export default function DoctorChatPage() {
                                 ))}
                             </div>
                         </ScrollArea>
-                        <div className="p-4 border-t">
-                            <div className="relative">
-                                <Input placeholder="Type your message..." className="pr-12" />
-                                <Button size="icon" className="absolute top-1/2 right-2 -translate-y-1/2 h-8 w-8">
+                        <div className="p-4 border-t space-y-2">
+                             {(isGenerating || suggestedReplies.length > 0) && (
+                                <div className="p-2 space-y-2">
+                                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4 text-primary" />
+                                        AI Suggested Replies
+                                    </h4>
+                                     {isGenerating ? (
+                                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Generating...
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-wrap gap-2">
+                                            {suggestedReplies.map((reply, i) => (
+                                                <Button key={i} variant="outline" size="sm" onClick={() => setInputValue(reply)}>
+                                                    {reply}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            <div className="relative flex items-center gap-2">
+                                <Input 
+                                    placeholder="Type your message..." 
+                                    className="pr-12" 
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                />
+                                <Button size="icon" variant="ghost" onClick={handleGenerateReplies} disabled={isGenerating}>
+                                    <Sparkles className="h-5 w-5" />
+                                </Button>
+                                <Button size="icon" onClick={handleSendMessage} disabled={!inputValue.trim()}>
                                     <Send className="h-4 w-4" />
                                 </Button>
                             </div>
                         </div>
                     </>
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-12">
                         <p>Select a patient to start a conversation</p>
                     </div>
                 )}
