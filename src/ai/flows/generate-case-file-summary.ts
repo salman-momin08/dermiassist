@@ -11,7 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const GenerateCaseFileSummaryInputSchema = z.object({
+const GenerateCaseFileSummaryInputSchema = z.object({
   patientName: z.string().describe("The patient's full name."),
   reportCondition: z.string().describe("The condition identified in the latest AI report."),
   reportFullText: z.string().describe('The complete AI skin analysis report.'),
@@ -19,7 +19,7 @@ export const GenerateCaseFileSummaryInputSchema = z.object({
 });
 export type GenerateCaseFileSummaryInput = z.infer<typeof GenerateCaseFileSummaryInputSchema>;
 
-export const GenerateCaseFileSummaryOutputSchema = z.object({
+const GenerateCaseFileSummaryOutputSchema = z.object({
   summary: z.string().describe('A structured summary of the patient case file.'),
 });
 export type GenerateCaseFileSummaryOutput = z.infer<typeof GenerateCaseFileSummaryOutputSchema>;
