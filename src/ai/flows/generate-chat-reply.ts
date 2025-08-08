@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -11,7 +12,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-export const GenerateChatReplyInputSchema = z.object({
+const GenerateChatReplyInputSchema = z.object({
   patientName: z.string().describe("The patient's name."),
   conversationHistory: z
     .string()
@@ -22,7 +23,7 @@ export type GenerateChatReplyInput = z.infer<
   typeof GenerateChatReplyInputSchema
 >;
 
-export const GenerateChatReplyOutputSchema = z.object({
+const GenerateChatReplyOutputSchema = z.object({
   replies: z
     .array(z.string())
     .describe('An array of 2-3 suggested, concise replies.'),
