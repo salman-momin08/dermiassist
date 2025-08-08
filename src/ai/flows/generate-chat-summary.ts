@@ -55,12 +55,14 @@ const generateChatSummaryFlow = ai.defineFlow(
     name: 'generateChatSummaryFlow',
     inputSchema: GenerateChatSummaryInputSchema,
     outputSchema: GenerateChatSummaryOutputSchema,
-    stream: true,
   },
   async (input) => {
     const { stream } = ai.generateStream({
-      prompt,
+      prompt: prompt.prompt,
       input,
+      output: {
+        schema: GenerateChatSummaryOutputSchema,
+      },
     });
     
     let summary = '';
