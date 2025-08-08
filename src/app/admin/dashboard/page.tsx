@@ -53,6 +53,9 @@ export default function AdminDashboardPage() {
         setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
     };
 
+    const verifiedDoctorsCount = doctors.filter(d => d.status === 'Verified').length;
+    const pendingVerificationsCount = doctors.filter(d => d.status === 'Pending').length;
+
     return (
         <div className="container mx-auto p-4 md:p-8">
             <div className="space-y-2 mb-8">
@@ -68,7 +71,7 @@ export default function AdminDashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{users.length}</div>
-                        <p className="text-xs text-muted-foreground">+5 since last month</p>
+                        <p className="text-xs text-muted-foreground">Total registered users on the platform.</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -77,8 +80,8 @@ export default function AdminDashboardPage() {
                         <UserCheck className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{doctors.filter(d => d.status === 'Verified').length}</div>
-                        <p className="text-xs text-muted-foreground">+3 this month</p>
+                        <div className="text-2xl font-bold">{verifiedDoctorsCount}</div>
+                        <p className="text-xs text-muted-foreground">Approved and verified doctors.</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -87,8 +90,8 @@ export default function AdminDashboardPage() {
                         <FileClock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{doctors.filter(d => d.status === 'Pending').length}</div>
-                        <p className="text-xs text-muted-foreground">Action required</p>
+                        <div className="text-2xl font-bold">{pendingVerificationsCount}</div>
+                        <p className="text-xs text-muted-foreground">Doctor applications awaiting review.</p>
                     </CardContent>
                 </Card>
             </div>
