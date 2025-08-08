@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Video, Clock, Download, FileText, MoreHorizontal } from "lucide-react";
+import { Calendar, Video, Clock, Download, FileText, MoreHorizontal, Printer } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { Logo } from "@/components/logo";
 
 const mockAppointments = [
     {
@@ -30,11 +32,13 @@ const mockAppointments = [
         time: "02:00 PM",
         mode: "Offline",
         status: "Completed",
+        patientName: "Patient",
         notes: "Patient's condition has improved significantly. Recommended to continue with the current skincare routine. Follow-up in 3 months.",
         prescription: {
             medication: "Tretinoin Cream 0.05%",
             dosage: "Apply a pea-sized amount to the face once daily at night.",
             instructions: "Avoid sun exposure. Use moisturizer.",
+            dateIssued: "2024-07-25",
         },
     },
 ];
@@ -42,11 +46,12 @@ const mockAppointments = [
 export default function AppointmentsPage() {
     const { toast } = useToast();
 
-    const handleDownload = (id: string) => {
+    const handlePrint = (id: string) => {
         toast({
-            title: "Downloading Prescription",
-            description: `Your e-prescription for appointment ${id} is being downloaded.`,
+            title: "Printing Prescription",
+            description: `Your e-prescription for appointment ${id} is being sent to your printer.`,
         });
+        // In a real app, this would trigger window.print()
     }
 
     return (
@@ -180,10 +185,67 @@ export default function AppointmentsPage() {
                                             </Dialog>
                                         )}
                                         {appointment.prescription && (
-                                            <Button size="sm" variant="outline" onClick={() => handleDownload(appointment.id)}>
-                                                <Download className="mr-2 h-4 w-4" />
-                                                Download E-Prescription
-                                            </Button>
+                                             <Dialog>
+                                                <DialogTrigger asChild>
+                                                    <Button size="sm" variant="outline">
+                                                        <Download className="mr-2 h-4 w-4" />
+                                                        View E-Prescription
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="max-w-2xl">
+                                                    <Card className="shadow-none border-0">
+                                                        <CardHeader className="text-center space-y-4">
+                                                            <div className="flex justify-center">
+                                                                <Logo />
+                                                            </div>
+                                                            <CardTitle className="font-normal">Official E-Prescription</CardTitle>
+                                                            <Separator />
+                                                        </CardHeader>
+                                                        <CardContent className="space-y-6 text-sm">
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <p className="font-semibold">Patient Details</p>
+                                                                    <p>{appointment.patientName}</p>
+                                                                    <p>Appointment: {appointment.date}</p>
+                                                                </div>
+                                                                 <div className="text-right">
+                                                                    <p className="font-semibold">Prescribing Doctor</p>
+                                                                    <p>{appointment.doctorName}</p>
+                                                                    <p>General Dermatology</p>
+                                                                </div>
+                                                            </div>
+                                                            <Separator />
+                                                            <div className="pt-4">
+                                                                <div className="flex items-start gap-4">
+                                                                     <div className="font-bold text-2xl text-primary font-serif">Rx</div>
+                                                                     <div className="w-full space-y-4">
+                                                                        <div>
+                                                                            <p className="font-bold">{appointment.prescription.medication}</p>
+                                                                            <p className="text-muted-foreground">{appointment.prescription.dosage}</p>
+                                                                        </div>
+                                                                        <Separator />
+                                                                        <div>
+                                                                            <p className="font-semibold">Instructions:</p>
+                                                                            <p className="text-muted-foreground">{appointment.prescription.instructions}</p>
+                                                                        </div>
+                                                                     </div>
+                                                                </div>
+                                                            </div>
+                                                            <Separator />
+                                                            <div className="text-xs text-muted-foreground text-center">
+                                                                <p>Date Issued: {appointment.prescription.dateIssued}</p>
+                                                                <p>This is a digitally generated prescription and does not require a physical signature for verification.</p>
+                                                            </div>
+                                                        </CardContent>
+                                                        <CardContent>
+                                                            <Button className="w-full" onClick={() => handlePrint(appointment.id)}>
+                                                                <Printer className="mr-2 h-4 w-4" />
+                                                                Print Prescription
+                                                            </Button>
+                                                        </CardContent>
+                                                    </Card>
+                                                </DialogContent>
+                                            </Dialog>
                                         )}
                                          {!appointment.notes && !appointment.prescription && (
                                             <p className="text-sm text-muted-foreground">No notes or prescription.</p>
