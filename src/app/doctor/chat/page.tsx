@@ -4,14 +4,16 @@
 import { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Send, User, Sparkles, Loader2 } from 'lucide-react';
+import { Search, Send, User, Sparkles, Loader2, BookText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { generateChatReply } from '@/ai/flows/generate-chat-reply';
+import { generateChatSummary } from '@/ai/flows/generate-chat-summary';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 
 const mockPatients = [
   { id: '1', name: 'Liam Johnson', lastMessage: 'Okay, thank you, doctor!', avatar: 'https://placehold.co/40x40.png', online: true },
@@ -48,7 +50,9 @@ export default function DoctorChatPage() {
   const [messages, setMessages] = useState(mockMessages);
   const [inputValue, setInputValue] = useState("");
   const [suggestedReplies, setSuggestedReplies] = useState<string[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingReplies, setIsGeneratingReplies] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [chatSummary, setChatSummary] = useState('');
   const { toast } = useToast();
 
   const selectedPatient = mockPatients.find(p => p.id === selectedPatientId);
@@ -73,7 +77,7 @@ export default function DoctorChatPage() {
 
   const handleGenerateReplies = async () => {
     if (!selectedPatient) return;
-    setIsGenerating(true);
+    setIsGeneratingReplies(true);
     setSuggestedReplies([]);
     
     const conversationHistory = currentMessages.map(m => `${m.sender === 'doctor' ? 'Doctor' : selectedPatient.name}: ${m.text}`).join('\n');
@@ -85,7 +89,7 @@ export default function DoctorChatPage() {
             description: "There are no messages from the patient to reply to.",
             variant: "destructive"
         });
-        setIsGenerating(false);
+        setIsGeneratingReplies(false);
         return;
     }
 
@@ -104,7 +108,31 @@ export default function DoctorChatPage() {
             variant: "destructive"
         });
     } finally {
-        setIsGenerating(false);
+        setIsGeneratingReplies(false);
+    }
+  }
+
+  const handleGenerateSummary = async () => {
+    if (!selectedPatient || currentMessages.length === 0) return;
+    setIsGeneratingSummary(true);
+    setChatSummary('');
+    
+    const conversationHistory = currentMessages.map(m => `${m.sender === 'doctor' ? 'Doctor' : selectedPatient.name}: ${m.text}`).join('\n');
+
+    try {
+        const result = await generateChatSummary({
+            patientName: selectedPatient.name,
+            conversationHistory,
+        });
+        setChatSummary(result.summary);
+    } catch (error) {
+        console.error("Failed to generate summary:", error);
+        toast({
+            title: "AI Error",
+            description: "Could not generate a summary. Please try again.",
+            variant: "destructive"
+        });
+        setIsGeneratingSummary(false);
     }
   }
 
@@ -160,10 +188,35 @@ export default function DoctorChatPage() {
                                 <AvatarImage src={selectedPatient.avatar} alt={selectedPatient.name} data-ai-hint="person portrait" />
                                 <AvatarFallback>{selectedPatient.name.charAt(0)}</AvatarFallback>
                             </Avatar>
-                            <div>
+                            <div className='flex-1'>
                                 <CardTitle>{selectedPatient.name}</CardTitle>
                                 <p className="text-sm text-muted-foreground">{selectedPatient.online ? 'Online' : 'Offline'}</p>
                             </div>
+                            <Dialog onOpenChange={(isOpen) => !isOpen && setIsGeneratingSummary(false)}>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="sm" onClick={handleGenerateSummary} disabled={currentMessages.length === 0}>
+                                        <BookText className="mr-2 h-4 w-4" />
+                                        Summarize
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Conversation Summary with {selectedPatient.name}</DialogTitle>
+                                        <DialogDescription>
+                                            An AI-generated summary of your conversation.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <ScrollArea className="max-h-[50vh] my-4 pr-4">
+                                        {isGeneratingSummary ? (
+                                            <div className="flex items-center justify-center p-8">
+                                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: chatSummary.replace(/\*/g, '•') }} />
+                                        )}
+                                    </ScrollArea>
+                                </DialogContent>
+                            </Dialog>
                         </CardHeader>
                         <Separator />
                         <ScrollArea className="h-[50vh] p-6">
@@ -189,13 +242,13 @@ export default function DoctorChatPage() {
                             </div>
                         </ScrollArea>
                         <div className="p-4 border-t space-y-2">
-                             {(isGenerating || suggestedReplies.length > 0) && (
+                             {(isGeneratingReplies || suggestedReplies.length > 0) && (
                                 <div className="p-2 space-y-2">
                                     <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                         <Sparkles className="w-4 h-4 text-primary" />
                                         AI Suggested Replies
                                     </h4>
-                                     {isGenerating ? (
+                                     {isGeneratingReplies ? (
                                         <div className="flex items-center gap-2 text-muted-foreground text-sm">
                                             <Loader2 className="h-4 w-4 animate-spin" />
                                             Generating...
@@ -219,7 +272,7 @@ export default function DoctorChatPage() {
                                     onChange={(e) => setInputValue(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                                 />
-                                <Button size="icon" variant="ghost" onClick={handleGenerateReplies} disabled={isGenerating}>
+                                <Button size="icon" variant="ghost" onClick={handleGenerateReplies} disabled={isGeneratingReplies}>
                                     <Sparkles className="h-5 w-5" />
                                 </Button>
                                 <Button size="icon" onClick={handleSendMessage} disabled={!inputValue.trim()}>
