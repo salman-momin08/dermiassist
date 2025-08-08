@@ -1,4 +1,7 @@
 
+"use client";
+
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,13 +9,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MoreHorizontal, Users, UserCheck, FileClock, Trash2, CheckCircle, XCircle } from "lucide-react";
 
-const mockUsers = [
+const mockUsersData = [
     { id: 'usr_1', name: 'Patient One', email: 'patient1@example.com', role: 'patient', joined: '2024-07-20' },
     { id: 'usr_2', name: 'Dr. Emily Carter', email: 'dremily.carter@skinwise.com', role: 'doctor', joined: '2024-07-19' },
     { id: 'usr_3', name: 'Patient Two', email: 'patient2@example.com', role: 'patient', joined: '2024-07-18' },
 ];
 
-const mockDoctors = [
+const mockDoctorsData = [
     { id: 'doc_1', name: 'Dr. Ben Adams', specialization: 'Pediatric Dermatology', joined: '2024-07-15', status: 'Verified' },
     { id: 'doc_2', name: 'Dr. Olivia Chen', specialization: 'Cosmetic Dermatology', joined: '2024-07-12', status: 'Verified' },
     { id: 'doc_3', name: 'Dr. Sarah Jenkins', specialization: 'General Dermatology', joined: '2024-07-21', status: 'Pending' },
@@ -20,6 +23,21 @@ const mockDoctors = [
 
 
 export default function AdminDashboardPage() {
+    const [users, setUsers] = useState(mockUsersData);
+    const [doctors, setDoctors] = useState(mockDoctorsData);
+
+    const handleApprove = (doctorId: string) => {
+        setDoctors(prevDoctors =>
+            prevDoctors.map(doc =>
+                doc.id === doctorId ? { ...doc, status: 'Verified' } : doc
+            )
+        );
+    };
+
+    const handleReject = (doctorId: string) => {
+        setDoctors(prevDoctors => prevDoctors.filter(doc => doc.id !== doctorId));
+    };
+
     return (
         <div className="container mx-auto p-4 md:p-8">
             <div className="space-y-2 mb-8">
@@ -44,7 +62,7 @@ export default function AdminDashboardPage() {
                         <UserCheck className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">15</div>
+                        <div className="text-2xl font-bold">{doctors.filter(d => d.status === 'Verified').length}</div>
                         <p className="text-xs text-muted-foreground">+3 this month</p>
                     </CardContent>
                 </Card>
@@ -54,7 +72,7 @@ export default function AdminDashboardPage() {
                         <FileClock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">1</div>
+                        <div className="text-2xl font-bold">{doctors.filter(d => d.status === 'Pending').length}</div>
                         <p className="text-xs text-muted-foreground">Action required</p>
                     </CardContent>
                 </Card>
@@ -76,7 +94,7 @@ export default function AdminDashboardPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {mockDoctors.map(doctor => (
+                                {doctors.map(doctor => (
                                 <TableRow key={doctor.id}>
                                     <TableCell>
                                         <div className="font-medium">{doctor.name}</div>
@@ -88,10 +106,10 @@ export default function AdminDashboardPage() {
                                     <TableCell className="text-right">
                                         {doctor.status === 'Pending' ? (
                                             <div className="flex gap-2 justify-end">
-                                                <Button size="sm" variant="outline" className="text-red-600 border-red-600/50 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20">
+                                                <Button size="sm" variant="outline" className="text-red-600 border-red-600/50 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20" onClick={() => handleReject(doctor.id)}>
                                                     <XCircle className="mr-1 h-4 w-4" /> Reject
                                                 </Button>
-                                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600 dark:text-black">
+                                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600 dark:text-black" onClick={() => handleApprove(doctor.id)}>
                                                     <CheckCircle className="mr-1 h-4 w-4" /> Approve
                                                 </Button>
                                             </div>
@@ -131,7 +149,7 @@ export default function AdminDashboardPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {mockUsers.map(user => (
+                                {users.map(user => (
                                 <TableRow key={user.id}>
                                     <TableCell>
                                         <div className="font-medium">{user.name}</div>
