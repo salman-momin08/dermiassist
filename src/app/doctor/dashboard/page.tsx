@@ -21,6 +21,7 @@ const initialAppointments = [
         status: "Pending",
         reportId: "1",
         reportCondition: "Acne Vulgaris",
+        reportFullText: "Analysis Report: Acne Vulgaris. Generated on 2024-05-15. Severity: Mild. It is recommended to use a gentle cleanser twice a day and apply a non-comedogenic moisturizer. Consider using over-the-counter benzoyl peroxide treatments. Avoid picking or squeezing pimples to prevent scarring. If the condition persists or worsens, consult a dermatologist. Do's: Cleanse your face twice daily with a mild, non-abrasive cleanser. Use non-comedogenic (won't clog pores) skin care products and cosmetics. Drink plenty of water to stay hydrated. Don'ts: Avoid harsh scrubbing or over-washing your face. Do not pick, pop, or squeeze pimples. Limit your intake of high-glycemic foods and dairy products if you notice a link. Submitted Info: Pre-medication: None. Disease Duration: 3 months."
     },
     {
         id: "APP002",
@@ -31,6 +32,7 @@ const initialAppointments = [
         status: "Pending",
         reportId: "2",
         reportCondition: "Eczema",
+        reportFullText: "Analysis Report: Eczema. Generated on 2024-04-22. Severity: Moderate. Recommendations include daily moisturizing with a thick cream, avoiding known triggers like certain fabrics or soaps, and using a humidifier. Short, lukewarm baths are advised. Do's: Moisturize daily. Wear soft, breathable clothing. Use a humidifier in dry or cold weather. Don'ts: Avoid long, hot baths or showers. Steer clear of harsh soaps and detergents. Try not to scratch the affected area to prevent infection. Submitted Info: Pre-medication: Hydrocortisone cream (1%). Disease Duration: 6 months."
     },
     {
         id: "APP003",
@@ -41,10 +43,9 @@ const initialAppointments = [
         status: "Pending",
         reportId: "3",
         reportCondition: "Rosacea",
+        reportFullText: "Analysis Report: Rosacea. Generated on 2024-03-10. Severity: Mild. It is recommended to identify and avoid triggers such as spicy foods, alcohol, and extreme temperatures. A gentle skincare routine is crucial. Sun protection is paramount. Do's: Use sunscreen daily. Choose gentle, fragrance-free skincare products. Keep a diary to identify personal triggers. Don'ts: Avoid sun exposure without protection. Do not use harsh exfoliants or astringents. Be cautious with hot beverages and spicy foods. Submitted Info: Pre-medication: None. Disease Duration: 1 year."
     },
 ];
-
-const mockReportFullText = "Analysis Report: Acne Vulgaris. Generated on 2024-05-15. Severity: Mild. It is recommended to use a gentle cleanser twice a day and apply a non-comedogenic moisturizer. Consider using over-the-counter benzoyl peroxide treatments. Avoid picking or squeezing pimples to prevent scarring. If the condition persists or worsens, consult a dermatologist. Do's: Cleanse your face twice daily with a mild, non-abrasive cleanser. Use non-comedogenic (won't clog pores) skin care products and cosmetics. Drink plenty of water to stay hydrated. Don'ts: Avoid harsh scrubbing or over-washing your face. Do not pick, pop, or squeeze pimples. Limit your intake of high-glycemic foods and dairy products if you notice a link. Submitted Info: Pre-medication: None. Disease Duration: 3 months."
 
 export default function DoctorDashboardPage() {
     const [summary, setSummary] = useState('');
@@ -56,19 +57,18 @@ export default function DoctorDashboardPage() {
     }, [appointments]);
 
     const handleRequest = (id: string, newStatus: 'Approved' | 'Declined') => {
-        // In a real app, this would be an API call.
-        // For now, we just filter it out of the list of pending requests.
         setAppointments(prev => prev.filter(app => app.id !== id));
     };
 
-    const handleGenerateSummary = async () => {
+    const handleGenerateSummary = async (reportText: string) => {
         setIsLoading(true);
+        setSummary('');
         try {
-            const result = await generateAiReportSummary({ report: mockReportFullText });
+            const result = await generateAiReportSummary({ report: reportText });
             setSummary(result.summary);
         } catch (error) {
             console.error("Failed to generate summary:", error);
-            setSummary("Could not generate summary at this time.");
+            setSummary("Could not generate summary at this time. Please try again.");
         } finally {
             setIsLoading(false);
         }
@@ -140,7 +140,7 @@ export default function DoctorDashboardPage() {
                                     <TableCell className="hidden sm:table-cell">{app.requestDate}</TableCell>
                                     <TableCell className="hidden md:table-cell"><Badge variant={app.mode === 'Online' ? 'default' : 'secondary'}>{app.mode}</Badge></TableCell>
                                     <TableCell>
-                                        <Dialog onOpenChange={(open) => {if(open) { handleGenerateSummary() } else { setSummary('') }}}>
+                                        <Dialog onOpenChange={(open) => {if(open) { handleGenerateSummary(app.reportFullText) } else { setSummary('') }}}>
                                             <DialogTrigger asChild>
                                                 <Button variant="outline" size="sm">
                                                     <Bot className="mr-2 h-4 w-4" />

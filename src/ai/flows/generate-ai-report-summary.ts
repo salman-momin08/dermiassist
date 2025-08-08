@@ -28,7 +28,9 @@ const prompt = ai.definePrompt({
   name: 'generateAiReportSummaryPrompt',
   input: {schema: GenerateAiReportSummaryInputSchema},
   output: {schema: GenerateAiReportSummaryOutputSchema},
-  prompt: `You are an AI assistant summarizing a dermatology report for a doctor.\n        Please provide a concise summary of the key findings and recommendations from the following AI skin analysis report. Focus on aspects relevant to treatment decisions.\n        Report: {{{report}}}`,
+  prompt: `You are an AI assistant summarizing a dermatology report for a doctor.
+        Please provide a concise summary of the key findings and recommendations from the following AI skin analysis report. Focus on aspects relevant to treatment decisions.
+        Report: {{{report}}}`,
   config: {
     safetySettings: [
       {
