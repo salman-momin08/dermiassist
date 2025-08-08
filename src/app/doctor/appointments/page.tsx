@@ -186,11 +186,14 @@ export default function DoctorAppointmentsPage() {
                                                                 <SelectValue placeholder="Select time" />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="morning">Morning</SelectItem>
-                                                                <SelectItem value="afternoon">Afternoon</SelectItem>
-                                                                <SelectItem value="night">Night</SelectItem>
-                                                                <SelectItem value="before-food">Before Food</SelectItem>
-                                                                <SelectItem value="after-food">After Food</SelectItem>
+                                                                <SelectItem value="morn-after">Morning (After Food)</SelectItem>
+                                                                <SelectItem value="morn-before">Morning (Before Food)</SelectItem>
+                                                                <SelectItem value="noon-after">Afternoon (After Food)</SelectItem>
+                                                                <SelectItem value="noon-before">Afternoon (Before Food)</SelectItem>
+                                                                <SelectItem value="night-after">Night (After Food)</SelectItem>
+                                                                <SelectItem value="night-before">Night (Before Food)</SelectItem>
+                                                                <SelectItem value="twice-day">Twice a day</SelectItem>
+                                                                <SelectItem value="thrice-day">Thrice a day</SelectItem>
                                                             </SelectContent>
                                                         </Select>
                                                     </div>
