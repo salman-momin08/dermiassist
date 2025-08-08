@@ -26,6 +26,7 @@ export function AppHeader({ authenticated = false, role = 'patient' }: AppHeader
   const doctorLinks = (
      <>
       <Link href="/doctor/dashboard" className="transition-colors hover:text-foreground/80 text-foreground/60">Dashboard</Link>
+      <Link href="/doctor/appointments" className="transition-colors hover:text-foreground/80 text-foreground/60">Appointments</Link>
       <Link href="/doctor/cases" className="transition-colors hover:text-foreground/80 text-foreground/60">Patient Cases</Link>
       <Link href="/doctor/chat" className="transition-colors hover:text-foreground/80 text-foreground/60">Chat</Link>
       <Link href="/doctor/profile" className="transition-colors hover:text-foreground/80 text-foreground/60">Profile</Link>
