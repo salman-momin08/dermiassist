@@ -124,7 +124,13 @@ export default function DoctorChatPage() {
             patientName: selectedPatient.name,
             conversationHistory: conversationHistory,
         });
-        setChatSummary(response.summary);
+        
+        let finalSummary = "";
+        for await (const chunk of response) {
+            finalSummary = chunk.summary;
+            setChatSummary(chunk.summary);
+        }
+
     } catch (error) {
         console.error("Failed to generate summary:", error);
         toast({
@@ -208,7 +214,7 @@ export default function DoctorChatPage() {
                                         </DialogDescription>
                                     </DialogHeader>
                                     <ScrollArea className="max-h-[50vh] my-4 pr-4">
-                                        {isGeneratingSummary ? (
+                                        {isGeneratingSummary && !chatSummary ? (
                                             <div className="flex items-center justify-center p-8">
                                                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                             </div>

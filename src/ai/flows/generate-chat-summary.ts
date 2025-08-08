@@ -33,7 +33,7 @@ type GenerateChatSummaryOutput = z.infer<
 
 export async function generateChatSummary(
   input: GenerateChatSummaryInput
-): Promise<GenerateChatSummaryOutput> {
+): Promise<AsyncGenerator<GenerateChatSummaryOutput>> {
   return generateChatSummaryFlow(input);
 }
 
@@ -54,23 +54,21 @@ const generateChatSummaryFlow = ai.defineFlow(
   {
     name: 'generateChatSummaryFlow',
     inputSchema: GenerateChatSummaryInputSchema,
-    outputSchema: GenerateChatSummaryOutputSchema,
+    outputSchema: z.string(),
   },
-  async (input) => {
+  async function* (input) {
     const { stream } = ai.generateStream({
-      prompt: prompt.prompt,
+      prompt: prompt.template,
       input,
       output: {
         schema: GenerateChatSummaryOutputSchema,
       },
     });
-    
-    let summary = '';
+
     for await (const chunk of stream) {
       if (chunk.output) {
-        summary = chunk.output.summary;
+        yield chunk.output;
       }
     }
-    return { summary };
   }
 );
