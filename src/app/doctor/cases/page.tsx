@@ -58,8 +58,10 @@ export default function DoctorCasesPage() {
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                <DropdownMenuItem>
-                                                    <FileText className="mr-2 h-4 w-4" />View Case Details
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/doctor/cases/${c.id}`} className="cursor-pointer">
+                                                        <FileText className="mr-2 h-4 w-4" />View Case Details
+                                                    </Link>
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem>
                                                      <MessageSquare className="mr-2 h-4 w-4" />Chat with Patient
