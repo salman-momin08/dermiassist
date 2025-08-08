@@ -122,12 +122,8 @@ export default function DoctorChatPage() {
     try {
         const response = await generateChatSummary({
             patientName: selectedPatient.name,
-            conversationHistory,
+            conversationHistory: conversationHistory,
         });
-        // Since we are streaming, we can process the full result here if needed,
-        // but the main display logic will be handled via state updates.
-        // For simplicity, we can just set the final summary.
-        // In a more complex setup, you might handle chunks.
         setChatSummary(response.summary);
     } catch (error) {
         console.error("Failed to generate summary:", error);
