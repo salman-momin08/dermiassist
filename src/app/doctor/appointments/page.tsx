@@ -166,9 +166,15 @@ export default function DoctorAppointmentsPage() {
                                                         </SelectTrigger>
                                                         <SelectContent>
                                                             <SelectItem value="cream">Cream</SelectItem>
-                                                            <SelectItem value="tablet">Tablet</SelectItem>
-                                                            <SelectItem value="syrup">Syrup</SelectItem>
                                                             <SelectItem value="ointment">Ointment</SelectItem>
+                                                            <SelectItem value="gel">Gel</SelectItem>
+                                                            <SelectItem value="lotion">Lotion</SelectItem>
+                                                            <SelectItem value="foam">Foam</SelectItem>
+                                                            <SelectItem value="solution">Solution</SelectItem>
+                                                            <SelectItem value="shampoo">Shampoo</SelectItem>
+                                                            <SelectItem value="tablet">Tablet</SelectItem>
+                                                            <SelectItem value="capsule">Capsule</SelectItem>
+                                                            <SelectItem value="syrup">Syrup</SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
