@@ -158,25 +158,42 @@ export default function DoctorAppointmentsPage() {
                                                     <Label htmlFor="medication">Medication</Label>
                                                     <Input id="medication" placeholder="e.g., Tretinoin Cream 0.05%" />
                                                 </div>
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="type">Medicine Type</Label>
-                                                    <Select>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select a type" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="cream">Cream</SelectItem>
-                                                            <SelectItem value="ointment">Ointment</SelectItem>
-                                                            <SelectItem value="gel">Gel</SelectItem>
-                                                            <SelectItem value="lotion">Lotion</SelectItem>
-                                                            <SelectItem value="foam">Foam</SelectItem>
-                                                            <SelectItem value="solution">Solution</SelectItem>
-                                                            <SelectItem value="shampoo">Shampoo</SelectItem>
-                                                            <SelectItem value="tablet">Tablet</SelectItem>
-                                                            <SelectItem value="capsule">Capsule</SelectItem>
-                                                            <SelectItem value="syrup">Syrup</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="type">Medicine Type</Label>
+                                                        <Select>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select a type" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="cream">Cream</SelectItem>
+                                                                <SelectItem value="ointment">Ointment</SelectItem>
+                                                                <SelectItem value="gel">Gel</SelectItem>
+                                                                <SelectItem value="lotion">Lotion</SelectItem>
+                                                                <SelectItem value="foam">Foam</SelectItem>
+                                                                <SelectItem value="solution">Solution</SelectItem>
+                                                                <SelectItem value="shampoo">Shampoo</SelectItem>
+                                                                <SelectItem value="tablet">Tablet</SelectItem>
+                                                                <SelectItem value="capsule">Capsule</SelectItem>
+                                                                <SelectItem value="syrup">Syrup</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="time">Time of Day</Label>
+                                                        <Select>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select time" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="morning">Morning</SelectItem>
+                                                                <SelectItem value="afternoon">Afternoon</SelectItem>
+                                                                <SelectItem value="night">Night</SelectItem>
+                                                                <SelectItem value="before-food">Before Food</SelectItem>
+                                                                <SelectItem value="after-food">After Food</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
                                                 </div>
                                                 <div className="space-y-2">
                                                     <Label htmlFor="dosage">Dosage</Label>
