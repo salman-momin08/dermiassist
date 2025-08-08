@@ -52,12 +52,12 @@ export default function DoctorChatPage() {
   );
 
   return (
-    <div className="container mx-auto p-4 md:p-8 h-[calc(100vh-12rem)]">
+    <div className="container mx-auto p-4 md:p-8 flex-1 flex flex-col">
         <div className="space-y-2 mb-8">
             <h1 className="text-3xl font-bold tracking-tight font-headline">Patient Chat</h1>
             <p className="text-muted-foreground">Communicate directly with your patients.</p>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1">
             <Card className="lg:col-span-1 h-full flex flex-col">
                 <CardHeader>
                     <CardTitle>Patients</CardTitle>
