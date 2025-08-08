@@ -12,7 +12,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-export const GenerateChatSummaryInputSchema = z.object({
+const GenerateChatSummaryInputSchema = z.object({
   patientName: z.string().describe("The patient's name."),
   conversationHistory: z
     .string()
@@ -22,7 +22,7 @@ export type GenerateChatSummaryInput = z.infer<
   typeof GenerateChatSummaryInputSchema
 >;
 
-export const GenerateChatSummaryOutputSchema = z.object({
+const GenerateChatSummaryOutputSchema = z.object({
   summary: z
     .string()
     .describe('A concise, bullet-pointed summary of the conversation.'),
