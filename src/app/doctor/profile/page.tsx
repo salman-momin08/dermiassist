@@ -1,4 +1,7 @@
 
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,8 +10,33 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, CheckCircle } from "lucide-react";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DoctorProfilePage() {
+    const { toast } = useToast();
+    const [name, setName] = useState("Dr. Alan Grant");
+    const [specialization, setSpecialization] = useState("General Dermatology");
+    const [bio, setBio] = useState("An experienced dermatologist with over 15 years of practice, specializing in a wide range of skin conditions. Committed to providing compassionate and comprehensive care to all patients.");
+    const [notifications, setNotifications] = useState(true);
+
+    const handleProfileSave = () => {
+        // In a real app, you would make an API call here.
+        console.log("Saving profile:", { name, specialization, bio });
+        toast({
+            title: "Profile Saved",
+            description: "Your professional information has been updated.",
+        });
+    };
+    
+    const handleSettingsSave = () => {
+        // In a real app, you would make an API call here.
+        console.log("Saving settings:", { notifications });
+        toast({
+            title: "Settings Updated",
+            description: "Your account settings have been saved.",
+        });
+    }
+
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-2xl">
              <div className="mb-6">
@@ -36,15 +64,15 @@ export default function DoctorProfilePage() {
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="name">Full Name</Label>
-                            <Input id="name" defaultValue="Dr. Alan Grant" />
+                            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
                         </div>
                          <div className="space-y-2">
                             <Label htmlFor="specialization">Specialization</Label>
-                            <Input id="specialization" defaultValue="General Dermatology" />
+                            <Input id="specialization" value={specialization} onChange={(e) => setSpecialization(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="bio">Professional Bio</Label>
-                            <Textarea id="bio" placeholder="A short bio about your expertise and experience." defaultValue="An experienced dermatologist with over 15 years of practice, specializing in a wide range of skin conditions. Committed to providing compassionate and comprehensive care to all patients." />
+                            <Textarea id="bio" placeholder="A short bio about your expertise and experience." value={bio} onChange={(e) => setBio(e.target.value)} />
                         </div>
                          <div className="flex items-center space-x-2 pt-2">
                             <CheckCircle className="h-5 w-5 text-green-500" />
@@ -52,7 +80,7 @@ export default function DoctorProfilePage() {
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button>Save Profile</Button>
+                        <Button onClick={handleProfileSave}>Save Profile</Button>
                     </CardFooter>
                 </Card>
 
@@ -67,8 +95,8 @@ export default function DoctorProfilePage() {
                             <Input id="email" type="email" defaultValue="dralan.grant@skinwise.com" disabled />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="new-password">New Password</Label>
-                            <Input id="new-password" type="password" />
+                            <Label htmlFor="new-password">Change Password</Label>
+                            <Input id="new-password" type="password" placeholder="Enter new password" />
                         </div>
                         <div className="flex items-center justify-between pt-2">
                             <Label htmlFor="notifications" className="flex flex-col space-y-1">
@@ -77,15 +105,14 @@ export default function DoctorProfilePage() {
                                     Receive email notifications for new appointment requests.
                                 </span>
                             </Label>
-                            <Switch id="notifications" defaultChecked />
+                            <Switch id="notifications" checked={notifications} onCheckedChange={setNotifications} />
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button>Update Settings</Button>
+                        <Button onClick={handleSettingsSave}>Update Settings</Button>
                     </CardFooter>
                 </Card>
             </div>
         </div>
     );
 }
-
