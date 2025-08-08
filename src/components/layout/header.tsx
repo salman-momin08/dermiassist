@@ -14,9 +14,10 @@ export function AppHeader({ authenticated = false, role = 'patient' }: AppHeader
   const patientLinks = (
     <>
       <Link href="/dashboard" className="transition-colors hover:text-foreground/80 text-foreground/60">Dashboard</Link>
-      <Link href="/analyze" className="transition-colors hover:text-foreground/80 text-foreground/60">New Analysis</Link>
       <Link href="/my-analyses" className="transition-colors hover:text-foreground/80 text-foreground/60">My Analyses</Link>
+      <Link href="/appointments" className="transition-colors hover:text-foreground/80 text-foreground/60">Appointments</Link>
       <Link href="/doctors" className="transition-colors hover:text-foreground/80 text-foreground/60">Find a Doctor</Link>
+      <Link href="/chat" className="transition-colors hover:text-foreground/80 text-foreground/60">Chat</Link>
     </>
   );
 
