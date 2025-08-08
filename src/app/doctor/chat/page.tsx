@@ -52,13 +52,13 @@ export default function DoctorChatPage() {
   );
 
   return (
-    <div className="container mx-auto p-4 md:p-8 flex-1 flex flex-col">
+    <div className="container mx-auto p-4 md:p-8">
         <div className="space-y-2 mb-8">
             <h1 className="text-3xl font-bold tracking-tight font-headline">Patient Chat</h1>
             <p className="text-muted-foreground">Communicate directly with your patients.</p>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1">
-            <Card className="lg:col-span-1 h-full flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <Card className="lg:col-span-1 flex flex-col h-[70vh]">
                 <CardHeader>
                     <CardTitle>Patients</CardTitle>
                     <div className="relative pt-2">
@@ -78,7 +78,7 @@ export default function DoctorChatPage() {
                                 <button key={patient.id} onClick={() => setSelectedPatientId(patient.id)} className={cn("w-full text-left p-4 hover:bg-muted/50", selectedPatientId === patient.id && "bg-muted")}>
                                     <div className="flex items-center gap-4">
                                         <Avatar className="h-10 w-10 relative">
-                                            <AvatarImage src={patient.avatar} alt={patient.name} />
+                                            <AvatarImage src={patient.avatar} alt={patient.name} data-ai-hint="person portrait"/>
                                             <AvatarFallback>{patient.name.charAt(0)}</AvatarFallback>
                                             {patient.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />}
                                         </Avatar>
@@ -94,12 +94,12 @@ export default function DoctorChatPage() {
                 </ScrollArea>
             </Card>
 
-            <Card className="lg:col-span-2 h-full flex flex-col">
+            <Card className="lg:col-span-2 flex flex-col h-[70vh]">
                 {selectedPatient ? (
                     <>
                         <CardHeader className="flex-row items-center gap-4 space-y-0">
                              <Avatar className="h-12 w-12">
-                                <AvatarImage src={selectedPatient.avatar} alt={selectedPatient.name} />
+                                <AvatarImage src={selectedPatient.avatar} alt={selectedPatient.name} data-ai-hint="person portrait" />
                                 <AvatarFallback>{selectedPatient.name.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <div>
@@ -114,7 +114,7 @@ export default function DoctorChatPage() {
                                     <div key={index} className={cn("flex items-end gap-2", msg.sender === 'doctor' ? 'justify-end' : 'justify-start')}>
                                         {msg.sender === 'patient' && (
                                             <Avatar className="h-8 w-8">
-                                                <AvatarImage src={selectedPatient.avatar} alt={selectedPatient.name} />
+                                                <AvatarImage src={selectedPatient.avatar} alt={selectedPatient.name} data-ai-hint="person portrait" />
                                                 <AvatarFallback>{selectedPatient.name.charAt(0)}</AvatarFallback>
                                             </Avatar>
                                         )}
