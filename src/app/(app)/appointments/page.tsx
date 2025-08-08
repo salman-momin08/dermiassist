@@ -1,14 +1,16 @@
 
 "use client"
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Video, MessageSquare, MoreHorizontal, CheckCircle, Clock, Download, FileText } from "lucide-react";
+import { Calendar, Video, Clock, Download, FileText, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 const mockAppointments = [
     {
@@ -147,7 +149,7 @@ export default function AppointmentsPage() {
                             <TableRow>
                                 <TableHead>Doctor</TableHead>
                                 <TableHead>Date</TableHead>
-                                <TableHead>Notes & Prescription</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -155,11 +157,27 @@ export default function AppointmentsPage() {
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
                                     <TableCell>{appointment.date}</TableCell>
-                                    <TableCell>
+                                    <TableCell className="text-right space-x-2">
                                         {appointment.notes && (
-                                            <p className="text-sm text-muted-foreground mb-2">
-                                                <strong className="text-foreground">Doctor's Notes:</strong> {appointment.notes}
-                                            </p>
+                                            <Dialog>
+                                                <DialogTrigger asChild>
+                                                    <Button size="sm" variant="outline">
+                                                        <FileText className="mr-2 h-4 w-4" />
+                                                        View Notes
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent>
+                                                    <DialogHeader>
+                                                        <DialogTitle>Follow-up notes from Dr. {appointment.doctorName}</DialogTitle>
+                                                        <DialogDescription>
+                                                            Notes from your appointment on {appointment.date}.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className="py-4 text-sm text-muted-foreground">
+                                                        {appointment.notes}
+                                                    </div>
+                                                </DialogContent>
+                                            </Dialog>
                                         )}
                                         {appointment.prescription && (
                                             <Button size="sm" variant="outline" onClick={() => handleDownload(appointment.id)}>
@@ -168,7 +186,7 @@ export default function AppointmentsPage() {
                                             </Button>
                                         )}
                                          {!appointment.notes && !appointment.prescription && (
-                                            <p className="text-sm text-muted-foreground">No notes or prescription for this appointment.</p>
+                                            <p className="text-sm text-muted-foreground">No notes or prescription.</p>
                                         )}
                                     </TableCell>
                                 </TableRow>
