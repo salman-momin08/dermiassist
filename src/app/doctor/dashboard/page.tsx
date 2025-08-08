@@ -11,6 +11,7 @@ import { CalendarCheck, Users, FileText, Bot, Loader2, BookUser } from "lucide-r
 import { generateAiReportSummary } from "@/ai/flows/generate-ai-report-summary"
 import { generateCaseFileSummary } from "@/ai/flows/generate-case-file-summary"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useToast } from "@/hooks/use-toast"
 
 const initialAppointments = [
     {
@@ -56,6 +57,7 @@ export default function DoctorDashboardPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [appointments, setAppointments] = useState(initialAppointments);
     const [activeDialog, setActiveDialog] = useState<'summary' | 'caseFile' | null>(null);
+    const { toast } = useToast();
 
     const pendingRequestsCount = useMemo(() => {
         return appointments.filter(a => a.status === 'Pending').length;
@@ -63,6 +65,10 @@ export default function DoctorDashboardPage() {
 
     const handleRequest = (id: string, newStatus: 'Approved' | 'Declined') => {
         setAppointments(prev => prev.filter(app => app.id !== id));
+        toast({
+            title: `Request ${newStatus}`,
+            description: `The appointment request has been ${newStatus.toLowerCase()}.`,
+        });
     };
 
     const handleGenerateSummary = async (reportText: string) => {
