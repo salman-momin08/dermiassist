@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const initialAppointments = [
     {
@@ -156,6 +157,20 @@ export default function DoctorAppointmentsPage() {
                                                 <div className="space-y-2">
                                                     <Label htmlFor="medication">Medication</Label>
                                                     <Input id="medication" placeholder="e.g., Tretinoin Cream 0.05%" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="type">Medicine Type</Label>
+                                                    <Select>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select a type" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="cream">Cream</SelectItem>
+                                                            <SelectItem value="tablet">Tablet</SelectItem>
+                                                            <SelectItem value="syrup">Syrup</SelectItem>
+                                                            <SelectItem value="ointment">Ointment</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
                                                 </div>
                                                 <div className="space-y-2">
                                                     <Label htmlFor="dosage">Dosage</Label>
