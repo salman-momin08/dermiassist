@@ -1,11 +1,14 @@
 
+"use client"
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Video, MessageSquare, MoreHorizontal, CheckCircle, Clock } from "lucide-react";
+import { Calendar, Video, MessageSquare, MoreHorizontal, CheckCircle, Clock, Download, FileText } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 
 const mockAppointments = [
     {
@@ -15,6 +18,8 @@ const mockAppointments = [
         time: "10:30 AM",
         mode: "Online",
         status: "Confirmed",
+        notes: null,
+        prescription: null,
     },
     {
         id: "APT002",
@@ -23,10 +28,25 @@ const mockAppointments = [
         time: "02:00 PM",
         mode: "Offline",
         status: "Completed",
+        notes: "Patient's condition has improved significantly. Recommended to continue with the current skincare routine. Follow-up in 3 months.",
+        prescription: {
+            medication: "Tretinoin Cream 0.05%",
+            dosage: "Apply a pea-sized amount to the face once daily at night.",
+            instructions: "Avoid sun exposure. Use moisturizer.",
+        },
     },
 ];
 
 export default function AppointmentsPage() {
+    const { toast } = useToast();
+
+    const handleDownload = (id: string) => {
+        toast({
+            title: "Downloading Prescription",
+            description: `Your e-prescription for appointment ${id} is being downloaded.`,
+        });
+    }
+
     return (
         <div className="container mx-auto p-4 md:p-8">
             <div className="flex items-center justify-between space-y-2 mb-8">
@@ -118,7 +138,7 @@ export default function AppointmentsPage() {
                  <CardHeader>
                     <CardTitle>Past Appointments</CardTitle>
                     <CardDescription>
-                        Review your consultation history.
+                        Review your consultation history, notes, and prescriptions.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -127,8 +147,7 @@ export default function AppointmentsPage() {
                             <TableRow>
                                 <TableHead>Doctor</TableHead>
                                 <TableHead>Date</TableHead>
-                                <TableHead className="hidden md:table-cell">Mode</TableHead>
-                                <TableHead className="hidden md:table-cell">Status</TableHead>
+                                <TableHead>Notes & Prescription</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -136,20 +155,31 @@ export default function AppointmentsPage() {
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
                                     <TableCell>{appointment.date}</TableCell>
-                                     <TableCell className="hidden md:table-cell">
-                                         <Badge variant="outline">
-                                            {appointment.mode === "Online" ? <Video className="mr-1 h-3 w-3" /> : <Calendar className="mr-1 h-3 w-3" />}
-                                            {appointment.mode}
-                                        </Badge>
-                                     </TableCell>
-                                    <TableCell className="hidden md:table-cell">
-                                        <Badge variant="secondary">
-                                            <CheckCircle className="mr-1 h-3 w-3" />
-                                            {appointment.status}
-                                        </Badge>
+                                    <TableCell>
+                                        {appointment.notes && (
+                                            <p className="text-sm text-muted-foreground mb-2">
+                                                <strong className="text-foreground">Doctor's Notes:</strong> {appointment.notes}
+                                            </p>
+                                        )}
+                                        {appointment.prescription && (
+                                            <Button size="sm" variant="outline" onClick={() => handleDownload(appointment.id)}>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download E-Prescription
+                                            </Button>
+                                        )}
+                                         {!appointment.notes && !appointment.prescription && (
+                                            <p className="text-sm text-muted-foreground">No notes or prescription for this appointment.</p>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))}
+                             {mockAppointments.filter(a => a.status === 'Completed').length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={3} className="text-center h-24 text-muted-foreground">
+                                        You have no past appointments.
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>

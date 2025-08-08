@@ -6,13 +6,16 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { CalendarCheck, Users, FileText, Bot, Loader2, BookUser } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { CalendarCheck, Users, FileText, Bot, Loader2, BookUser, StickyNote, Pill } from "lucide-react"
 import { generateAiReportSummary } from "@/ai/flows/generate-ai-report-summary"
 import { generateCaseFileSummary } from "@/ai/flows/generate-case-file-summary"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 
 
 const initialAppointments = [
@@ -66,11 +69,9 @@ const initialAppointments = [
 ];
 
 export default function DoctorAppointmentsPage() {
-    const [summary, setSummary] = useState('');
-    const [caseFile, setCaseFile] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
     const [appointments, setAppointments] = useState(initialAppointments);
-    const [activeDialog, setActiveDialog] = useState<'summary' | 'caseFile' | null>(null);
+    const [selectedAppointment, setSelectedAppointment] = useState<(typeof initialAppointments)[0] | null>(null);
+    const [notes, setNotes] = useState("");
     const { toast } = useToast();
 
     const handleRequest = (id: string, newStatus: 'Confirmed' | 'Declined') => {
@@ -84,44 +85,25 @@ export default function DoctorAppointmentsPage() {
             description: `The appointment request has been ${newStatus.toLowerCase()}.`,
         });
     };
-
-    const handleGenerateSummary = async (reportText: string) => {
-        setIsLoading(true);
-        setSummary('');
-        try {
-            const result = await generateAiReportSummary({ report: reportText });
-            setSummary(result.summary);
-        } catch (error) {
-            console.error("Failed to generate summary:", error);
-            setSummary("Could not generate summary at this time. Please try again.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
     
-    const handleGenerateCaseFile = async (app: typeof appointments[0]) => {
-        setIsLoading(true);
-        setCaseFile('');
-        try {
-            const result = await generateCaseFileSummary({
-                patientName: app.patientName,
-                reportCondition: app.reportCondition,
-                reportFullText: app.reportFullText,
-                previousNotes: app.previousNotes,
-            });
-            setCaseFile(result.summary);
-        } catch (error) {
-            console.error("Failed to generate case file:", error);
-            setCaseFile("Could not generate case file at this time. Please try again.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const handleSaveNotes = () => {
+        // In a real app, this would update the backend
+        if (!selectedAppointment) return;
+        setAppointments(prev =>
+            prev.map(app =>
+                app.id === selectedAppointment.id ? { ...app, notes: notes } : app
+            )
+        );
+        toast({ title: "Notes Saved", description: "The consultation notes have been saved." });
+        setSelectedAppointment(null);
+        setNotes('');
+    }
 
-    const closeDialog = () => {
-        setSummary('');
-        setCaseFile('');
-        setActiveDialog(null);
+    const handleSendPrescription = () => {
+        // In a real app, this would save the prescription and notify the patient
+        if (!selectedAppointment) return;
+        toast({ title: "E-Prescription Sent", description: `The prescription has been sent to ${selectedAppointment.patientName}.` });
+        setSelectedAppointment(null);
     }
 
     const renderTable = (data: typeof appointments) => (
@@ -147,7 +129,8 @@ export default function DoctorAppointmentsPage() {
                          <TableCell>
                             <Badge variant={
                                 app.status === 'Confirmed' ? 'default' :
-                                app.status === 'Completed' ? 'secondary' : 'outline'
+                                app.status === 'Completed' ? 'secondary' : 
+                                app.status === 'Declined' ? 'destructive' : 'outline'
                             }>{app.status}</Badge>
                         </TableCell>
                         <TableCell className="text-right space-x-2">
@@ -156,12 +139,20 @@ export default function DoctorAppointmentsPage() {
                                     <Button size="sm" variant="outline" onClick={() => handleRequest(app.id, 'Declined')}>Decline</Button>
                                     <Button size="sm" onClick={() => handleRequest(app.id, 'Confirmed')}>Confirm</Button>
                                 </>
-                             ) : (
+                             ) : app.status === 'Confirmed' || app.status === 'Completed' ? (
                                 <>
-                                    <Button size="sm" variant="outline" disabled>E-Prescription</Button>
-                                    <Button size="sm" disabled>Add Notes</Button>
+                                    <DialogTrigger asChild onSelect={() => setSelectedAppointment(app)}>
+                                        <Button size="sm" variant="outline">
+                                            <Pill className="mr-2 h-4 w-4" /> E-Prescription
+                                        </Button>
+                                    </DialogTrigger>
+                                     <DialogTrigger asChild onSelect={() => { setSelectedAppointment(app); setNotes(app.notes || "");}}>
+                                        <Button size="sm">
+                                            <StickyNote className="mr-2 h-4 w-4" /> Notes
+                                        </Button>
+                                    </DialogTrigger>
                                 </>
-                             )}
+                             ) : null}
                         </TableCell>
                     </TableRow>
                 )) : (
@@ -176,40 +167,85 @@ export default function DoctorAppointmentsPage() {
     );
 
     return (
-        <div className="container mx-auto p-4 md:p-8">
-            <div className="space-y-2 mb-8">
-                <h1 className="text-3xl font-bold tracking-tight font-headline">Appointments</h1>
-                <p className="text-muted-foreground">Manage your patient appointment schedule and requests.</p>
+        <Dialog>
+            <div className="container mx-auto p-4 md:p-8">
+                <div className="space-y-2 mb-8">
+                    <h1 className="text-3xl font-bold tracking-tight font-headline">Appointments</h1>
+                    <p className="text-muted-foreground">Manage your patient appointment schedule and requests.</p>
+                </div>
+                
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Appointment Management</CardTitle>
+                        <CardDescription>Review pending requests and view your schedule.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Tabs defaultValue="pending">
+                            <TabsList className="grid w-full grid-cols-4">
+                                <TabsTrigger value="pending">Pending</TabsTrigger>
+                                <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
+                                <TabsTrigger value="completed">Completed</TabsTrigger>
+                                <TabsTrigger value="declined">Declined</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="pending">
+                                {renderTable(appointments.filter(a => a.status === 'Pending'))}
+                            </TabsContent>
+                            <TabsContent value="confirmed">
+                                {renderTable(appointments.filter(a => a.status === 'Confirmed'))}
+                            </TabsContent>
+                            <TabsContent value="completed">
+                                {renderTable(appointments.filter(a => a.status === 'Completed'))}
+                            </TabsContent>
+                            <TabsContent value="declined">
+                                {renderTable(appointments.filter(a => a.status === 'Declined'))}
+                            </TabsContent>
+                        </Tabs>
+                    </CardContent>
+                </Card>
             </div>
-            
-            <Card>
-                <CardHeader>
-                    <CardTitle>Appointment Management</CardTitle>
-                     <CardDescription>Review pending requests and view your schedule.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Tabs defaultValue="pending">
-                        <TabsList className="grid w-full grid-cols-4">
-                            <TabsTrigger value="pending">Pending</TabsTrigger>
-                            <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
-                            <TabsTrigger value="completed">Completed</TabsTrigger>
-                            <TabsTrigger value="declined">Declined</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="pending">
-                            {renderTable(appointments.filter(a => a.status === 'Pending'))}
-                        </TabsContent>
-                        <TabsContent value="confirmed">
-                             {renderTable(appointments.filter(a => a.status === 'Confirmed'))}
-                        </TabsContent>
-                        <TabsContent value="completed">
-                             {renderTable(appointments.filter(a => a.status === 'Completed'))}
-                        </TabsContent>
-                        <TabsContent value="declined">
-                             {renderTable(appointments.filter(a => a.status === 'Declined'))}
-                        </TabsContent>
-                    </Tabs>
-                </CardContent>
-            </Card>
-        </div>
+             {selectedAppointment?.notes !== undefined ? (
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Consultation Notes for {selectedAppointment?.patientName}</DialogTitle>
+                        <DialogDescription>Add or edit your private notes for this consultation. These notes will be visible to the patient.</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Textarea 
+                            placeholder="Type your consultation notes here..." 
+                            className="min-h-[200px]" 
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={handleSaveNotes}>Save Notes</Button>
+                    </DialogFooter>
+                </DialogContent>
+            ) : (
+                 <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>E-Prescription for {selectedAppointment?.patientName}</DialogTitle>
+                        <DialogDescription>Fill out the details below to generate an e-prescription.</DialogDescription>
+                    </DialogHeader>
+                     <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="medication">Medication</Label>
+                            <Input id="medication" placeholder="e.g., Tretinoin Cream 0.05%" />
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="dosage">Dosage</Label>
+                            <Input id="dosage" placeholder="e.g., Apply a pea-sized amount once daily" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="instructions">Additional Instructions</Label>
+                            <Textarea id="instructions" placeholder="e.g., Avoid sun exposure. Use moisturizer." />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={handleSendPrescription}>Send to Patient</Button>
+                    </DialogFooter>
+                </DialogContent>
+            )}
+        </Dialog>
     );
 }
