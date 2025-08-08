@@ -18,7 +18,7 @@ const GenerateChatSummaryInputSchema = z.object({
     .string()
     .describe('The entire conversation history, with each message on a new line.'),
 });
-export type GenerateChatSummaryInput = z.infer<
+type GenerateChatSummaryInput = z.infer<
   typeof GenerateChatSummaryInputSchema
 >;
 
@@ -27,7 +27,7 @@ const GenerateChatSummaryOutputSchema = z.object({
     .string()
     .describe('A concise, bullet-pointed summary of the conversation.'),
 });
-export type GenerateChatSummaryOutput = z.infer<
+type GenerateChatSummaryOutput = z.infer<
   typeof GenerateChatSummaryOutputSchema
 >;
 
@@ -55,9 +55,20 @@ const generateChatSummaryFlow = ai.defineFlow(
     name: 'generateChatSummaryFlow',
     inputSchema: GenerateChatSummaryInputSchema,
     outputSchema: GenerateChatSummaryOutputSchema,
+    stream: true,
   },
   async (input) => {
-    const { output } = await prompt(input);
-    return output!;
+    const { stream } = ai.generateStream({
+      prompt,
+      input,
+    });
+    
+    let summary = '';
+    for await (const chunk of stream) {
+      if (chunk.output) {
+        summary = chunk.output.summary;
+      }
+    }
+    return { summary };
   }
 );

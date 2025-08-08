@@ -120,11 +120,15 @@ export default function DoctorChatPage() {
     const conversationHistory = currentMessages.map(m => `${m.sender === 'doctor' ? 'Doctor' : selectedPatient.name}: ${m.text}`).join('\n');
 
     try {
-        const result = await generateChatSummary({
+        const response = await generateChatSummary({
             patientName: selectedPatient.name,
             conversationHistory,
         });
-        setChatSummary(result.summary);
+        // Since we are streaming, we can process the full result here if needed,
+        // but the main display logic will be handled via state updates.
+        // For simplicity, we can just set the final summary.
+        // In a more complex setup, you might handle chunks.
+        setChatSummary(response.summary);
     } catch (error) {
         console.error("Failed to generate summary:", error);
         toast({
@@ -132,6 +136,7 @@ export default function DoctorChatPage() {
             description: "Could not generate a summary. Please try again.",
             variant: "destructive"
         });
+    } finally {
         setIsGeneratingSummary(false);
     }
   }
