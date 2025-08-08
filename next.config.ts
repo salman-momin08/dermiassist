@@ -21,6 +21,9 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: '4.5mb', // Increase for video generation data uris
+      serverActions: {
+        bodySizeLimit: '10mb' // Increase body size limit to 10mb for video generation data uris
+      },
     },
   },
 };
