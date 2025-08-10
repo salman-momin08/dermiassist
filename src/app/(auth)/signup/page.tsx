@@ -16,10 +16,18 @@ import {
 import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/logo';
 import Link from 'next/link';
-import { X, Loader2 } from 'lucide-react';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { X, Loader2, CalendarIcon } from 'lucide-react';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 
 
 function GoogleIcon() {
@@ -32,9 +40,38 @@ function GoogleIcon() {
 }
 
 const signupSchema = z.object({
-  name: z.string().min(1, { message: "Name is required." }),
+  role: z.enum(["patient", "doctor"], { required_error: "You must select a role."}),
+  firstName: z.string().min(1, { message: "First name is required." }),
+  lastName: z.string().min(1, { message: "Last name is required." }),
+  dob: z.date({ required_error: "Date of birth is required."}),
+  gender: z.string().optional(),
   email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  mobile: z.string().min(10, { message: "Please enter a valid mobile number."}),
+  password: z.string().min(8, { message: "Password must be at least 8 characters." }),
+  confirmPassword: z.string(),
+  medicalId: z.string().optional(),
+  specialization: z.string().optional(),
+  acceptTerms: z.boolean().refine(val => val === true, { message: "You must accept the terms and conditions."}),
+  acceptPrivacy: z.boolean().refine(val => val === true, { message: "You must accept the privacy policy."}),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords do not match.",
+  path: ["confirmPassword"],
+}).refine(data => {
+    if (data.role === 'doctor') {
+        return !!data.medicalId && data.medicalId.length > 0;
+    }
+    return true;
+}, {
+    message: "Medical Registration Number is required for doctors.",
+    path: ["medicalId"],
+}).refine(data => {
+    if (data.role === 'doctor') {
+        return !!data.specialization && data.specialization.length > 0;
+    }
+    return true;
+}, {
+    message: "Specialization is required for doctors.",
+    path: ["specialization"],
 });
 
 export default function SignupPage() {
@@ -44,11 +81,22 @@ export default function SignupPage() {
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      name: "",
+      role: "patient",
+      firstName: "",
+      lastName: "",
+      gender: "prefer-not-to-say",
       email: "",
+      mobile: "",
       password: "",
+      confirmPassword: "",
+      medicalId: "",
+      specialization: "",
+      acceptTerms: false,
+      acceptPrivacy: false,
     },
   });
+
+  const role = form.watch("role");
 
   const onSubmit = (values: z.infer<typeof signupSchema>) => {
     // Simulate API call
@@ -59,16 +107,17 @@ export default function SignupPage() {
           title: "Account Created",
           description: "Welcome! We're redirecting you to your dashboard.",
         });
-        router.push("/dashboard");
+        const destination = values.role === 'doctor' ? '/doctor/dashboard' : '/dashboard';
+        router.push(destination);
         resolve(true);
       }, 1000);
     });
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <div className="w-full max-w-sm relative">
-         <Button variant="ghost" size="icon" className="absolute top-2 right-2 z-10" asChild>
+    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4 py-12">
+      <div className="w-full max-w-lg relative">
+         <Button variant="ghost" size="icon" className="absolute top-4 right-4 z-10" asChild>
             <Link href="/"><X className="h-4 w-4" /></Link>
         </Button>
         <Card>
@@ -78,53 +127,167 @@ export default function SignupPage() {
                     <Logo />
                 </Link>
             </div>
-            <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
+            <CardTitle className="text-2xl font-headline">Create a Secure Account</CardTitle>
             <CardDescription>
-              Enter your information to create your SkinWise account.
+              Join SkinWise to take control of your skin health.
             </CardDescription>
           </CardHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
-              <CardContent className="grid gap-4">
-                <FormField
+              <CardContent className="space-y-6">
+                 <FormField
                   control={form.control}
-                  name="name"
+                  name="role"
                   render={({ field }) => (
-                    <FormItem className="grid gap-2">
-                      <FormLabel>Name</FormLabel>
+                    <FormItem className="space-y-3">
+                      <FormLabel>I am a...</FormLabel>
                       <FormControl>
-                        <Input placeholder="John Doe" {...field} />
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex space-x-4"
+                        >
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="patient" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Patient
+                            </FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="doctor" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Doctor
+                            </FormLabel>
+                          </FormItem>
+                        </RadioGroup>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem className="grid gap-2">
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="m@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem className="grid gap-2">
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                
+                <Separator />
+                
+                <div className="grid sm:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="firstName" render={({ field }) => (
+                        <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="lastName" render={({ field }) => (
+                        <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                </div>
+                
+                 <div className="grid sm:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="dob" render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                            <FormLabel>Date of Birth</FormLabel>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <FormControl>
+                                        <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                                            {field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}
+                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                        </Button>
+                                    </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
+                                </PopoverContent>
+                            </Popover>
+                             <FormMessage />
+                        </FormItem>
+                    )} />
+                     <FormField control={form.control} name="gender" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Gender</FormLabel>
+                             <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Select a gender" /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                    <SelectItem value="male">Male</SelectItem>
+                                    <SelectItem value="female">Female</SelectItem>
+                                    <SelectItem value="other">Other</SelectItem>
+                                    <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                     )} />
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="email" render={({ field }) => (
+                        <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" placeholder="m@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="mobile" render={({ field }) => (
+                        <FormItem><FormLabel>Mobile Number</FormLabel><FormControl><Input placeholder="e.g. +1 123 456 7890" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="password" render={({ field }) => (
+                        <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                     <FormField control={form.control} name="confirmPassword" render={({ field }) => (
+                        <FormItem><FormLabel>Confirm Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                </div>
+                
+                {role === 'doctor' && (
+                  <>
+                    <Separator />
+                    <div className="space-y-4 rounded-md border p-4">
+                        <p className="text-sm font-medium">Doctor Verification</p>
+                         <FormField control={form.control} name="medicalId" render={({ field }) => (
+                            <FormItem><FormLabel>Medical Registration Number</FormLabel><FormControl><Input placeholder="Your medical ID" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="specialization" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Specialization</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Select your specialization" /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="general-dermatology">General Dermatology</SelectItem>
+                                        <SelectItem value="cosmetic-dermatology">Cosmetic Dermatology</SelectItem>
+                                        <SelectItem value="pediatric-dermatology">Pediatric Dermatology</SelectItem>
+                                        <SelectItem value="dermatopathology">Dermatopathology</SelectItem>
+                                        <SelectItem value="mohs-surgery">Mohs Surgery</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                         )} />
+                    </div>
+                  </>
+                )}
+                
+                <Separator />
+
+                <div className="space-y-4">
+                    <FormField control={form.control} name="acceptTerms" render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                            <div className="space-y-1 leading-none">
+                                <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Terms & Conditions</Link>.</FormLabel>
+                                <FormMessage />
+                            </div>
+                        </FormItem>
+                    )} />
+                     <FormField control={form.control} name="acceptPrivacy" render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                            <div className="space-y-1 leading-none">
+                                <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>.</FormLabel>
+                                <FormMessage />
+                            </div>
+                        </FormItem>
+                    )} />
+                </div>
+
+
                  <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
                    {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                    Create Account
@@ -139,9 +302,9 @@ export default function SignupPage() {
                         </span>
                     </div>
                 </div>
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full gap-2">
                   <GoogleIcon />
-                  Google
+                  Sign up with Google
                 </Button>
               </CardContent>
             </form>
@@ -159,3 +322,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
+    
