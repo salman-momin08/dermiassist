@@ -39,6 +39,15 @@ function GoogleIcon() {
     )
 }
 
+function FacebookIcon() {
+    return (
+        <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="size-4">
+            <title>Facebook</title>
+            <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" fill="currentColor"></path>
+        </svg>
+    )
+}
+
 const signupSchema = z.object({
   role: z.enum(["patient", "doctor"], { required_error: "You must select a role."}),
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -301,14 +310,20 @@ export default function SignupPage() {
                     </div>
                     <div className="relative flex justify-center text-xs uppercase">
                         <span className="bg-card px-2 text-muted-foreground">
-                        Or continue with
+                        Or sign up with
                         </span>
                     </div>
                 </div>
-                <Button variant="outline" className="w-full gap-2">
-                  <GoogleIcon />
-                  Sign up with Google
-                </Button>
+                 <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" className="w-full">
+                      <GoogleIcon />
+                      Google
+                    </Button>
+                    <Button variant="outline" className="w-full">
+                      <FacebookIcon />
+                      Facebook
+                    </Button>
+                </div>
               </CardContent>
             </form>
           </Form>

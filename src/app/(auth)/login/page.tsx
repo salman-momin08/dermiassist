@@ -31,6 +31,15 @@ function GoogleIcon() {
     )
 }
 
+function FacebookIcon() {
+    return (
+        <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="size-4">
+            <title>Facebook</title>
+            <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" fill="currentColor"></path>
+        </svg>
+    )
+}
+
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
   password: z.string().min(1, { message: "Password is required." }),
@@ -125,10 +134,16 @@ export default function LoginPage() {
                         </span>
                     </div>
                 </div>
-                <Button variant="outline" className="w-full">
-                  <GoogleIcon />
-                  Google
-                </Button>
+                 <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" className="w-full">
+                      <GoogleIcon />
+                      Google
+                    </Button>
+                    <Button variant="outline" className="w-full">
+                      <FacebookIcon />
+                      Facebook
+                    </Button>
+                </div>
               </CardContent>
             </form>
           </Form>
