@@ -24,64 +24,6 @@ export function Chatbot() {
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
 
-    // Draggable state
-    const [position, setPosition] = useState({ x: 0, y: 0 });
-    const [isMounted, setIsMounted] = useState(false);
-    const triggerRef = useRef<HTMLButtonElement>(null);
-    const isDraggingRef = useRef(false);
-    const dragStartPos = useRef({ x: 0, y: 0 });
-
-    useEffect(() => {
-      setIsMounted(true);
-      setPosition({ x: window.innerWidth - 88, y: window.innerHeight - 88 });
-    }, []);
-
-    const handleMouseDown = useCallback((e: MouseEvent<HTMLButtonElement>) => {
-        // Only start drag on left-click
-        if (e.button !== 0) return;
-        if (triggerRef.current) {
-            isDraggingRef.current = true;
-            dragStartPos.current = {
-                x: e.clientX,
-                y: e.clientY,
-            };
-            triggerRef.current.style.cursor = 'grabbing';
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-        }
-    }, []);
-
-    const handleMouseMove = useCallback((e: globalThis.MouseEvent) => {
-        if (isDraggingRef.current && triggerRef.current) {
-            const dx = e.clientX - dragStartPos.current.x;
-            const dy = e.clientY - dragStartPos.current.y;
-            triggerRef.current.style.transform = `translate(${position.x + dx}px, ${position.y + dy}px)`;
-        }
-    }, [position]);
-
-    const handleMouseUp = useCallback((e: globalThis.MouseEvent) => {
-        if (isDraggingRef.current && triggerRef.current) {
-            const finalX = e.clientX - dragStartPos.current.x + position.x;
-            const finalY = e.clientY - dragStartPos.current.y + position.y;
-            setPosition({ x: finalX, y: finalY });
-
-            triggerRef.current.style.cursor = 'grab';
-            isDraggingRef.current = false;
-        }
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-    }, [position, handleMouseMove]);
-    
-    const handleClick = useCallback((e: MouseEvent) => {
-        const distanceMoved = Math.sqrt(
-            Math.pow(e.clientX - dragStartPos.current.x, 2) +
-            Math.pow(e.clientY - dragStartPos.current.y, 2)
-        );
-
-        if (distanceMoved < 5) {
-             setIsOpen(true);
-        }
-    }, []);
 
     const handleSend = async () => {
         if (!input.trim()) return;
@@ -103,24 +45,11 @@ export function Chatbot() {
         }
     };
     
-    if (!isMounted) {
-        return null; // Don't render until the client has mounted and we know the window size
-    }
-
     return (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
                 <Button
-                    ref={triggerRef}
-                    onMouseDown={handleMouseDown}
-                    onClick={handleClick}
-                    className="fixed h-16 w-16 rounded-full shadow-lg z-50"
-                    style={{
-                        top: 0,
-                        left: 0,
-                        transform: `translate(${position.x}px, ${position.y}px)`,
-                        cursor: 'grab',
-                    }}
+                    className="fixed bottom-8 right-8 h-16 w-16 rounded-full shadow-lg z-50"
                     size="icon"
                 >
                     <Bot className="h-8 w-8" />
