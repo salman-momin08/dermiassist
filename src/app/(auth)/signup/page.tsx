@@ -47,7 +47,10 @@ const signupSchema = z.object({
   gender: z.string().optional(),
   email: z.string().email({ message: "Invalid email address." }),
   mobile: z.string().min(10, { message: "Please enter a valid mobile number."}),
-  password: z.string().min(8, { message: "Password must be at least 8 characters." }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters." })
+      .refine((password) => /[A-Z]/.test(password), { message: "Password must contain at least one uppercase letter."})
+      .refine((password) => /[0-9]/.test(password), { message: "Password must contain at least one number."})
+      .refine((password) => /[^A-Za-z0-9]/.test(password), { message: "Password must contain at least one special character."}),
   confirmPassword: z.string(),
   medicalId: z.string().optional(),
   specialization: z.string().optional(),
@@ -322,5 +325,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
-    
