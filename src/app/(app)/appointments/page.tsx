@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useRef } from "react";
@@ -20,38 +19,7 @@ import html2canvas from 'html2canvas';
 import Image from "next/image";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-const mockAppointments = [
-    {
-        id: "APT001",
-        doctorName: "Dr. Emily Carter",
-        doctorLocation: "123 Health St, Wellness City, 45678",
-        doctorPhone: "+1 (555) 123-4567",
-        doctorSignature: "https://placehold.co/150x50.png?text=Dr.+Emily+Carter",
-        date: "2024-08-15T10:30:00",
-        mode: "Online",
-        status: "Confirmed",
-        notes: null,
-        prescription: null,
-    },
-    {
-        id: "APT002",
-        doctorName: "Dr. Ben Adams",
-        doctorLocation: "456 Care Ave, Meditown, 12345",
-        doctorPhone: "+1 (555) 765-4321",
-        doctorSignature: "https://placehold.co/150x50.png?text=Dr.+Ben+Adams",
-        date: "2024-07-25T14:00:00",
-        mode: "Offline",
-        status: "Completed",
-        patientName: "Patient",
-        notes: "Patient's condition has improved significantly. Recommended to continue with the current skincare routine. Follow-up in 3 months.",
-        prescription: {
-            medication: "Tretinoin Cream 0.05%",
-            dosage: "Apply a pea-sized amount to the face once daily at night.",
-            instructions: "Avoid sun exposure. Use moisturizer.",
-            dateIssued: "2024-07-25",
-        },
-    },
-];
+const appointments: any[] = [];
 
 export default function AppointmentsPage() {
     const { toast } = useToast();
@@ -71,7 +39,7 @@ export default function AppointmentsPage() {
         });
     }
     
-    const handleDownloadLetter = async (appointment: typeof mockAppointments[0]) => {
+    const handleDownloadLetter = async (appointment: any) => {
         const input = letterRef.current;
         if (!input) return;
 
@@ -145,14 +113,14 @@ export default function AppointmentsPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Doctor</TableHead>
-                                <TableHead>Date & Time</TableHead>
+                                <TableHead>Date &amp; Time</TableHead>
                                 <TableHead className="hidden md:table-cell">Mode</TableHead>
                                 <TableHead className="hidden md:table-cell">Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {mockAppointments.filter(a => a.status === 'Confirmed').map(appointment => (
+                            {appointments.filter(a => a.status === 'Confirmed').map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
                                     <TableCell>{format(new Date(appointment.date), 'PPpp')}</TableCell>
@@ -191,7 +159,7 @@ export default function AppointmentsPage() {
                                     </TableCell>
                                 </TableRow>
                             ))}
-                             {mockAppointments.filter(a => a.status === 'Confirmed').length === 0 && (
+                             {appointments.filter(a => a.status === 'Confirmed').length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
                                         You have no upcoming appointments.
@@ -220,7 +188,7 @@ export default function AppointmentsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {mockAppointments.filter(a => a.status === 'Completed').map(appointment => (
+                            {appointments.filter(a => a.status === 'Completed').map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
                                     <TableCell>{format(new Date(appointment.date), 'PP')}</TableCell>
@@ -366,7 +334,7 @@ export default function AppointmentsPage() {
                                     </TableCell>
                                 </TableRow>
                             ))}
-                             {mockAppointments.filter(a => a.status === 'Completed').length === 0 && (
+                             {appointments.filter(a => a.status === 'Completed').length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={3} className="text-center h-24 text-muted-foreground">
                                         You have no past appointments.
