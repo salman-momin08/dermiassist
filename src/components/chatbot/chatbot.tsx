@@ -37,42 +37,49 @@ export function Chatbot() {
     }, []);
 
     const handleMouseDown = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+        // Only start drag on left-click
+        if (e.button !== 0) return;
         if (triggerRef.current) {
             isDraggingRef.current = true;
             dragStartPos.current = {
-                x: e.clientX - position.x,
-                y: e.clientY - position.y
+                x: e.clientX,
+                y: e.clientY,
             };
             triggerRef.current.style.cursor = 'grabbing';
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('mouseup', handleMouseUp);
         }
-    }, [position]);
-
-    const handleMouseMove = useCallback((e: globalThis.MouseEvent) => {
-        if (isDraggingRef.current) {
-            setPosition({
-                x: e.clientX - dragStartPos.current.x,
-                y: e.clientY - dragStartPos.current.y
-            });
-        }
     }, []);
 
-    const handleMouseUp = useCallback(() => {
+    const handleMouseMove = useCallback((e: globalThis.MouseEvent) => {
+        if (isDraggingRef.current && triggerRef.current) {
+            const dx = e.clientX - dragStartPos.current.x;
+            const dy = e.clientY - dragStartPos.current.y;
+            triggerRef.current.style.transform = `translate(${position.x + dx}px, ${position.y + dy}px)`;
+        }
+    }, [position]);
+
+    const handleMouseUp = useCallback((e: globalThis.MouseEvent) => {
+        if (isDraggingRef.current && triggerRef.current) {
+            const finalX = e.clientX - dragStartPos.current.x + position.x;
+            const finalY = e.clientY - dragStartPos.current.y + position.y;
+            setPosition({ x: finalX, y: finalY });
+
+            triggerRef.current.style.cursor = 'grab';
+            isDraggingRef.current = false;
+        }
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
-        if (triggerRef.current) {
-            triggerRef.current.style.cursor = 'grab';
-        }
-        // Use a timeout to reset dragging state, allowing the click event to be suppressed
-        setTimeout(() => {
-          isDraggingRef.current = false;
-        }, 0);
-    }, [handleMouseMove]);
+    }, [position, handleMouseMove]);
     
-    const handleClick = useCallback(() => {
-        if (!isDraggingRef.current) {
-            setIsOpen(true);
+    const handleClick = useCallback((e: MouseEvent) => {
+        const distanceMoved = Math.sqrt(
+            Math.pow(e.clientX - dragStartPos.current.x, 2) +
+            Math.pow(e.clientY - dragStartPos.current.y, 2)
+        );
+
+        if (distanceMoved < 5) {
+             setIsOpen(true);
         }
     }, []);
 
