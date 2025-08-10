@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, CheckCircle, AlertTriangle, Upload, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle, AlertTriangle, Upload, XCircle, ShieldCheck, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -24,6 +24,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import Image from "next/image";
 
+// Mock verification status
+type VerificationStatus = 'Verified' | 'Pending' | 'Not Verified';
+
 export default function DoctorProfilePage() {
     const { toast } = useToast();
     const [name, setName] = useState("Dr. Alan Grant");
@@ -33,6 +36,7 @@ export default function DoctorProfilePage() {
     const [location, setLocation] = useState("123 Skin Care Ave, Dermville, 12345");
     const [phone, setPhone] = useState("+1 (555) 987-6543");
     const [signature, setSignature] = useState<string | null>("https://placehold.co/150x50.png?text=Dr.+Alan+Grant");
+    const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>('Not Verified');
     const signatureInputRef = useRef<HTMLInputElement>(null);
 
     const handleProfileSave = () => {
@@ -63,6 +67,14 @@ export default function DoctorProfilePage() {
             reader.readAsDataURL(file);
         }
     };
+    
+    const handleRequestVerification = () => {
+        setVerificationStatus('Pending');
+        toast({
+            title: "Verification Request Sent",
+            description: "Your request has been submitted for admin review. This may take 2-3 business days.",
+        });
+    }
 
 
     return (
@@ -153,14 +165,46 @@ export default function DoctorProfilePage() {
                                 )}
                             </div>
                         </div>
-                         <div className="flex items-center space-x-2 pt-2">
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                            <span className="text-sm font-medium text-muted-foreground">Your identity is verified.</span>
-                        </div>
                     </CardContent>
                     <CardFooter>
                         <Button onClick={handleProfileSave}>Save Profile</Button>
                     </CardFooter>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Verification Status</CardTitle>
+                        <CardDescription>Complete verification to build trust with patients.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {verificationStatus === 'Verified' && (
+                             <div className="flex items-center space-x-2 p-4 bg-green-500/10 rounded-lg">
+                                <ShieldCheck className="h-6 w-6 text-green-600" />
+                                <div >
+                                    <p className="font-semibold text-green-700 dark:text-green-400">Your Identity is Verified</p>
+                                    <p className="text-sm text-muted-foreground">Your profile is visible to patients and you have full access.</p>
+                                </div>
+                            </div>
+                        )}
+                         {verificationStatus === 'Pending' && (
+                             <div className="flex items-center space-x-2 p-4 bg-yellow-500/10 rounded-lg">
+                                <ShieldAlert className="h-6 w-6 text-yellow-600" />
+                                <div >
+                                    <p className="font-semibold text-yellow-700 dark:text-yellow-400">Verification Pending</p>
+                                    <p className="text-sm text-muted-foreground">Your request is under review by our admin team.</p>
+                                </div>
+                            </div>
+                        )}
+                        {verificationStatus === 'Not Verified' && (
+                             <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-l-4 border-primary bg-secondary/50 rounded-lg">
+                                <div>
+                                    <h3 className="font-semibold">Complete Your Verification</h3>
+                                    <p className="text-sm text-muted-foreground">Submit your profile for review to get verified.</p>
+                                </div>
+                                <Button className="mt-4 sm:mt-0" onClick={handleRequestVerification}>Request Verification</Button>
+                            </div>
+                        )}
+                    </CardContent>
                 </Card>
 
                  <Card>

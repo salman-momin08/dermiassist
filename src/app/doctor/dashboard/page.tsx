@@ -7,11 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { CalendarCheck, Users, FileText, Bot, Loader2, BookUser } from "lucide-react"
+import { CalendarCheck, Users, FileText, Bot, Loader2, BookUser, ShieldAlert } from "lucide-react"
 import { generateAiReportSummary } from "@/ai/flows/generate-ai-report-summary"
 import { generateCaseFileSummary } from "@/ai/flows/generate-case-file-summary"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/hooks/use-toast"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import Link from "next/link"
 
 const initialAppointments = [
     {
@@ -57,6 +59,9 @@ const mockDashboardStats = {
     newPatientsThisMonth: 2,
     reportsToReview: 8,
 };
+
+// Mock the current doctor's verification status
+const isDoctorVerified = false;
 
 export default function DoctorDashboardPage() {
     const [summary, setSummary] = useState('');
@@ -124,6 +129,19 @@ export default function DoctorDashboardPage() {
                 <p className="text-muted-foreground">Welcome back, Dr. Grant. Here's what's happening today.</p>
             </div>
             
+            {!isDoctorVerified && (
+                <Alert variant="destructive" className="mb-8">
+                    <ShieldAlert className="h-4 w-4" />
+                    <AlertTitle>Verification Required</AlertTitle>
+                    <AlertDescription>
+                        Your account is not verified. Please complete your profile to get access to all features and be visible to patients.
+                        <Button variant="link" className="p-0 h-auto ml-2 text-destructive font-semibold" asChild>
+                            <Link href="/doctor/profile">Go to Profile</Link>
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -244,3 +262,5 @@ export default function DoctorDashboardPage() {
         </div>
     );
 }
+
+    

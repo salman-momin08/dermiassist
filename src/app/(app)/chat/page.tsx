@@ -1,15 +1,16 @@
 
 "use client"
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Send, User } from 'lucide-react';
+import { Search, Send, User, Paperclip, Image as ImageIcon, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
+import Image from 'next/image';
 
 const mockDoctors = [
   { id: '1', name: 'Dr. Alan Grant', lastMessage: 'It\'s best to apply it at night...', avatar: 'https://placehold.co/40x40.png', online: true },
@@ -17,7 +18,13 @@ const mockDoctors = [
   { id: '3', name: 'Dr. Ben Adams', lastMessage: 'Let\'s schedule a follow-up call.', avatar: 'https://placehold.co/40x40.png', online: true },
 ];
 
-const mockMessages: Record<string, { sender: 'patient' | 'doctor'; text: string }[]> = {
+type Message = {
+    sender: 'patient' | 'doctor';
+    text?: string;
+    image?: string;
+};
+
+const mockMessages: Record<string, Message[]> = {
   '1': [
     { sender: 'patient', text: 'Hello Dr. Grant, I wanted to ask about the prescription.' },
     { sender: 'doctor', text: 'Hi Liam, of course. What is your question?' },
@@ -39,6 +46,8 @@ export default function ChatPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState(mockMessages);
   const [inputValue, setInputValue] = useState("");
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedDoctor = mockDoctors.find(p => p.id === selectedDoctorId);
   const currentMessages = messages[selectedDoctorId as keyof typeof messages] || [];
@@ -48,16 +57,43 @@ export default function ChatPage() {
   );
 
   const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() && !attachedImage) return;
 
-    const newMessage = { sender: 'patient' as const, text: inputValue };
+    const newMessage: Message = { sender: 'patient' as const };
+    if (inputValue.trim()) {
+        newMessage.text = inputValue;
+    }
+    if (attachedImage) {
+        newMessage.image = attachedImage;
+    }
+    
     const updatedMessages = {
       ...messages,
       [selectedDoctorId]: [...currentMessages, newMessage],
     };
     setMessages(updatedMessages);
     setInputValue("");
+    setAttachedImage(null);
   };
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAttachedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const lastMessageText = (docId: string) => {
+    const lastMsg = messages[docId]?.slice(-1)[0];
+    if (!lastMsg) return 'No messages yet';
+    if (lastMsg.text) return lastMsg.text;
+    if (lastMsg.image) return 'Sent an image';
+    return '...';
+  }
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -92,7 +128,7 @@ export default function ChatPage() {
                                         </Avatar>
                                         <div className="flex-grow">
                                             <p className="font-semibold">{doctor.name}</p>
-                                            <p className="text-sm text-muted-foreground truncate">{messages[doctor.id]?.slice(-1)[0]?.text || 'No messages yet'}</p>
+                                            <p className="text-sm text-muted-foreground truncate">{lastMessageText(doctor.id)}</p>
                                         </div>
                                     </div>
                                 </button>
@@ -126,8 +162,9 @@ export default function ChatPage() {
                                                 <AvatarFallback>{selectedDoctor.name.charAt(0)}</AvatarFallback>
                                             </Avatar>
                                         )}
-                                        <div className={cn("max-w-[70%] rounded-xl p-3", msg.sender === 'patient' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                            <p>{msg.text}</p>
+                                        <div className={cn("max-w-[70%] rounded-xl p-3 space-y-2", msg.sender === 'patient' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                            {msg.text && <p>{msg.text}</p>}
+                                            {msg.image && <Image src={msg.image} alt="attached image" width={200} height={200} className="rounded-md" />}
                                         </div>
                                         {msg.sender === 'patient' && (
                                             <Avatar className="h-8 w-8">
@@ -138,8 +175,26 @@ export default function ChatPage() {
                                 ))}
                             </div>
                         </ScrollArea>
-                        <div className="p-4 border-t">
+                        <div className="p-4 border-t space-y-2">
+                             {attachedImage && (
+                                <div className="relative w-24 h-24">
+                                    <Image src={attachedImage} alt="preview" layout="fill" objectFit="cover" className="rounded-md" />
+                                    <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => setAttachedImage(null)}>
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
                             <div className="relative flex items-center gap-2">
+                                <Input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                />
+                                <Button size="icon" variant="ghost" onClick={() => fileInputRef.current?.click()}>
+                                    <Paperclip className="h-5 w-5" />
+                                </Button>
                                 <Input 
                                     placeholder="Type your message..." 
                                     className="pr-12" 
@@ -147,7 +202,7 @@ export default function ChatPage() {
                                     onChange={(e) => setInputValue(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                                 />
-                                <Button size="icon" onClick={handleSendMessage} disabled={!inputValue.trim()}>
+                                <Button size="icon" onClick={handleSendMessage} disabled={!inputValue.trim() && !attachedImage}>
                                     <Send className="h-4 w-4" />
                                 </Button>
                             </div>
@@ -163,3 +218,5 @@ export default function ChatPage() {
     </div>
   )
 }
+
+    
