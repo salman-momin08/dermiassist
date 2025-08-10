@@ -78,7 +78,7 @@ export default function DoctorProfilePage() {
             if (type === 'certificate') setCertificate(result.url);
             toast({ title: "Upload Successful", description: `Your ${type} has been updated.` });
         } else {
-            toast({ title: "Upload Failed", description: result.message, variant: "destructive" });
+            toast({ title: "Upload Failed", description: result.message || "Upload failed", variant: "destructive" });
         }
     };
     
