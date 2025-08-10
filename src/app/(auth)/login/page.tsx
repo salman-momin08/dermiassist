@@ -1,3 +1,9 @@
+
+"use client"
+
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -11,8 +17,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
 import Link from 'next/link';
-import { Separator } from '@/components/ui/separator';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
 function GoogleIcon() {
     return (
@@ -23,7 +31,39 @@ function GoogleIcon() {
     )
 }
 
+const loginSchema = z.object({
+  email: z.string().email({ message: "Invalid email address." }),
+  password: z.string().min(1, { message: "Password is required." }),
+});
+
+
 export default function LoginPage() {
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const form = useForm<z.infer<typeof loginSchema>>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = (values: z.infer<typeof loginSchema>) => {
+    // Simulate API call
+    console.log(values);
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        toast({
+          title: "Login Successful",
+          description: "Welcome back! Redirecting you to your dashboard.",
+        });
+        router.push("/dashboard");
+        resolve(true);
+      }, 1000);
+    });
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-sm relative">
@@ -42,33 +82,56 @@ export default function LoginPage() {
               Enter your email below to login to your account.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="m@example.com" required />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required />
-            </div>
-             <Button type="submit" className="w-full" asChild>
-                <Link href="/dashboard">Login</Link>
-            </Button>
-            <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <CardContent className="grid gap-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem className="grid gap-2">
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="m@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem className="grid gap-2">
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                 <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Login
+                </Button>
+                <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-card px-2 text-muted-foreground">
+                        Or continue with
+                        </span>
+                    </div>
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">
-                    Or continue with
-                    </span>
-                </div>
-            </div>
-            <Button variant="outline" className="w-full">
-              <GoogleIcon />
-              Google
-            </Button>
-          </CardContent>
+                <Button variant="outline" className="w-full">
+                  <GoogleIcon />
+                  Google
+                </Button>
+              </CardContent>
+            </form>
+          </Form>
           <CardFooter className="text-sm">
             <p className="w-full text-center text-muted-foreground">
               Don't have an account?{' '}
