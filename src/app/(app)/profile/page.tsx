@@ -1,10 +1,12 @@
 
+"use client"
+
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2, Upload } from "lucide-react";
 import Link from "next/link";
 import {
   AlertDialog,
@@ -17,8 +19,44 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { uploadFile } from "@/lib/actions";
+import { useToast } from "@/hooks/use-toast";
+
 
 export default function ProfilePage() {
+    const [profileImage, setProfileImage] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const { toast } = useToast();
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const result = await uploadFile(formData);
+
+        setIsUploading(false);
+        if (result.success && result.url) {
+            setProfileImage(result.url);
+            toast({
+                title: "Image Uploaded",
+                description: "Your profile picture has been updated.",
+            });
+        } else {
+            toast({
+                title: "Upload Failed",
+                description: result.message || "An error occurred during upload.",
+                variant: "destructive",
+            });
+        }
+    };
+
+
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-2xl">
             <div className="mb-6">
@@ -44,7 +82,25 @@ export default function ProfilePage() {
                         <CardTitle>Personal Information</CardTitle>
                         <CardDescription>Update your personal details here.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-6">
+                        <div className="flex items-center space-x-6">
+                            <div className="relative">
+                                <Avatar className="h-24 w-24">
+                                    <AvatarImage src={profileImage || "https://placehold.co/100x100.png?text=P"} alt="Patient" />
+                                    <AvatarFallback>P</AvatarFallback>
+                                </Avatar>
+                                <Button size="icon" variant="outline" className="absolute bottom-0 right-0 rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                                    <span className="sr-only">Upload Profile Picture</span>
+                                </Button>
+                                <Input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-xl font-bold">Patient</h3>
+                                <p className="text-muted-foreground">patient@example.com</p>
+                            </div>
+                        </div>
+
                         <div className="space-y-2">
                             <Label htmlFor="name">Full Name</Label>
                             <Input id="name" defaultValue="Patient" />
