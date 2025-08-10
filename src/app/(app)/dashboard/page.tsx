@@ -1,18 +1,24 @@
+
+"use client";
+
+import { useAnalyses } from "@/hooks/use-analyses";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Activity, Stethoscope, FileText, PlusCircle, ArrowUpRight, BadgeHelp } from "lucide-react";
+import { Activity, Stethoscope, FileText, PlusCircle, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { useMemo } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const chartData = [
-  { month: "January", analyses: 186 },
-  { month: "February", analyses: 305 },
-  { month: "March", analyses: 237 },
-  { month: "April", analyses: 73 },
-  { month: "May", analyses: 209 },
-  { month: "June", analyses: 214 },
+  { month: "January", analyses: 1 },
+  { month: "February", analyses: 3 },
+  { month: "March", analyses: 2 },
+  { month: "April", analyses: 5 },
+  { month: "May", analyses: 4 },
+  { month: "June", analyses: 6 },
 ]
 
 const chartConfig = {
@@ -22,7 +28,51 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
+// Mock data - in a real app this would come from an API
+const mockAppointments = {
+    total: 2,
+    upcoming: 1,
+};
+
 export default function DashboardPage() {
+  const { analyses, isLoading } = useAnalyses();
+
+  const dashboardStats = useMemo(() => {
+    const totalAnalyses = analyses.length;
+    const analysesLastMonth = analyses.filter(a => {
+        const analysisDate = new Date(a.date);
+        const today = new Date();
+        const lastMonth = new Date(today.setMonth(today.getMonth() - 1));
+        return analysisDate > lastMonth;
+    }).length;
+    const recentAnalyses = analyses.slice(0, 3);
+
+    return { totalAnalyses, analysesLastMonth, recentAnalyses };
+  }, [analyses]);
+
+  if (isLoading) {
+    return (
+       <div className="container mx-auto p-4 md:p-8 space-y-8">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-4 w-80" />
+            </div>
+            <Skeleton className="h-10 w-48" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+          </div>
+           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-7">
+                <Skeleton className="lg:col-span-4 h-96" />
+                <Skeleton className="lg:col-span-3 h-96" />
+           </div>
+       </div>
+    )
+  }
+
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="flex items-center justify-between space-y-2 mb-8">
@@ -51,8 +101,8 @@ export default function DashboardPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">+2 since last month</p>
+            <div className="text-2xl font-bold">{dashboardStats.totalAnalyses}</div>
+            <p className="text-xs text-muted-foreground">+{dashboardStats.analysesLastMonth} since last month</p>
           </CardContent>
         </Card>
         <Card>
@@ -61,8 +111,8 @@ export default function DashboardPage() {
             <Stethoscope className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2</div>
-            <p className="text-xs text-muted-foreground">1 upcoming</p>
+            <div className="text-2xl font-bold">{mockAppointments.total}</div>
+            <p className="text-xs text-muted-foreground">{mockAppointments.upcoming} upcoming</p>
           </CardContent>
         </Card>
         <Card>
@@ -71,7 +121,7 @@ export default function DashboardPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{dashboardStats.totalAnalyses}</div>
             <p className="text-xs text-muted-foreground">All reports are downloadable</p>
           </CardContent>
         </Card>
@@ -129,33 +179,25 @@ export default function DashboardPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {dashboardStats.recentAnalyses.length > 0 ? (
+                    dashboardStats.recentAnalyses.map(analysis => (
+                       <TableRow key={analysis.id}>
+                          <TableCell>
+                              <div className="font-medium">{analysis.condition}</div>
+                              <div className="hidden text-sm text-muted-foreground md:inline">
+                                  {analysis.severity}
+                              </div>
+                          </TableCell>
+                          <TableCell className="text-right">{analysis.date}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
                     <TableRow>
-                        <TableCell>
-                            <div className="font-medium">Acne Vulgaris</div>
-                            <div className="hidden text-sm text-muted-foreground md:inline">
-                                Mild
-                            </div>
-                        </TableCell>
-                        <TableCell className="text-right">2024-05-15</TableCell>
+                      <TableCell colSpan={2} className="text-center h-24">
+                        No recent analyses.
+                      </TableCell>
                     </TableRow>
-                     <TableRow>
-                        <TableCell>
-                            <div className="font-medium">Eczema</div>
-                             <div className="hidden text-sm text-muted-foreground md:inline">
-                                Moderate
-                            </div>
-                        </TableCell>
-                        <TableCell className="text-right">2024-04-22</TableCell>
-                    </TableRow>
-                     <TableRow>
-                        <TableCell>
-                            <div className="font-medium">Rosacea</div>
-                             <div className="hidden text-sm text-muted-foreground md:inline">
-                                Mild
-                            </div>
-                        </TableCell>
-                        <TableCell className="text-right">2024-03-10</TableCell>
-                    </TableRow>
+                  )}
                 </TableBody>
             </Table>
           </CardContent>

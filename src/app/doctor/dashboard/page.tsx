@@ -51,6 +51,13 @@ const initialAppointments = [
     },
 ];
 
+// Mock data, in a real app this would come from an API
+const mockDashboardStats = {
+    totalPatients: 48,
+    newPatientsThisMonth: 2,
+    reportsToReview: 8,
+};
+
 export default function DoctorDashboardPage() {
     const [summary, setSummary] = useState('');
     const [caseFile, setCaseFile] = useState('');
@@ -134,8 +141,8 @@ export default function DoctorDashboardPage() {
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">48</div>
-                        <p className="text-xs text-muted-foreground">+2 this month</p>
+                        <div className="text-2xl font-bold">{mockDashboardStats.totalPatients}</div>
+                        <p className="text-xs text-muted-foreground">+{mockDashboardStats.newPatientsThisMonth} this month</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -144,7 +151,7 @@ export default function DoctorDashboardPage() {
                         <FileText className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">8</div>
+                        <div className="text-2xl font-bold">{mockDashboardStats.reportsToReview}</div>
                         <p className="text-xs text-muted-foreground">From new and existing patients.</p>
                     </CardContent>
                 </Card>

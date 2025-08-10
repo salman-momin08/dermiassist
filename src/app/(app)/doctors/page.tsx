@@ -1,4 +1,7 @@
 
+"use client"
+
+import { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAnalyses } from '@/hooks/use-analyses';
+import { useToast } from '@/hooks/use-toast';
 
 const doctors = [
     {
@@ -48,13 +53,21 @@ const doctors = [
     },
 ];
 
-const analyses = [
-    { id: '1', condition: 'Acne Vulgaris', date: '2024-05-15' },
-    { id: '2', condition: 'Eczema', date: '2024-04-22' },
-    { id: '3', condition: 'Rosacea', date: '2024-03-10' },
-];
-
 export default function DoctorsPage() {
+    const { analyses, isLoading } = useAnalyses();
+    const { toast } = useToast();
+    const [openDialog, setOpenDialog] = useState<string | null>(null);
+
+    const handleRequestAppointment = (doctorName: string) => {
+        // In a real app, this would send a request to a backend.
+        // Here, we'll just simulate it with a toast.
+        toast({
+            title: "Request Sent",
+            description: `Your appointment request has been sent to ${doctorName}. You will be notified once it's confirmed.`,
+        });
+        setOpenDialog(null); // Close the dialog
+    }
+
     return (
         <div className="container mx-auto p-4 md:p-8">
             <div className="flex flex-col items-center justify-center space-y-2 mb-8 text-center">
@@ -93,7 +106,7 @@ export default function DoctorsPage() {
                             </div>
                         </CardContent>
                         <CardFooter>
-                            <Dialog>
+                            <Dialog open={openDialog === doctor.name} onOpenChange={(isOpen) => setOpenDialog(isOpen ? doctor.name : null)}>
                                 <DialogTrigger asChild>
                                     <Button className="w-full">Request Appointment</Button>
                                 </DialogTrigger>
@@ -109,12 +122,12 @@ export default function DoctorsPage() {
                                             <Label>Appointment Mode</Label>
                                             <RadioGroup defaultValue="online" className="flex gap-4">
                                                 <div className="flex items-center space-x-2">
-                                                    <RadioGroupItem value="online" id="online" />
-                                                    <Label htmlFor="online">Online</Label>
+                                                    <RadioGroupItem value="online" id={`online-${doctor.name}`} />
+                                                    <Label htmlFor={`online-${doctor.name}`}>Online</Label>
                                                 </div>
                                                 <div className="flex items-center space-x-2">
-                                                    <RadioGroupItem value="offline" id="offline" />
-                                                    <Label htmlFor="offline">Offline</Label>
+                                                    <RadioGroupItem value="offline" id={`offline-${doctor.name}`} />
+                                                    <Label htmlFor={`offline-${doctor.name}`}>Offline</Label>
                                                 </div>
                                             </RadioGroup>
                                         </div>
@@ -125,11 +138,15 @@ export default function DoctorsPage() {
                                                     <SelectValue placeholder="Select a report to attach" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {analyses.map(a => (
-                                                        <SelectItem key={a.id} value={a.id}>
-                                                            {a.condition} - {a.date}
-                                                        </SelectItem>
-                                                    ))}
+                                                    {isLoading ? (
+                                                        <SelectItem value="loading" disabled>Loading reports...</SelectItem>
+                                                    ) : (
+                                                      analyses.map(a => (
+                                                          <SelectItem key={a.id} value={a.id}>
+                                                              {a.condition} - {a.date}
+                                                          </SelectItem>
+                                                      ))
+                                                    )}
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -139,7 +156,7 @@ export default function DoctorsPage() {
                                         </div>
                                     </div>
                                     <DialogFooter>
-                                        <Button type="submit">Send Request</Button>
+                                        <Button type="submit" onClick={() => handleRequestAppointment(doctor.name)}>Send Request</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>

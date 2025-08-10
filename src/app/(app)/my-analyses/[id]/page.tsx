@@ -15,6 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { visualProgressAnalysis } from '@/ai/flows/visual-progress-analysis';
 import { generateHealingVideo } from '@/ai/flows/generate-healing-video';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function AnalysisDetailPage({ params }: { params: { id: string } }) {
     const { getAnalysisById, isLoading } = useAnalyses();
@@ -28,7 +30,8 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
     const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
     const [videoUri, setVideoUri] = useState<string | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
-
+    const reportRef = useRef<HTMLDivElement>(null);
+    const [isDownloading, setIsDownloading] = useState(false);
 
     useEffect(() => {
         if (!isLoading) {
@@ -105,6 +108,34 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
         }
     };
 
+    const handleDownloadPdf = async () => {
+        const input = reportRef.current;
+        if (!input || !analysis) return;
+
+        setIsDownloading(true);
+
+        try {
+            const canvas = await html2canvas(input, {
+                 scale: 2,
+                 useCORS: true,
+                 backgroundColor: null,
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'px', [canvas.width, canvas.height]);
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`SkinWise-Report-${analysis.condition}-${analysis.date}.pdf`);
+        } catch (error) {
+            console.error("Failed to generate PDF:", error);
+            toast({
+                title: "Download Failed",
+                description: "Could not generate the PDF report. Please try again.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     const resetDialog = () => {
         setProgressImage(null);
         setProgressSummary(null);
@@ -136,7 +167,7 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-6">
+                <div ref={reportRef} className="lg:col-span-2 space-y-6 bg-background p-4 rounded-lg">
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-3xl font-headline">Analysis Report: {analysis.condition}</CardTitle>
@@ -178,6 +209,14 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
                             </CardContent>
                         </Card>
                     </div>
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Your Submitted Photo</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                             <Image src={analysis.image} alt="Skin condition" width={400} height={400} className="rounded-lg w-full aspect-square object-cover" data-ai-hint="skin condition" />
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <div className="space-y-6">
@@ -290,9 +329,18 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
                         </DialogContent>
                     </Dialog>
                     
-                    <Button className="w-full">
-                        <FileText className="mr-2 h-4 w-4" />
-                        Download Report (PDF)
+                    <Button className="w-full" onClick={handleDownloadPdf} disabled={isDownloading}>
+                        {isDownloading ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Downloading...
+                            </>
+                        ) : (
+                             <>
+                                <FileText className="mr-2 h-4 w-4" />
+                                Download Report (PDF)
+                            </>
+                        )}
                     </Button>
                 </div>
             </div>
