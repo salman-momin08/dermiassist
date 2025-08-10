@@ -29,14 +29,16 @@ type VerificationStatus = 'Verified' | 'Pending' | 'Not Verified';
 
 export default function DoctorProfilePage() {
     const { toast } = useToast();
-    const [name, setName] = useState("Dr. Alan Grant");
+    // In a real app, this data would come from an API/auth context
+    const [name, setName] = useState("Doctor");
+    const [email, setEmail] = useState("doctor@example.com");
     const [specialization, setSpecialization] = useState("General Dermatology");
-    const [bio, setBio] = useState("An experienced dermatologist with over 15 years of practice, specializing in a wide range of skin conditions. Committed to providing compassionate and comprehensive care to all patients.");
+    const [bio, setBio] = useState("");
     const [notifications, setNotifications] = useState(true);
-    const [location, setLocation] = useState("123 Skin Care Ave, Dermville, 12345");
-    const [phone, setPhone] = useState("+1 (555) 987-6543");
+    const [location, setLocation] = useState("");
+    const [phone, setPhone] = useState("");
     
-    const [signature, setSignature] = useState<string | null>("https://placehold.co/150x50.png?text=Dr.+Alan+Grant");
+    const [signature, setSignature] = useState<string | null>(null);
     const [certificate, setCertificate] = useState<string | null>(null);
     const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>('Not Verified');
 
@@ -253,7 +255,7 @@ export default function DoctorProfilePage() {
                      <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" defaultValue="dralan.grant@skinwise.com" disabled />
+                            <Input id="email" type="email" value={email} disabled />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="new-password">Change Password</Label>

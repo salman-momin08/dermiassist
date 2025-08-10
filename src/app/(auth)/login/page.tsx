@@ -59,18 +59,15 @@ export default function LoginPage() {
   });
 
   const onSubmit = (values: z.infer<typeof loginSchema>) => {
-    // Simulate API call
-    console.log(values);
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        toast({
-          title: "Login Successful",
-          description: "Welcome back! Redirecting you to your dashboard.",
-        });
-        router.push("/dashboard");
-        resolve(true);
-      }, 1000);
+    // In a real app, you'd handle the login logic here, e.g., call an API.
+    console.log("Login form submitted with values:", values);
+    toast({
+      title: "Form Submitted",
+      description: "Check the console for the submitted data.",
     });
+    // On successful login from your API, you would then redirect.
+    // For now, we'll just log it.
+    // router.push("/dashboard");
   };
 
   return (

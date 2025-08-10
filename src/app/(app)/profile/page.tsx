@@ -30,6 +30,12 @@ export default function ProfilePage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
 
+    // In a real app, this user data would come from a context or API
+    const user = {
+        name: 'Patient',
+        email: 'patient@example.com'
+    };
+
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -87,7 +93,7 @@ export default function ProfilePage() {
                             <div className="relative">
                                 <Avatar className="h-24 w-24">
                                     <AvatarImage src={profileImage || "https://placehold.co/100x100.png?text=P"} alt="Patient" />
-                                    <AvatarFallback>P</AvatarFallback>
+                                    <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                                 <Button size="icon" variant="outline" className="absolute bottom-0 right-0 rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                                     {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -96,18 +102,18 @@ export default function ProfilePage() {
                                 <Input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                             </div>
                             <div className="space-y-1">
-                                <h3 className="text-xl font-bold">Patient</h3>
-                                <p className="text-muted-foreground">patient@example.com</p>
+                                <h3 className="text-xl font-bold">{user.name}</h3>
+                                <p className="text-muted-foreground">{user.email}</p>
                             </div>
                         </div>
 
                         <div className="space-y-2">
                             <Label htmlFor="name">Full Name</Label>
-                            <Input id="name" defaultValue="Patient" />
+                            <Input id="name" defaultValue={user.name} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" defaultValue="patient@example.com" disabled />
+                            <Input id="email" type="email" defaultValue={user.email} disabled />
                             <p className="text-xs text-muted-foreground">Your email address is used for logging in and cannot be changed.</p>
                         </div>
                     </CardContent>

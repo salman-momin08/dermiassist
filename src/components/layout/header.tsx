@@ -66,11 +66,14 @@ export function AppHeader({ authenticated = false, role = 'patient' }: AppHeader
   }
 
   const getUserNavProps = () => {
+    // In a real app, this data would come from an authentication context or API
+    const defaultUser = { name: "User", email: "user@example.com" };
+    
     switch(role) {
       case 'doctor':
-        return { name: 'Dr. Alan Grant', email: 'dralan.grant@skinwise.com', role: 'doctor' as const };
+        return { name: 'Doctor', email: 'doctor@example.com', role: 'doctor' as const };
       case 'admin':
-        return { name: 'Admin User', email: 'admin@skinwise.com', role: 'admin' as const };
+        return { name: 'Admin', email: 'admin@example.com', role: 'admin' as const };
       case 'patient':
       default:
         return { name: 'Patient', email: 'patient@example.com', role: 'patient' as const };

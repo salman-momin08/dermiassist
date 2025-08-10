@@ -111,19 +111,15 @@ export default function SignupPage() {
   const role = form.watch("role");
 
   const onSubmit = (values: z.infer<typeof signupSchema>) => {
-    // Simulate API call
-    console.log(values);
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        toast({
-          title: "Account Created",
-          description: "Welcome! We're redirecting you to your dashboard.",
-        });
-        const destination = values.role === 'doctor' ? '/doctor/dashboard' : '/dashboard';
-        router.push(destination);
-        resolve(true);
-      }, 1000);
+    // In a real app, you would handle account creation here (e.g., call an API)
+    console.log("Signup form submitted with values:", values);
+     toast({
+        title: "Account Creation Submitted",
+        description: "Check the console for the submitted form data.",
     });
+    // On successful account creation from your API, you would then redirect.
+    // const destination = values.role === 'doctor' ? '/doctor/dashboard' : '/dashboard';
+    // router.push(destination);
   };
 
   return (

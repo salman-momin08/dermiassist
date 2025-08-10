@@ -7,6 +7,12 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminProfilePage() {
+    // In a real app, this data would come from an authentication context or API
+    const user = {
+        name: "Admin",
+        email: "admin@example.com"
+    };
+
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-2xl">
             <div className="mb-6">
@@ -35,11 +41,11 @@ export default function AdminProfilePage() {
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="name">Full Name</Label>
-                            <Input id="name" defaultValue="Admin User" />
+                            <Input id="name" defaultValue={user.name} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" defaultValue="admin@skinwise.com" disabled />
+                            <Input id="email" type="email" defaultValue={user.email} disabled />
                             <p className="text-xs text-muted-foreground">Your email address is used for logging in and cannot be changed.</p>
                         </div>
                     </CardContent>
