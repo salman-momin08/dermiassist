@@ -11,25 +11,15 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { notFound } from "next/navigation";
 
-const mockCaseDetails = {
-    id: "CASE001",
-    patientName: "Liam Johnson",
-    patientAge: 28,
-    patientGender: "Male",
-    status: "Active",
-    condition: "Acne Vulgaris",
-    timeline: [
-        { type: "appointment", date: "2024-07-28", title: "Follow-up Consultation", description: "Online session to review progress." },
-        { type: "report", date: "2024-07-20", title: "AI Analysis Report", description: "Initial analysis submitted by patient." },
-        { type: "appointment", date: "2024-07-15", title: "Initial Consultation", description: "First appointment booked." },
-    ],
-    notes: "Patient reports improvement with the prescribed topical treatment. Redness has decreased. Recommending continued use and a follow-up in 2 weeks. Advised on a non-comedogenic skincare routine.",
-};
+// In a real app, you would fetch this data based on the `params.id`
+const mockCaseDetails: any = null;
 
 export default function CaseDetailPage({ params }: { params: { id: string } }) {
     const { toast } = useToast();
-    const [notes, setNotes] = useState(mockCaseDetails.notes);
+    // In a real app, notes would likely be part of the fetched case details state
+    const [notes, setNotes] = useState(mockCaseDetails?.notes || "");
 
     const handleSaveNotes = () => {
         // In a real app, you'd save this to a database.
@@ -39,6 +29,29 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
             description: "Your notes for this case have been successfully updated.",
         });
     };
+
+    if (!mockCaseDetails) {
+       return (
+        <div className="container mx-auto p-4 md:p-8">
+             <div className="mb-6">
+                <Button variant="outline" asChild>
+                    <Link href="/doctor/cases">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back to All Cases
+                    </Link>
+                </Button>
+            </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Case Not Found</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground">The case you are looking for does not exist.</p>
+                </CardContent>
+            </Card>
+        </div>
+       )
+    }
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -70,7 +83,7 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-6">
-                                {mockCaseDetails.timeline.map((item, index) => (
+                                {mockCaseDetails.timeline.map((item: any, index: number) => (
                                     <div key={index} className="flex gap-4">
                                         <div className="flex flex-col items-center">
                                             <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary">

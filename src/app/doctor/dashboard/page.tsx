@@ -15,49 +15,13 @@ import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import Link from "next/link"
 
-const initialAppointments = [
-    {
-        id: "APP001",
-        patientName: "Liam Johnson",
-        patientAvatar: "https://placehold.co/40x40.png",
-        requestDate: "2024-07-28",
-        mode: "Online",
-        status: "Pending",
-        reportId: "1",
-        reportCondition: "Acne Vulgaris",
-        reportFullText: "Analysis Report: Acne Vulgaris. Generated on 2024-05-15. Severity: Mild. It is recommended to use a gentle cleanser twice a day and apply a non-comedogenic moisturizer. Consider using over-the-counter benzoyl peroxide treatments. Avoid picking or squeezing pimples to prevent scarring. If the condition persists or worsens, consult a dermatologist. Do's: Cleanse your face twice daily with a mild, non-abrasive cleanser. Use non-comedogenic (won't clog pores) skin care products and cosmetics. Drink plenty of water to stay hydrated. Don'ts: Avoid harsh scrubbing or over-washing your face. Do not pick, pop, or squeeze pimples. Limit your intake of high-glycemic foods and dairy products if you notice a link. Submitted Info: Pre-medication: None. Disease Duration: 3 months.",
-        previousNotes: "Initial consultation. Patient is new to the platform. No major concerns reported other than the current acne breakout."
-    },
-    {
-        id: "APP002",
-        patientName: "Olivia Smith",
-        patientAvatar: "https://placehold.co/40x40.png",
-        requestDate: "2024-07-27",
-        mode: "Offline",
-        status: "Pending",
-        reportId: "2",
-        reportCondition: "Eczema",
-        reportFullText: "Analysis Report: Eczema. Generated on 2024-04-22. Severity: Moderate. Recommendations include daily moisturizing with a thick cream, avoiding known triggers like certain fabrics or soaps, and using a humidifier. Short, lukewarm baths are advised. Do's: Moisturize daily. Wear soft, breathable clothing. Use a humidifier in dry or cold weather. Don'ts: Avoid long, hot baths or showers. Steer clear of harsh soaps and detergents. Try not to scratch the affected area to prevent infection. Submitted Info: Pre-medication: Hydrocortisone cream (1%). Disease Duration: 6 months.",
-        previousNotes: "Follow-up for eczema management. Patient reports the hydrocortisone cream is providing some relief but flare-ups persist, especially in dry weather."
-    },
-    {
-        id: "APP003",
-        patientName: "Noah Williams",
-        patientAvatar: "https://placehold.co/40x40.png",
-        requestDate: "2024-07-27",
-        mode: "Online",
-        status: "Pending",
-        reportId: "3",
-        reportCondition: "Rosacea",
-        reportFullText: "Analysis Report: Rosacea. Generated on 2024-03-10. Severity: Mild. It is recommended to identify and avoid triggers such as spicy foods, alcohol, and extreme temperatures. A gentle skincare routine is crucial. Sun protection is paramount. Do's: Use sunscreen daily. Choose gentle, fragrance-free skincare products. Keep a diary to identify personal triggers. Don'ts: Avoid sun exposure without protection. Do not use harsh exfoliants or astringents. Be cautious with hot beverages and spicy foods. Submitted Info: Pre-medication: None. Disease Duration: 1 year."
-    },
-];
+const initialAppointments: any[] = [];
 
 // Mock data, in a real app this would come from an API
 const mockDashboardStats = {
-    totalPatients: 48,
-    newPatientsThisMonth: 2,
-    reportsToReview: 8,
+    totalPatients: 0,
+    newPatientsThisMonth: 0,
+    reportsToReview: 0,
 };
 
 // Mock the current doctor's verification status
@@ -262,5 +226,3 @@ export default function DoctorDashboardPage() {
         </div>
     );
 }
-
-    

@@ -12,14 +12,7 @@ import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const chartData = [
-  { month: "January", analyses: 1 },
-  { month: "February", analyses: 3 },
-  { month: "March", analyses: 2 },
-  { month: "April", analyses: 5 },
-  { month: "May", analyses: 4 },
-  { month: "June", analyses: 6 },
-]
+const chartData: any[] = [];
 
 const chartConfig = {
   analyses: {
@@ -28,10 +21,9 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-// Mock data - in a real app this would come from an API
 const mockAppointments = {
-    total: 2,
-    upcoming: 1,
+    total: 0,
+    upcoming: 0,
 };
 
 export default function DashboardPage() {
@@ -136,23 +128,29 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <BarChart accessibilityLayer data={chartData}>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  tickLine={false}
-                  tickMargin={10}
-                  axisLine={false}
-                  tickFormatter={(value) => value.slice(0, 3)}
-                />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent hideLabel />}
-                />
-                <Bar dataKey="analyses" fill="var(--color-analyses)" radius={8} />
-              </BarChart>
-            </ChartContainer>
+            {chartData.length > 0 ? (
+                <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                  <BarChart accessibilityLayer data={chartData}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      tickLine={false}
+                      tickMargin={10}
+                      axisLine={false}
+                      tickFormatter={(value) => value.slice(0, 3)}
+                    />
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent hideLabel />}
+                    />
+                    <Bar dataKey="analyses" fill="var(--color-analyses)" radius={8} />
+                  </BarChart>
+                </ChartContainer>
+            ) : (
+                <div className="flex h-[300px] w-full items-center justify-center text-muted-foreground">
+                    No analysis data available.
+                </div>
+            )}
           </CardContent>
         </Card>
         <Card className="lg:col-span-3">

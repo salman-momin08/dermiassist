@@ -27,29 +27,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 
-const mockUsersData = [
-    { id: 'usr_1', name: 'Patient One', email: 'patient1@example.com', role: 'patient', joined: '2024-07-20' },
-    { id: 'usr_2', name: 'Dr. Emily Carter', email: 'dremily.carter@skinwise.com', role: 'doctor', joined: '2024-07-19' },
-    { id: 'usr_3', name: 'Patient Two', email: 'patient2@example.com', role: 'patient', joined: '2024-07-18' },
-    { id: 'usr_4', name: 'Dr. Ben Adams', email: 'drben.adams@skinwise.com', role: 'doctor', joined: '2024-07-15' },
-    { id: 'usr_5', name: 'Dr. Olivia Chen', email: 'drolivia.chen@skinwise.com', role: 'doctor', joined: '2024-07-12' },
-];
+const mockUsersData: any[] = [];
 
-const mockDoctorsData = [
-    { id: 'doc_1', name: 'Dr. Ben Adams', specialization: 'Pediatric Dermatology', joined: '2024-07-15', status: 'Verified' },
-    { id: 'doc_2', name: 'Dr. Olivia Chen', specialization: 'Cosmetic Dermatology', joined: '2024-07-12', status: 'Verified' },
-    { id: 'doc_3', name: 'Dr. Sarah Jenkins', specialization: 'General Dermatology', joined: '2024-07-21', status: 'Pending' },
-    { id: 'doc_4', name: 'Dr. Emily Carter', specialization: 'General Dermatology', joined: '2024-07-19', status: 'Verified' },
-];
+const mockDoctorsData: any[] = [];
 
-const analyticsData = [
-  { month: "January", users: 12 },
-  { month: "February", users: 23 },
-  { month: "March", users: 31 },
-  { month: "April", users: 25 },
-  { month: "May", users: 42 },
-  { month: "June", users: 51 },
-];
+const analyticsData: any[] = [];
 
 const chartConfig = {
   users: {
@@ -58,12 +40,26 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-type User = typeof mockUsersData[number];
-type Doctor = typeof mockDoctorsData[number];
+type User = {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    joined: string;
+};
+
+type Doctor = {
+    id: string;
+    name: string;
+    specialization: string;
+    joined: string;
+    status: string;
+};
+
 
 export default function AdminDashboardPage() {
-    const [users, setUsers] = useState(mockUsersData);
-    const [doctors, setDoctors] = useState(mockDoctorsData);
+    const [users, setUsers] = useState<User[]>(mockUsersData);
+    const [doctors, setDoctors] = useState<Doctor[]>(mockDoctorsData);
     const [userSearch, setUserSearch] = useState("");
     const [doctorSearch, setDoctorSearch] = useState("");
     const [selectedUser, setSelectedUser] = useState<User | (Doctor & {email?: string, role?: string}) | null>(null);
@@ -200,7 +196,7 @@ export default function AdminDashboardPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredUsers.map(user => (
+                                    {filteredUsers.length > 0 ? filteredUsers.map(user => (
                                     <TableRow key={user.id}>
                                         <TableCell>
                                             <div className="font-medium">{user.name}</div>
@@ -246,7 +242,13 @@ export default function AdminDashboardPage() {
                                             </AlertDialog>
                                         </TableCell>
                                     </TableRow>
-                                    ))}
+                                    )) : (
+                                         <TableRow>
+                                            <TableCell colSpan={3} className="h-24 text-center">
+                                                No users found.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
                                 </TableBody>
                             </Table>
                         </CardContent>
@@ -300,24 +302,30 @@ export default function AdminDashboardPage() {
                     <CardDescription>An overview of platform growth and activity.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                      <BarChart data={analyticsData} accessibilityLayer>
-                        <CartesianGrid vertical={false} />
-                        <XAxis
-                          dataKey="month"
-                          tickLine={false}
-                          tickMargin={10}
-                          axisLine={false}
-                          tickFormatter={(value) => value.slice(0, 3)}
-                        />
-                         <YAxis />
-                        <ChartTooltip
-                          cursor={false}
-                          content={<ChartTooltipContent hideLabel />}
-                        />
-                        <Bar dataKey="users" fill="var(--color-users)" radius={8} />
-                      </BarChart>
-                    </ChartContainer>
+                    {analyticsData.length > 0 ? (
+                        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                          <BarChart data={analyticsData} accessibilityLayer>
+                            <CartesianGrid vertical={false} />
+                            <XAxis
+                              dataKey="month"
+                              tickLine={false}
+                              tickMargin={10}
+                              axisLine={false}
+                              tickFormatter={(value) => value.slice(0, 3)}
+                            />
+                             <YAxis />
+                            <ChartTooltip
+                              cursor={false}
+                              content={<ChartTooltipContent hideLabel />}
+                            />
+                            <Bar dataKey="users" fill="var(--color-users)" radius={8} />
+                          </BarChart>
+                        </ChartContainer>
+                    ) : (
+                        <div className="flex h-[300px] w-full items-center justify-center text-muted-foreground">
+                            No analytics data available.
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -12,11 +12,7 @@ import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 
-const mockDoctors = [
-  { id: '1', name: 'Dr. Alan Grant', lastMessage: 'It\'s best to apply it at night...', avatar: 'https://placehold.co/40x40.png', online: true },
-  { id: '2', name: 'Dr. Emily Carter', lastMessage: 'Thank you for the report.', avatar: 'https://placehold.co/40x40.png', online: false },
-  { id: '3', name: 'Dr. Ben Adams', lastMessage: 'Let\'s schedule a follow-up call.', avatar: 'https://placehold.co/40x40.png', online: true },
-];
+const mockDoctors: any[] = [];
 
 type Message = {
     sender: 'patient' | 'doctor';
@@ -24,33 +20,25 @@ type Message = {
     image?: string;
 };
 
-const mockMessages: Record<string, Message[]> = {
-  '1': [
-    { sender: 'patient', text: 'Hello Dr. Grant, I wanted to ask about the prescription.' },
-    { sender: 'doctor', text: 'Hi Liam, of course. What is your question?' },
-    { sender: 'patient', text: 'Should I apply it in the morning or at night?' },
-    { sender: 'doctor', text: 'It\'s best to apply it at night, about 30 minutes before you go to sleep.' },
-  ],
-  '2': [
-    { sender: 'patient', text: 'Hello Dr. Carter, I\'ve attached my latest report.' },
-    { sender: 'doctor', text: 'Thank you for the report.' },
-  ],
-   '3': [
-    { sender: 'doctor', text: 'Let\'s schedule a follow-up call.' },
-  ],
-};
+const mockMessages: Record<string, Message[]> = {};
 
 
 export default function ChatPage() {
-  const [selectedDoctorId, setSelectedDoctorId] = useState('1');
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState(mockMessages);
   const [inputValue, setInputValue] = useState("");
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (mockDoctors.length > 0) {
+      setSelectedDoctorId(mockDoctors[0].id);
+    }
+  }, []);
+
   const selectedDoctor = mockDoctors.find(p => p.id === selectedDoctorId);
-  const currentMessages = messages[selectedDoctorId as keyof typeof messages] || [];
+  const currentMessages = selectedDoctorId ? messages[selectedDoctorId as keyof typeof messages] || [] : [];
 
   const filteredDoctors = mockDoctors.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -58,6 +46,7 @@ export default function ChatPage() {
 
   const handleSendMessage = () => {
     if (!inputValue.trim() && !attachedImage) return;
+    if (!selectedDoctorId) return;
 
     const newMessage: Message = { sender: 'patient' as const };
     if (inputValue.trim()) {
@@ -117,23 +106,29 @@ export default function ChatPage() {
                 </CardHeader>
                 <ScrollArea className="h-[50vh]">
                     <CardContent className="p-0">
-                        <div className="space-y-2">
-                            {filteredDoctors.map(doctor => (
-                                <button key={doctor.id} onClick={() => setSelectedDoctorId(doctor.id)} className={cn("w-full text-left p-4 hover:bg-muted/50", selectedDoctorId === doctor.id && "bg-muted")}>
-                                    <div className="flex items-center gap-4">
-                                        <Avatar className="h-10 w-10 relative">
-                                            <AvatarImage src={doctor.avatar} alt={doctor.name} data-ai-hint="doctor portrait"/>
-                                            <AvatarFallback>{doctor.name.charAt(0)}</AvatarFallback>
-                                            {doctor.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />}
-                                        </Avatar>
-                                        <div className="flex-grow">
-                                            <p className="font-semibold">{doctor.name}</p>
-                                            <p className="text-sm text-muted-foreground truncate">{lastMessageText(doctor.id)}</p>
+                        {filteredDoctors.length > 0 ? (
+                            <div className="space-y-2">
+                                {filteredDoctors.map(doctor => (
+                                    <button key={doctor.id} onClick={() => setSelectedDoctorId(doctor.id)} className={cn("w-full text-left p-4 hover:bg-muted/50", selectedDoctorId === doctor.id && "bg-muted")}>
+                                        <div className="flex items-center gap-4">
+                                            <Avatar className="h-10 w-10 relative">
+                                                <AvatarImage src={doctor.avatar} alt={doctor.name} data-ai-hint="doctor portrait"/>
+                                                <AvatarFallback>{doctor.name.charAt(0)}</AvatarFallback>
+                                                {doctor.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />}
+                                            </Avatar>
+                                            <div className="flex-grow">
+                                                <p className="font-semibold">{doctor.name}</p>
+                                                <p className="text-sm text-muted-foreground truncate">{lastMessageText(doctor.id)}</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                           <div className="text-center p-8 text-muted-foreground">
+                                No doctors found.
+                           </div>
+                        )}
                     </CardContent>
                 </ScrollArea>
             </Card>
@@ -218,5 +213,3 @@ export default function ChatPage() {
     </div>
   )
 }
-
-    

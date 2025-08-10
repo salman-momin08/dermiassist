@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,37 +13,13 @@ import { Separator } from '@/components/ui/separator';
 import { generateChatReply } from '@/ai/flows/generate-chat-reply';
 import { useToast } from '@/hooks/use-toast';
 
-const mockPatients = [
-  { id: '1', name: 'Liam Johnson', lastMessage: 'Okay, thank you, doctor!', avatar: 'https://placehold.co/40x40.png', online: true },
-  { id: '2', name: 'Olivia Smith', lastMessage: 'I will schedule a follow-up.', avatar: 'https://placehold.co/40x40.png', online: false },
-  { id: '3', name: 'Noah Williams', lastMessage: 'The new cream is working well.', avatar: 'https://placehold.co/40x40.png', online: true },
-  { id: '4', name: 'Emma Brown', lastMessage: 'I have a question about the side effects.', avatar: 'https://placehold.co/40x40.png', online: false },
-];
+const mockPatients: any[] = [];
 
-const mockMessages: Record<string, { sender: 'patient' | 'doctor'; text: string }[]> = {
-  '1': [
-    { sender: 'patient', text: 'Hello Dr. Grant, I wanted to ask about the prescription.' },
-    { sender: 'doctor', text: 'Hi Liam, of course. What is your question?' },
-    { sender: 'patient', text: 'Should I apply it in the morning or at night?' },
-    { sender: 'doctor', text: 'It\'s best to apply it at night, about 30 minutes before you go to sleep.' },
-    { sender: 'patient', text: 'Okay, thank you, doctor!' },
-  ],
-  '2': [
-    { sender: 'patient', text: 'Dr. Grant, I\'ve attached my latest report.' },
-    { sender: 'doctor', text: 'Thank you, Olivia. I will review it and get back to you shortly.' },
-    { sender: 'patient', text: 'I will schedule a follow-up.'}
-  ],
-   '3': [
-    { sender: 'patient', text: 'The new cream is working well.' },
-  ],
-   '4': [
-    { sender: 'patient', text: 'I have a question about the side effects.' },
-  ],
-};
+const mockMessages: Record<string, { sender: 'patient' | 'doctor'; text: string }[]> = {};
 
 
 export default function DoctorChatPage() {
-  const [selectedPatientId, setSelectedPatientId] = useState('1');
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState(mockMessages);
   const [inputValue, setInputValue] = useState("");
@@ -51,15 +27,21 @@ export default function DoctorChatPage() {
   const [isGeneratingReplies, setIsGeneratingReplies] = useState(false);
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (mockPatients.length > 0) {
+      setSelectedPatientId(mockPatients[0].id);
+    }
+  }, []);
+
   const selectedPatient = mockPatients.find(p => p.id === selectedPatientId);
-  const currentMessages = messages[selectedPatientId as keyof typeof messages] || [];
+  const currentMessages = selectedPatientId ? messages[selectedPatientId as keyof typeof messages] || [] : [];
 
   const filteredPatients = mockPatients.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || !selectedPatientId) return;
 
     const newMessage = { sender: 'doctor' as const, text: inputValue };
     const updatedMessages = {
@@ -130,23 +112,29 @@ export default function DoctorChatPage() {
                 </CardHeader>
                 <ScrollArea className="h-[50vh]">
                     <CardContent className="p-0">
-                        <div className="space-y-2">
-                            {filteredPatients.map(patient => (
-                                <button key={patient.id} onClick={() => { setSelectedPatientId(patient.id); setSuggestedReplies([]); }} className={cn("w-full text-left p-4 hover:bg-muted/50", selectedPatientId === patient.id && "bg-muted")}>
-                                    <div className="flex items-center gap-4">
-                                        <Avatar className="h-10 w-10 relative">
-                                            <AvatarImage src={patient.avatar} alt={patient.name} data-ai-hint="person portrait"/>
-                                            <AvatarFallback>{patient.name.charAt(0)}</AvatarFallback>
-                                            {patient.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />}
-                                        </Avatar>
-                                        <div className="flex-grow">
-                                            <p className="font-semibold">{patient.name}</p>
-                                            <p className="text-sm text-muted-foreground truncate">{messages[patient.id]?.slice(-1)[0]?.text || 'No messages yet'}</p>
+                        {filteredPatients.length > 0 ? (
+                            <div className="space-y-2">
+                                {filteredPatients.map(patient => (
+                                    <button key={patient.id} onClick={() => { setSelectedPatientId(patient.id); setSuggestedReplies([]); }} className={cn("w-full text-left p-4 hover:bg-muted/50", selectedPatientId === patient.id && "bg-muted")}>
+                                        <div className="flex items-center gap-4">
+                                            <Avatar className="h-10 w-10 relative">
+                                                <AvatarImage src={patient.avatar} alt={patient.name} data-ai-hint="person portrait"/>
+                                                <AvatarFallback>{patient.name.charAt(0)}</AvatarFallback>
+                                                {patient.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />}
+                                            </Avatar>
+                                            <div className="flex-grow">
+                                                <p className="font-semibold">{patient.name}</p>
+                                                <p className="text-sm text-muted-foreground truncate">{messages[patient.id]?.slice(-1)[0]?.text || 'No messages yet'}</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center p-8 text-muted-foreground">
+                                No patients found.
+                           </div>
+                        )}
                     </CardContent>
                 </ScrollArea>
             </Card>
@@ -228,7 +216,7 @@ export default function DoctorChatPage() {
                         </div>
                     </>
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-12">
+                    <div className="flex flex-col items-center justify-center h-[calc(50vh+120px)] text-muted-foreground p-12">
                         <p>Select a patient to start a conversation</p>
                     </div>
                 )}

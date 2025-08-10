@@ -8,13 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { MoreHorizontal, FileText, MessageSquare } from "lucide-react";
 import Link from "next/link";
 
-const mockCases = [
-    { id: "CASE001", patientName: "Liam Johnson", condition: "Acne Vulgaris", lastUpdate: "2024-07-28", status: "Active" },
-    { id: "CASE002", patientName: "Olivia Smith", condition: "Eczema", lastUpdate: "2024-07-27", status: "Active" },
-    { id: "CASE003", patientName: "Noah Williams", condition: "Rosacea", lastUpdate: "2024-07-27", status: "Resolved" },
-    { id: "CASE004", patientName: "Emma Brown", condition: "Psoriasis", lastUpdate: "2024-07-26", status: "Active" },
-    { id: "CASE005", patientName: "James Wilson", condition: "Dermatitis", lastUpdate: "2024-07-25", status: "Resolved" },
-];
+const mockCases: any[] = [];
 
 export default function DoctorCasesPage() {
     return (
@@ -41,7 +35,7 @@ export default function DoctorCasesPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {mockCases.map((c) => (
+                            {mockCases.length > 0 ? mockCases.map((c) => (
                                 <TableRow key={c.id}>
                                     <TableCell className="font-medium">{c.patientName}</TableCell>
                                     <TableCell>{c.condition}</TableCell>
@@ -72,7 +66,13 @@ export default function DoctorCasesPage() {
                                         </DropdownMenu>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="h-24 text-center">
+                                        No cases found.
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>
