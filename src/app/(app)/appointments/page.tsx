@@ -230,6 +230,12 @@ export default function AppointmentsPage() {
                                                     <Button size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Appointment Letter</Button>
                                                 </DialogTrigger>
                                                 <DialogContent className="max-w-2xl">
+                                                    <DialogHeader>
+                                                        <DialogTitle>Appointment Letter</DialogTitle>
+                                                        <DialogDescription>
+                                                            A downloadable copy of your appointment confirmation.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
                                                     <div ref={letterRef} className="p-8 bg-white text-black">
                                                         <Card className="shadow-none border-0 text-black">
                                                             <CardHeader className="text-center space-y-4">
@@ -294,6 +300,12 @@ export default function AppointmentsPage() {
                                                     </Button>
                                                 </DialogTrigger>
                                                 <DialogContent className="max-w-2xl">
+                                                    <DialogHeader>
+                                                        <DialogTitle>E-Prescription Details</DialogTitle>
+                                                        <DialogDescription>
+                                                            Your official e-prescription from Dr. {appointment.doctorName}.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
                                                     <Card className="shadow-none border-0">
                                                         <CardHeader className="text-center space-y-4">
                                                             <div className="flex justify-center">
