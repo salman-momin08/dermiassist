@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback, MouseEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
 import { Bot, Send, User, Loader2 } from 'lucide-react';
@@ -21,6 +22,59 @@ export function Chatbot() {
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
+
+    // Draggable state
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [isMounted, setIsMounted] = useState(false);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const isDraggingRef = useRef(false);
+    const dragStartPos = useRef({ x: 0, y: 0 });
+
+    useEffect(() => {
+      setIsMounted(true);
+      setPosition({ x: window.innerWidth - 88, y: window.innerHeight - 88 });
+    }, []);
+
+    const handleMouseDown = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+        if (triggerRef.current) {
+            isDraggingRef.current = true;
+            dragStartPos.current = {
+                x: e.clientX - position.x,
+                y: e.clientY - position.y
+            };
+            triggerRef.current.style.cursor = 'grabbing';
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+    }, [position]);
+
+    const handleMouseMove = useCallback((e: globalThis.MouseEvent) => {
+        if (isDraggingRef.current) {
+            setPosition({
+                x: e.clientX - dragStartPos.current.x,
+                y: e.clientY - dragStartPos.current.y
+            });
+        }
+    }, []);
+
+    const handleMouseUp = useCallback(() => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        if (triggerRef.current) {
+            triggerRef.current.style.cursor = 'grab';
+        }
+        // Use a timeout to reset dragging state, allowing the click event to be suppressed
+        setTimeout(() => {
+          isDraggingRef.current = false;
+        }, 0);
+    }, [handleMouseMove]);
+    
+    const handleClick = useCallback(() => {
+        if (!isDraggingRef.current) {
+            setIsOpen(true);
+        }
+    }, []);
 
     const handleSend = async () => {
         if (!input.trim()) return;
@@ -42,11 +96,24 @@ export function Chatbot() {
         }
     };
     
+    if (!isMounted) {
+        return null; // Don't render until the client has mounted and we know the window size
+    }
+
     return (
-        <Sheet>
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
                 <Button
-                    className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-lg"
+                    ref={triggerRef}
+                    onMouseDown={handleMouseDown}
+                    onClick={handleClick}
+                    className="fixed h-16 w-16 rounded-full shadow-lg z-50"
+                    style={{
+                        top: 0,
+                        left: 0,
+                        transform: `translate(${position.x}px, ${position.y}px)`,
+                        cursor: 'grab',
+                    }}
                     size="icon"
                 >
                     <Bot className="h-8 w-8" />
