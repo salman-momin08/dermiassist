@@ -18,6 +18,7 @@ import { addMinutes, differenceInMinutes, format } from 'date-fns';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Image from "next/image";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const mockAppointments = [
     {
@@ -229,41 +230,43 @@ export default function AppointmentsPage() {
                                                 <DialogTrigger asChild>
                                                     <Button size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Appointment Letter</Button>
                                                 </DialogTrigger>
-                                                <DialogContent className="max-w-2xl">
+                                                <DialogContent className="max-w-3xl">
                                                     <DialogHeader>
-                                                        <DialogTitle>Appointment Letter</DialogTitle>
+                                                        <DialogTitle>Appointment Confirmation Letter</DialogTitle>
                                                         <DialogDescription>
                                                             A downloadable copy of your appointment confirmation.
                                                         </DialogDescription>
                                                     </DialogHeader>
-                                                    <div ref={letterRef} className="p-8 bg-white text-black">
-                                                        <Card className="shadow-none border-0 text-black">
-                                                            <CardHeader className="text-center space-y-4">
-                                                                <div className="flex justify-center">
-                                                                    <Logo />
-                                                                </div>
-                                                                <CardTitle className="font-normal text-2xl">Appointment Confirmation</CardTitle>
-                                                                <Separator />
-                                                            </CardHeader>
-                                                            <CardContent className="space-y-6 text-sm">
-                                                                <p>Dear {appointment.patientName},</p>
-                                                                <p>This letter confirms your appointment with <strong>{appointment.doctorName}</strong>. Please find the details below:</p>
-                                                                <div className="border p-4 rounded-lg space-y-2 bg-slate-50">
-                                                                    <p><strong>Date:</strong> {format(new Date(appointment.date), 'EEEE, MMMM d, yyyy')}</p>
-                                                                    <p><strong>Time:</strong> {format(new Date(appointment.date), 'p')}</p>
-                                                                    <p><strong>Location:</strong> {appointment.doctorLocation}</p>
-                                                                    <p><strong>Contact:</strong> {appointment.doctorPhone}</p>
-                                                                </div>
-                                                                <p>Please arrive 15 minutes early and bring a valid ID. If you need to reschedule, please contact us at least 24 hours in advance.</p>
-                                                                <div className="pt-8">
-                                                                    <p>Sincerely,</p>
-                                                                    {appointment.doctorSignature && <Image src={appointment.doctorSignature} alt="Doctor's Signature" width={150} height={50} data-ai-hint="signature"/>}
-                                                                    <p><strong>{appointment.doctorName}</strong></p>
-                                                                    <p>SkinWise Dermatology</p>
-                                                                </div>
-                                                            </CardContent>
-                                                        </Card>
-                                                    </div>
+                                                    <ScrollArea className="max-h-[60vh] pr-6">
+                                                        <div ref={letterRef} className="p-8 bg-white text-black">
+                                                            <Card className="shadow-none border-0 text-black">
+                                                                <CardHeader className="text-center space-y-4">
+                                                                    <div className="flex justify-center">
+                                                                        <Logo />
+                                                                    </div>
+                                                                    <CardTitle className="font-normal text-2xl">Appointment Confirmation</CardTitle>
+                                                                    <Separator />
+                                                                </CardHeader>
+                                                                <CardContent className="space-y-6 text-sm">
+                                                                    <p>Dear {appointment.patientName},</p>
+                                                                    <p>This letter confirms your appointment with <strong>{appointment.doctorName}</strong>. Please find the details below:</p>
+                                                                    <div className="border p-4 rounded-lg space-y-2 bg-slate-50">
+                                                                        <p><strong>Date:</strong> {format(new Date(appointment.date), 'EEEE, MMMM d, yyyy')}</p>
+                                                                        <p><strong>Time:</strong> {format(new Date(appointment.date), 'p')}</p>
+                                                                        <p><strong>Location:</strong> {appointment.doctorLocation}</p>
+                                                                        <p><strong>Contact:</strong> {appointment.doctorPhone}</p>
+                                                                    </div>
+                                                                    <p>Please arrive 15 minutes early and bring a valid ID. If you need to reschedule, please contact us at least 24 hours in advance.</p>
+                                                                    <div className="pt-8">
+                                                                        <p>Sincerely,</p>
+                                                                        {appointment.doctorSignature && <Image src={appointment.doctorSignature} alt="Doctor's Signature" width={150} height={50} data-ai-hint="signature"/>}
+                                                                        <p><strong>{appointment.doctorName}</strong></p>
+                                                                        <p>SkinWise Dermatology</p>
+                                                                    </div>
+                                                                </CardContent>
+                                                            </Card>
+                                                        </div>
+                                                    </ScrollArea>
                                                     <Button className="w-full mt-4" onClick={() => handleDownloadLetter(appointment)} disabled={isDownloading}>
                                                         {isDownloading ? <><Download className="mr-2 h-4 w-4" />Downloading...</> : <><Download className="mr-2 h-4 w-4" />Download PDF</>}
                                                     </Button>
@@ -377,5 +380,7 @@ export default function AppointmentsPage() {
         </div>
     );
 }
+
+    
 
     
