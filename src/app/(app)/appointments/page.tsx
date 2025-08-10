@@ -1,25 +1,32 @@
 
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Video, Clock, Download, FileText, MoreHorizontal, Printer } from "lucide-react";
+import { Calendar, Video, Clock, Download, FileText, MoreHorizontal, Printer, Phone, MapPin } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Logo } from "@/components/logo";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { addMinutes, differenceInMinutes, format } from 'date-fns';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import Image from "next/image";
 
 const mockAppointments = [
     {
         id: "APT001",
         doctorName: "Dr. Emily Carter",
-        date: "2024-08-15",
-        time: "10:30 AM",
+        doctorLocation: "123 Health St, Wellness City, 45678",
+        doctorPhone: "+1 (555) 123-4567",
+        doctorSignature: "https://placehold.co/150x50.png?text=Dr.+Emily+Carter",
+        date: "2024-08-15T10:30:00",
         mode: "Online",
         status: "Confirmed",
         notes: null,
@@ -28,8 +35,10 @@ const mockAppointments = [
     {
         id: "APT002",
         doctorName: "Dr. Ben Adams",
-        date: "2024-07-25",
-        time: "02:00 PM",
+        doctorLocation: "456 Care Ave, Meditown, 12345",
+        doctorPhone: "+1 (555) 765-4321",
+        doctorSignature: "https://placehold.co/150x50.png?text=Dr.+Ben+Adams",
+        date: "2024-07-25T14:00:00",
         mode: "Offline",
         status: "Completed",
         patientName: "Patient",
@@ -45,13 +54,63 @@ const mockAppointments = [
 
 export default function AppointmentsPage() {
     const { toast } = useToast();
+    const [now, setNow] = useState(new Date());
+    const letterRef = useRef<HTMLDivElement>(null);
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    useEffect(() => {
+        const timer = setInterval(() => setNow(new Date()), 60000); // Update every minute
+        return () => clearInterval(timer);
+    }, []);
 
     const handlePrint = (id: string) => {
         toast({
             title: "Printing Prescription",
             description: `Your e-prescription for appointment ${id} is being sent to your printer.`,
         });
-        // In a real app, this would trigger window.print()
+    }
+    
+    const handleDownloadLetter = async (appointment: typeof mockAppointments[0]) => {
+        const input = letterRef.current;
+        if (!input) return;
+
+        setIsDownloading(true);
+
+        try {
+            const canvas = await html2canvas(input, { scale: 2, useCORS: true, backgroundColor: null });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'px', [canvas.width, canvas.height]);
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`SkinWise-Appointment-${appointment.id}.pdf`);
+        } catch (error) {
+            console.error("Failed to generate PDF:", error);
+            toast({
+                title: "Download Failed",
+                description: "Could not generate the PDF letter. Please try again.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+    
+    const isJoinButtonEnabled = (appointmentDate: string) => {
+        const appointmentTime = new Date(appointmentDate);
+        const diff = differenceInMinutes(appointmentTime, now);
+        // Enable from 10 mins before to 10 mins after
+        return diff <= 10 && diff > -10;
+    };
+
+    const getJoinTooltipContent = (appointmentDate: string) => {
+        const appointmentTime = new Date(appointmentDate);
+        const diff = differenceInMinutes(appointmentTime, now);
+        if (diff > 10) {
+            return `You can join the call ${diff - 10} minutes before the start time.`;
+        }
+        if (diff <= -10) {
+            return "The window to join this call has passed.";
+        }
+        return "Join your video consultation now.";
     }
 
     return (
@@ -95,7 +154,7 @@ export default function AppointmentsPage() {
                             {mockAppointments.filter(a => a.status === 'Confirmed').map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
-                                    <TableCell>{appointment.date} at {appointment.time}</TableCell>
+                                    <TableCell>{format(new Date(appointment.date), 'PPpp')}</TableCell>
                                     <TableCell className="hidden md:table-cell">
                                         <Badge variant="outline">
                                             {appointment.mode === "Online" ? <Video className="mr-1 h-3 w-3" /> : <Calendar className="mr-1 h-3 w-3" />}
@@ -109,23 +168,25 @@ export default function AppointmentsPage() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button size="icon" variant="ghost">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem>
-                                                    {appointment.mode === "Online" ? (
-                                                        <><Video className="mr-2 h-4 w-4" /> Join Call</>
-                                                    ) : (
-                                                        <><Calendar className="mr-2 h-4 w-4" /> View Details</>
-                                                    )}
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem>Cancel Appointment</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        {appointment.mode === "Online" ? (
+                                             <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        {/* This div is necessary to prevent Tooltip from complaining about a disabled button */}
+                                                        <div> 
+                                                            <Button size="sm" disabled={!isJoinButtonEnabled(appointment.date)}>
+                                                                <Video className="mr-2 h-4 w-4" /> Join Call
+                                                            </Button>
+                                                        </div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>{getJoinTooltipContent(appointment.date)}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        ) : (
+                                            <Button size="sm" variant="outline" disabled>View Details</Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -161,8 +222,48 @@ export default function AppointmentsPage() {
                             {mockAppointments.filter(a => a.status === 'Completed').map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
-                                    <TableCell>{appointment.date}</TableCell>
+                                    <TableCell>{format(new Date(appointment.date), 'PP')}</TableCell>
                                     <TableCell className="text-right space-x-2">
+                                         {appointment.mode === 'Offline' && (
+                                            <Dialog>
+                                                <DialogTrigger asChild>
+                                                    <Button size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Appointment Letter</Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="max-w-2xl">
+                                                    <div ref={letterRef} className="p-8 bg-white text-black">
+                                                        <Card className="shadow-none border-0 text-black">
+                                                            <CardHeader className="text-center space-y-4">
+                                                                <div className="flex justify-center">
+                                                                    <Logo />
+                                                                </div>
+                                                                <CardTitle className="font-normal text-2xl">Appointment Confirmation</CardTitle>
+                                                                <Separator />
+                                                            </CardHeader>
+                                                            <CardContent className="space-y-6 text-sm">
+                                                                <p>Dear {appointment.patientName},</p>
+                                                                <p>This letter confirms your appointment with <strong>{appointment.doctorName}</strong>. Please find the details below:</p>
+                                                                <div className="border p-4 rounded-lg space-y-2 bg-slate-50">
+                                                                    <p><strong>Date:</strong> {format(new Date(appointment.date), 'EEEE, MMMM d, yyyy')}</p>
+                                                                    <p><strong>Time:</strong> {format(new Date(appointment.date), 'p')}</p>
+                                                                    <p><strong>Location:</strong> {appointment.doctorLocation}</p>
+                                                                    <p><strong>Contact:</strong> {appointment.doctorPhone}</p>
+                                                                </div>
+                                                                <p>Please arrive 15 minutes early and bring a valid ID. If you need to reschedule, please contact us at least 24 hours in advance.</p>
+                                                                <div className="pt-8">
+                                                                    <p>Sincerely,</p>
+                                                                    {appointment.doctorSignature && <Image src={appointment.doctorSignature} alt="Doctor's Signature" width={150} height={50} data-ai-hint="signature"/>}
+                                                                    <p><strong>{appointment.doctorName}</strong></p>
+                                                                    <p>SkinWise Dermatology</p>
+                                                                </div>
+                                                            </CardContent>
+                                                        </Card>
+                                                    </div>
+                                                    <Button className="w-full mt-4" onClick={() => handleDownloadLetter(appointment)} disabled={isDownloading}>
+                                                        {isDownloading ? <><Download className="mr-2 h-4 w-4" />Downloading...</> : <><Download className="mr-2 h-4 w-4" />Download PDF</>}
+                                                    </Button>
+                                                </DialogContent>
+                                            </Dialog>
+                                        )}
                                         {appointment.notes && (
                                             <Dialog>
                                                 <DialogTrigger asChild>
@@ -175,7 +276,7 @@ export default function AppointmentsPage() {
                                                     <DialogHeader>
                                                         <DialogTitle>Follow-up notes from Dr. {appointment.doctorName}</DialogTitle>
                                                         <DialogDescription>
-                                                            Notes from your appointment on {appointment.date}.
+                                                            Notes from your appointment on {format(new Date(appointment.date), 'PP')}.
                                                         </DialogDescription>
                                                     </DialogHeader>
                                                     <div className="py-4 text-sm text-muted-foreground">
@@ -206,7 +307,7 @@ export default function AppointmentsPage() {
                                                                 <div>
                                                                     <p className="font-semibold">Patient Details</p>
                                                                     <p>{appointment.patientName}</p>
-                                                                    <p>Appointment: {appointment.date}</p>
+                                                                    <p>Appointment: {format(new Date(appointment.date), 'PP')}</p>
                                                                 </div>
                                                                  <div className="text-right">
                                                                     <p className="font-semibold">Prescribing Doctor</p>
@@ -247,9 +348,6 @@ export default function AppointmentsPage() {
                                                 </DialogContent>
                                             </Dialog>
                                         )}
-                                         {!appointment.notes && !appointment.prescription && (
-                                            <p className="text-sm text-muted-foreground">No notes or prescription.</p>
-                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -267,3 +365,5 @@ export default function AppointmentsPage() {
         </div>
     );
 }
+
+    

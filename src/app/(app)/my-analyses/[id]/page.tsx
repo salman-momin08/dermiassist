@@ -121,8 +121,17 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
                  backgroundColor: null,
             });
             const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('p', 'px', [canvas.width, canvas.height]);
-            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            // A4 page size in pixels at 96 DPI: 794x1123
+            const pdf = new jsPDF('p', 'px', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+            const imgX = (pdfWidth - imgWidth * ratio) / 2;
+            const imgY = 0;
+            
+            pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
             pdf.save(`SkinWise-Report-${analysis.condition}-${analysis.date}.pdf`);
         } catch (error) {
             console.error("Failed to generate PDF:", error);
@@ -167,68 +176,62 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div ref={reportRef} className="lg:col-span-2 space-y-6 bg-background p-4 rounded-lg">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-3xl font-headline">Analysis Report: {analysis.condition}</CardTitle>
-                            <CardDescription>Generated on {analysis.date} | Severity: {analysis.severity}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                             <h3 className="font-semibold text-xl mb-4 text-primary">Expert Recommendations</h3>
-                             <p className="text-muted-foreground leading-relaxed">{analysis.recommendations}</p>
-                        </CardContent>
-                    </Card>
-
-                     <div className="grid md:grid-cols-2 gap-6">
-                        <Card className="border-green-500/50 dark:border-green-500/50">
+                <div className="lg:col-span-2 space-y-6">
+                    <div ref={reportRef} className="space-y-6 bg-background p-4 sm:p-6 rounded-lg">
+                        <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                                    <CheckCircle size={24} />
-                                    Do's
-                                </CardTitle>
-                                <CardDescription>Recommended actions to take.</CardDescription>
-                            </Header>
+                                <CardTitle className="text-3xl font-headline">Analysis Report: {analysis.condition}</CardTitle>
+                                <CardDescription>Generated on {analysis.date} | Severity: {analysis.severity}</CardDescription>
+                            </CardHeader>
                             <CardContent>
-                                <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
-                                    {analysis.dos.map((item, index) => <li key={index}>{item}</li>)}
-                                </ul>
+                                 <h3 className="font-semibold text-xl mb-4 text-primary">Expert Recommendations</h3>
+                                 <p className="text-muted-foreground leading-relaxed">{analysis.recommendations}</p>
                             </CardContent>
                         </Card>
-                         <Card className="border-red-500/50 dark:border-red-500/50">
+
+                         <div className="grid md:grid-cols-2 gap-6">
+                            <Card className="border-green-500/50 dark:border-green-500/50">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                                        <CheckCircle size={24} />
+                                        Do's
+                                    </CardTitle>
+                                    <CardDescription>Recommended actions to take.</CardDescription>
+                                </Header>
+                                <CardContent>
+                                    <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
+                                        {analysis.dos.map((item, index) => <li key={index}>{item}</li>)}
+                                    </ul>
+                                </CardContent>
+                            </Card>
+                             <Card className="border-red-500/50 dark:border-red-500/50">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                                        <XCircle size={24} />
+                                        Don'ts
+                                    </CardTitle>
+                                    <CardDescription>Things you should avoid.</CardDescription>
+                                </Header>
+                                <CardContent>
+                                   <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
+                                        {analysis.donts.map((item, index) => <li key={index}>{item}</li>)}
+                                    </ul>
+                                </CardContent>
+                            </Card>
+                        </div>
+                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
-                                    <XCircle size={24} />
-                                    Don'ts
-                                </CardTitle>
-                                <CardDescription>Things you should avoid.</CardDescription>
-                            </Header>
+                                <CardTitle>Your Submitted Photo</CardTitle>
+                            </CardHeader>
                             <CardContent>
-                               <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
-                                    {analysis.donts.map((item, index) => <li key={index}>{item}</li>)}
-                                </ul>
+                                 <Image src={analysis.image} alt="Skin condition" width={400} height={400} className="rounded-lg w-full aspect-square object-cover" data-ai-hint="skin condition" />
                             </CardContent>
                         </Card>
                     </div>
-                     <Card>
-                        <CardHeader>
-                            <CardTitle>Your Submitted Photo</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                             <Image src={analysis.image} alt="Skin condition" width={400} height={400} className="rounded-lg w-full aspect-square object-cover" data-ai-hint="skin condition" />
-                        </CardContent>
-                    </Card>
                 </div>
 
                 <div className="space-y-6">
                      <Card>
-                        <CardHeader>
-                            <CardTitle>Your Submitted Photo</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                             <Image src={analysis.image} alt="Skin condition" width={400} height={400} className="rounded-lg w-full aspect-square object-cover" data-ai-hint="skin condition" />
-                        </CardContent>
-                    </Card>
-                    <Card>
                         <CardHeader>
                             <CardTitle>Information Provided</CardTitle>
                         </CardHeader>
@@ -347,3 +350,5 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
         </div>
     );
 }
+
+    

@@ -7,13 +7,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"
-import { Pill, StickyNote } from "lucide-react"
+import { Pill, StickyNote, Calendar, Clock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar as CalendarIcon } from "lucide-react"
+import { Calendar as CalendarPicker } from "@/components/ui/calendar"
+import { format, set } from "date-fns"
+import { cn } from "@/lib/utils"
 
 const initialAppointments = [
     {
@@ -46,8 +51,7 @@ const initialAppointments = [
         requestDate: "2024-07-27",
         mode: "Online",
         status: "Confirmed",
-        appointmentDate: "2024-08-05",
-        appointmentTime: "11:00 AM",
+        appointmentDate: "2024-08-05T11:00:00",
         reportId: "3",
         reportCondition: "Rosacea",
         reportFullText: "Analysis Report: Rosacea. Generated on 2024-03-10. Severity: Mild. It is recommended to identify and avoid triggers such as spicy foods, alcohol, and extreme temperatures. A gentle skincare routine is crucial. Sun protection is paramount. Do's: Use sunscreen daily. Choose gentle, fragrance-free skincare products. Keep a diary to identify personal triggers. Don'ts: Avoid sun exposure without protection. Do not use harsh exfoliants or astringents. Be cautious with hot beverages and spicy foods. Submitted Info: Pre-medication: None. Disease Duration: 1 year.",
@@ -59,8 +63,7 @@ const initialAppointments = [
         requestDate: "2024-07-26",
         mode: "Offline",
         status: "Completed",
-        appointmentDate: "2024-07-30",
-        appointmentTime: "02:30 PM",
+        appointmentDate: "2024-07-30T14:30:00",
         reportId: "4",
         reportCondition: "Psoriasis",
         reportFullText: "...",
@@ -68,29 +71,43 @@ const initialAppointments = [
     },
 ];
 
-type Appointment = typeof initialAppointments[number];
+type Appointment = typeof initialAppointments[number] & { appointmentDate?: string };
 
 export default function DoctorAppointmentsPage() {
-    const [appointments, setAppointments] = useState(initialAppointments);
+    const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
     const [currentNotes, setCurrentNotes] = useState("");
     const { toast } = useToast();
+    const [scheduleDate, setScheduleDate] = useState<Date | undefined>(new Date());
+    const [scheduleTime, setScheduleTime] = useState("09:00");
 
-    const handleRequest = (id: string, newStatus: 'Confirmed' | 'Declined') => {
+    const handleConfirmRequest = (id: string) => {
+        if (!scheduleDate) {
+            toast({ title: "Please select a date.", variant: "destructive" });
+            return;
+        }
+
+        const [hours, minutes] = scheduleTime.split(':').map(Number);
+        const finalDateTime = set(scheduleDate, { hours, minutes });
+
         setAppointments(prev =>
             prev.map(app =>
                 app.id === id ? { 
                     ...app, 
-                    status: newStatus,
-                    appointmentDate: newStatus === 'Confirmed' ? '2024-08-10' : undefined, // Mock date
-                    appointmentTime: newStatus === 'Confirmed' ? '03:00 PM' : undefined,   // Mock time
+                    status: 'Confirmed',
+                    appointmentDate: finalDateTime.toISOString(),
                 } : app
             )
         );
         toast({
-            title: `Request ${newStatus}`,
-            description: `The appointment request has been ${newStatus.toLowerCase()}.`,
+            title: `Request Confirmed`,
+            description: `The appointment has been scheduled.`,
         });
     };
+    
+    const handleDeclineRequest = (id: string) => {
+        setAppointments(prev => prev.map(app => app.id === id ? {...app, status: 'Declined' } : app));
+        toast({ title: "Request Declined", variant: "destructive" });
+    }
     
     const handleSaveNotes = (id: string) => {
         setAppointments(prev =>
@@ -124,7 +141,7 @@ export default function DoctorAppointmentsPage() {
                             <div className="text-sm text-muted-foreground">{app.mode}</div>
                         </TableCell>
                         <TableCell>
-                            {app.status === 'Pending' ? `Requested: ${app.requestDate}` : `${app.appointmentDate} at ${app.appointmentTime}`}
+                            {app.status === 'Pending' ? `Requested: ${app.requestDate}` : app.appointmentDate ? format(new Date(app.appointmentDate), 'PPpp') : 'Not Scheduled'}
                         </TableCell>
                          <TableCell>
                             <Badge variant={
@@ -135,10 +152,54 @@ export default function DoctorAppointmentsPage() {
                         </TableCell>
                         <TableCell className="text-right space-x-2">
                              {app.status === 'Pending' && (
-                                <>
-                                    <Button size="sm" variant="outline" onClick={() => handleRequest(app.id, 'Declined')}>Decline</Button>
-                                    <Button size="sm" onClick={() => handleRequest(app.id, 'Confirmed')}>Confirm</Button>
-                                </>
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button size="sm">Confirm</Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Schedule Appointment for {app.patientName}</DialogTitle>
+                                            <DialogDescription>Select a date and time to confirm this appointment.</DialogDescription>
+                                        </DialogHeader>
+                                        <div className="grid gap-4 py-4">
+                                            <div className="space-y-2">
+                                                <Label>Date</Label>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button
+                                                            variant={"outline"}
+                                                            className={cn(
+                                                                "w-full justify-start text-left font-normal",
+                                                                !scheduleDate && "text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                                            {scheduleDate ? format(scheduleDate, "PPP") : <span>Pick a date</span>}
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0">
+                                                        <CalendarPicker
+                                                            mode="single"
+                                                            selected={scheduleDate}
+                                                            onSelect={setScheduleDate}
+                                                            initialFocus
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="time">Time</Label>
+                                                <Input id="time" type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} />
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button variant="ghost" onClick={() => handleDeclineRequest(app.id)}>Decline Request</Button>
+                                            <DialogClose asChild>
+                                                <Button onClick={() => handleConfirmRequest(app.id)}>Confirm Appointment</Button>
+                                            </DialogClose>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
                              )} 
                              {(app.status === 'Confirmed' || app.status === 'Completed') && (
                                 <>
@@ -294,3 +355,5 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
+
+    
