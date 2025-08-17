@@ -49,7 +49,7 @@ export function Chatbot() {
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
                 <Button
-                    className="fixed bottom-[30%] right-8 h-16 w-16 rounded-full shadow-lg z-50"
+                    className="fixed bottom-8 right-8 h-16 w-16 rounded-full shadow-lg z-50"
                     size="icon"
                 >
                     <Bot className="h-8 w-8" />
