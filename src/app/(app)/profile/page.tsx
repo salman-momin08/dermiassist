@@ -289,6 +289,8 @@ export default function ProfilePage() {
                                             month={calendarMonth}
                                             onMonthChange={setCalendarMonth}
                                             disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                            view={calendarView}
+                                            onViewChange={setCalendarView}
                                         />
                                     </PopoverContent>
                                 </Popover>
