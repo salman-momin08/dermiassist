@@ -1,11 +1,24 @@
 
 "use client"
 
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const plans = [
     {
@@ -49,6 +62,17 @@ const plans = [
 ]
 
 export default function SubscriptionPage() {
+    const { toast } = useToast();
+    
+    const handlePlanChange = (planName: string) => {
+        // In a real app, you would handle the plan change logic here.
+        // For now, we'll just show a success toast.
+        toast({
+            title: "Plan Changed!",
+            description: `You have successfully switched to the ${planName} plan.`,
+        });
+    }
+    
     return (
         <div className="container mx-auto p-4 md:p-8">
             <div className="flex flex-col items-center justify-center space-y-2 mb-8 text-center">
@@ -82,9 +106,29 @@ export default function SubscriptionPage() {
                             </ul>
                         </CardContent>
                         <CardFooter>
-                            <Button className="w-full" disabled={plan.current}>
-                                {plan.current ? "Current Plan" : "Choose Plan"}
-                            </Button>
+                            {plan.current ? (
+                                 <Button className="w-full" disabled>Current Plan</Button>
+                            ) : (
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button className="w-full">Choose Plan</Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Confirm Plan Change</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Are you sure you want to switch to the {plan.name} plan?
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handlePlanChange(plan.name)}>
+                                                Confirm
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            )}
                         </CardFooter>
                     </Card>
                 ))}
