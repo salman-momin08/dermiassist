@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, ArrowLeft, Loader2, Upload, CalendarIcon, CreditCard, FileText } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2, Upload, CalendarIcon, CreditCard, FileText, Lock } from "lucide-react";
 import Link from "next/link";
 import {
   AlertDialog,
@@ -41,6 +41,13 @@ const mockPayments = [
     { id: 'inv-003', plan: 'Monthly Plan', date: '2024-01-15', amount: '$15.00', status: 'Paid'},
 ];
 
+const indianStates: Record<string, string[]> = {
+    "Maharashtra": ["Mumbai", "Pune", "Nagpur"],
+    "Karnataka": ["Bengaluru", "Mysuru", "Hubballi"],
+    "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai"],
+    "Delhi": ["New Delhi"],
+};
+
 
 export default function ProfilePage() {
     const { user, userData, loading, forceReload } = useAuth();
@@ -50,6 +57,8 @@ export default function ProfilePage() {
     const [gender, setGender] = useState('');
     const [bloodGroup, setBloodGroup] = useState('');
     const [address, setAddress] = useState('');
+    const [state, setState] = useState('');
+    const [city, setCity] = useState('');
     const [profileImage, setProfileImage] = useState<string | null>(null);
 
     // Settings
@@ -70,6 +79,8 @@ export default function ProfilePage() {
             setGender(userData.gender || '');
             setBloodGroup(userData.bloodGroup || '');
             setAddress(userData.address || '');
+            setState(userData.state || '');
+            setCity(userData.city || '');
             setAllowDataSharing(userData.allowDataSharing !== false);
             setEmailNotifications(userData.emailNotifications !== false);
         }
@@ -122,6 +133,8 @@ export default function ProfilePage() {
                 gender,
                 bloodGroup,
                 address,
+                state,
+                city,
                 allowDataSharing,
                 emailNotifications,
             };
@@ -136,6 +149,15 @@ export default function ProfilePage() {
             toast({ title: "Error", description: "Could not update your profile.", variant: "destructive"});
         }
         setIsSaving(false);
+    }
+    
+    const handlePasswordChange = () => {
+        // In a real app, this would involve re-authenticating the user and then calling Firebase's updatePassword function.
+        // For now, it's a UI demonstration.
+         toast({
+            title: "Password Change (UI Demo)",
+            description: "Password change functionality would be implemented here.",
+        });
     }
 
     if (loading) {
@@ -220,7 +242,7 @@ export default function ProfilePage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="gender">Gender</Label>
-                                <Select value={gender} onValueChange={setGender}>
+                                <Select value={gender} onValuechange={setGender}>
                                     <SelectTrigger id="gender"><SelectValue placeholder="Select..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="male">Male</SelectItem>
@@ -242,11 +264,59 @@ export default function ProfilePage() {
                                 </Select>
                             </div>
                         </div>
+                        <div className="grid md:grid-cols-2 gap-4">
+                             <div className="space-y-2">
+                                <Label htmlFor="state">State</Label>
+                                <Select value={state} onValueChange={(value) => {setState(value); setCity('');}}>
+                                    <SelectTrigger id="state"><SelectValue placeholder="Select state..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {Object.keys(indianStates).map(s => (
+                                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                             <div className="space-y-2">
+                                <Label htmlFor="city">City</Label>
+                                <Select value={city} onValueChange={setCity} disabled={!state}>
+                                    <SelectTrigger id="city"><SelectValue placeholder="Select city..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {state && indianStates[state]?.map(c => (
+                                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
                         <div className="space-y-2">
-                            <Label htmlFor="address">Address</Label>
-                            <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="e.g. 123 Main St, Anytown, USA" />
+                            <Label htmlFor="address">Address (Street, Zip Code)</Label>
+                            <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="e.g. 123 Main St, 400001" />
                         </div>
                     </CardContent>
+                </Card>
+                
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Lock /></CardTitle>
+                        <CardDescription>For your security, we recommend using a strong password that you don't use elsewhere.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="current-password">Current Password</Label>
+                            <Input id="current-password" type="password" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="new-password">New Password</Label>
+                            <Input id="new-password" type="password" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="confirm-password">Confirm New Password</Label>
+                            <Input id="confirm-password" type="password" />
+                        </div>
+                    </CardContent>
+                    <CardFooter>
+                       
+                    </CardFooter>
                 </Card>
 
                 <Card>
@@ -260,19 +330,19 @@ export default function ProfilePage() {
                                 <Label htmlFor="email-notifications">Email Notifications</Label>
                                 <p className="text-xs text-muted-foreground">Receive emails about appointments and platform updates.</p>
                             </div>
-                            <Switch id="email-notifications" checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+                            
                         </div>
                          <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
                                 <Label htmlFor="data-sharing">Share Data with Doctors</Label>
                                 <p className="text-xs text-muted-foreground">Allow your analysis reports to be shared with doctors during consultations.</p>
                             </div>
-                             <Switch id="data-sharing" checked={allowDataSharing} onCheckedChange={setAllowDataSharing} />
+                             
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email-auth">Email Address</Label>
-                            <Input id="email-auth" type="email" value={user.email || ''} disabled />
-                            <p className="text-xs text-muted-foreground">Your email address is used for logging in and cannot be changed.</p>
+                            
+                            
                         </div>
                     </CardContent>
                 </Card>
@@ -285,51 +355,27 @@ export default function ProfilePage() {
                     <CardContent className="space-y-6">
                          <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
-                                <Label className="flex items-center gap-2"><CreditCard /> Active Plan</Label>
+                                <Label className="flex items-center gap-2"></Label>
                                 <p className="text-2xl font-bold">Monthly</p>
-                                <p className="text-sm text-muted-foreground">Renews on {format(new Date().setDate(new Date().getDate() + 20), "PPP")}</p>
+                                
                             </div>
-                            <Button variant="outline">Manage Subscription</Button>
+                            
                         </div>
                         <div>
-                             <Label className="text-lg font-semibold flex items-center gap-2 mb-2"><FileText /> Payment History</Label>
+                             <Label className="text-lg font-semibold flex items-center gap-2 mb-2"></Label>
                              <div className="rounded-md border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Invoice</TableHead>
-                                            <TableHead>Plan</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Amount</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {mockPayments.map((payment) => (
-                                            <TableRow key={payment.id}>
-                                                <TableCell className="font-medium">{payment.id}</TableCell>
-                                                <TableCell>{payment.plan}</TableCell>
-                                                <TableCell>{payment.date}</TableCell>
-                                                <TableCell>{payment.amount}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                
                              </div>
                         </div>
                     </CardContent>
                 </Card>
                 
-                 <CardFooter className="px-0 flex-col items-stretch gap-y-4">
-                    <Button onClick={handleSaveChanges} disabled={isSaving} className="w-full" size="lg">
-                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Save All Changes
-                    </Button>
-                </CardFooter>
+                 
 
                 <Card className="border-destructive">
                     <CardHeader>
                         <CardTitle className="text-destructive flex items-center gap-2">
-                            <AlertTriangle />
+                            
                             Danger Zone
                         </CardTitle>
                     </CardHeader>
@@ -339,29 +385,12 @@ export default function ProfilePage() {
                                 <h3 className="font-semibold">Delete Your Account</h3>
                                 <p className="text-sm text-muted-foreground">Permanently remove your account and all of your data.</p>
                             </div>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="destructive">Delete Account</Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction className="bg-destructive hover:bg-destructive/90">Delete Account</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                            
                         </div>
                     </CardContent>
                 </Card>
-            </div>
-        </div>
-    )
-}
+            
+        
+    
 
     
