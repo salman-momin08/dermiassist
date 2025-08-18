@@ -158,7 +158,7 @@ export default function ProfilePage() {
             title: "Password Change (UI Demo)",
             description: "Password change functionality would be implemented here.",
         });
-    }
+    };
 
     if (loading) {
       return (
@@ -242,7 +242,7 @@ export default function ProfilePage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="gender">Gender</Label>
-                                <Select value={gender} onValuechange={setGender}>
+                                <Select value={gender} onValueChange={setGender}>
                                     <SelectTrigger id="gender"><SelectValue placeholder="Select..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="male">Male</SelectItem>
@@ -297,25 +297,25 @@ export default function ProfilePage() {
                 
                  <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Lock /></CardTitle>
-                        <CardDescription>For your security, we recommend using a strong password that you don't use elsewhere.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Lock /> Security</CardTitle>
+                        <CardDescription>Manage your account security settings.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="current-password">Current Password</Label>
-                            <Input id="current-password" type="password" />
+                            <Input id="current-password" type="password" placeholder="Enter your current password" />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="new-password">New Password</Label>
-                            <Input id="new-password" type="password" />
+                            <Input id="new-password" type="password" placeholder="Enter a new strong password" />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="confirm-password">Confirm New Password</Label>
-                            <Input id="confirm-password" type="password" />
+                            <Input id="confirm-password" type="password" placeholder="Confirm your new password" />
                         </div>
                     </CardContent>
                     <CardFooter>
-                       
+                       <Button onClick={handlePasswordChange}>Update Password</Button>
                     </CardFooter>
                 </Card>
 
@@ -330,19 +330,21 @@ export default function ProfilePage() {
                                 <Label htmlFor="email-notifications">Email Notifications</Label>
                                 <p className="text-xs text-muted-foreground">Receive emails about appointments and platform updates.</p>
                             </div>
-                            
+                             <Switch id="email-notifications" checked={emailNotifications} onCheckedChange={setEmailNotifications} />
                         </div>
                          <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
                                 <Label htmlFor="data-sharing">Share Data with Doctors</Label>
                                 <p className="text-xs text-muted-foreground">Allow your analysis reports to be shared with doctors during consultations.</p>
                             </div>
-                             
+                             <Switch id="data-sharing" checked={allowDataSharing} onCheckedChange={setAllowDataSharing} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email-auth">Email Address</Label>
-                            
-                            
+                             <div className="flex items-center space-x-2">
+                                <Input id="email-auth" type="email" value={user.email || ''} disabled />
+                                <Button variant="outline" disabled>Change</Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -355,27 +357,53 @@ export default function ProfilePage() {
                     <CardContent className="space-y-6">
                          <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
-                                <Label className="flex items-center gap-2"></Label>
+                                <Label className="flex items-center gap-2"><CreditCard /> Your Current Plan</Label>
                                 <p className="text-2xl font-bold">Monthly</p>
-                                
+                                <p className="text-xs text-muted-foreground">Renews on: 2024-02-15</p>
                             </div>
-                            
+                            <Button variant="outline">Change Plan</Button>
                         </div>
                         <div>
-                             <Label className="text-lg font-semibold flex items-center gap-2 mb-2"></Label>
+                             <Label className="text-lg font-semibold flex items-center gap-2 mb-2"><FileText /> Payment History</Label>
                              <div className="rounded-md border">
-                                
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Invoice ID</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Amount</TableHead>
+                                            <TableHead className="text-right">Status</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {mockPayments.map((payment) => (
+                                            <TableRow key={payment.id}>
+                                                <TableCell className="font-medium">{payment.id}</TableCell>
+                                                <TableCell>{payment.date}</TableCell>
+                                                <TableCell>{payment.amount}</TableCell>
+                                                <TableCell className="text-right">{payment.status}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
                              </div>
                         </div>
                     </CardContent>
                 </Card>
                 
-                 
+                 <Card>
+                    <CardFooter>
+                        <Button onClick={handleSaveChanges} disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save All Changes
+                        </Button>
+                    </CardFooter>
+                </Card>
 
                 <Card className="border-destructive">
                     <CardHeader>
                         <CardTitle className="text-destructive flex items-center gap-2">
-                            
+                            <AlertTriangle />
                             Danger Zone
                         </CardTitle>
                     </CardHeader>
@@ -385,12 +413,27 @@ export default function ProfilePage() {
                                 <h3 className="font-semibold">Delete Your Account</h3>
                                 <p className="text-sm text-muted-foreground">Permanently remove your account and all of your data.</p>
                             </div>
-                            
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive">Delete Account</Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This action cannot be undone. This will permanently delete your account, subscription, and all of your data.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction className="bg-destructive hover:bg-destructive/90">Delete Account</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </div>
                     </CardContent>
                 </Card>
-            
-        
-    
-
-    
+            </div>
+        </div>
+    );
+}
