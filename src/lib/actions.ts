@@ -24,10 +24,9 @@ export async function uploadFile(formData: FormData) {
   try {
     const results = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream({
-          // Use AI to detect the most interesting part (like a face) and crop around it
+          // Use AI to detect the main subject (person's upper body) and crop around it
           // This creates a 400x400px thumbnail centered on the subject
-          // 'thumb' crop will intelligently crop the image without distorting it
-          gravity: "auto",
+          gravity: "auto:subject",
           crop: "thumb",
           width: 400,
           height: 400,
