@@ -107,15 +107,18 @@ export default function ProfilePage() {
             } else if (userState) {
                 setState('Other');
                 setOtherState(userState);
+            } else {
+                setState('');
             }
 
             const userCity = userData.city || '';
-            const isKnownCity = userState && isKnownState && indianStates[userState]?.includes(userCity);
-            if (isKnownCity) {
+            if (userState && isKnownState && indianStates[userState as keyof typeof indianStates]?.includes(userCity)) {
                 setCity(userCity);
             } else if (userCity) {
                 setCity('Other');
                 setOtherCity(userCity);
+            } else {
+                setCity('');
             }
 
             setAllowDataSharing(userData.allowDataSharing !== false);
@@ -271,7 +274,16 @@ export default function ProfilePage() {
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0">
-                                        <Calendar mode="single" selected={dob} onSelect={setDob} initialFocus disabled={(date) => date > new Date() || date < new Date("1900-01-01")} />
+                                        <Calendar 
+                                            mode="single" 
+                                            selected={dob} 
+                                            onSelect={setDob} 
+                                            initialFocus 
+                                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                            captionLayout="dropdown-buttons"
+                                            fromYear={1900}
+                                            toYear={new Date().getFullYear()}
+                                        />
                                     </PopoverContent>
                                 </Popover>
                             </div>
@@ -323,7 +335,7 @@ export default function ProfilePage() {
                                 <Select value={city} onValueChange={(value) => {setCity(value); setOtherCity('');}} disabled={!state || state === 'Other'}>
                                     <SelectTrigger id="city"><SelectValue placeholder="Select city..." /></SelectTrigger>
                                     <SelectContent>
-                                        {state && indianStates[state]?.map(c => (
+                                        {state && indianStates[state as keyof typeof indianStates]?.map(c => (
                                             <SelectItem key={c} value={c}>{c}</SelectItem>
                                         ))}
                                         <SelectItem value="Other">Other</SelectItem>
@@ -465,3 +477,5 @@ export default function ProfilePage() {
         </div>
     );
 }
+
+    
