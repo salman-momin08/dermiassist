@@ -38,7 +38,7 @@ export async function uploadFile(formData: FormData) {
   } catch (error) {
     console.error("Upload failed", error);
     // It's helpful to return a more specific error message if possible
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred. This is often due to missing or invalid Cloudinary credentials in the .env file.";
     return { success: false, message: `Upload failed: ${errorMessage}` };
   }
 }
