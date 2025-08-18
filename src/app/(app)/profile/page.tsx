@@ -100,7 +100,7 @@ export default function ProfilePage() {
     useEffect(() => {
         if (user && userData) {
             setName(userData.displayName || user.displayName || '');
-            setProfileImage(user.photoURL || null);
+            setProfileImage(userData.photoURL || user.photoURL || null);
             setProfileImagePublicId(userData.photoPublicId || null);
             setPhone(userData.phone || '');
             if (userData.dob) {
@@ -149,6 +149,11 @@ export default function ProfilePage() {
         formData.append('file', file);
 
         try {
+            // If there's an old picture, delete it from Cloudinary first
+            if (profileImagePublicId) {
+                await deleteFile(profileImagePublicId);
+            }
+
             const result = await uploadFile(formData);
 
             if (result.success && result.url && result.publicId) {
@@ -170,8 +175,9 @@ export default function ProfilePage() {
             }
         } catch (error) {
              toast({ title: "Update Failed", description: "Could not update profile picture.", variant: "destructive"});
+        } finally {
+            setIsUploading(false);
         }
-        setIsUploading(false);
     };
     
     const handleDeletePicture = async () => {
@@ -227,8 +233,9 @@ export default function ProfilePage() {
         } catch (error) {
             console.error("Profile update error:", error);
             toast({ title: "Error", description: "Could not update your profile.", variant: "destructive"});
+        } finally {
+            setIsSaving(false);
         }
-        setIsSaving(false);
     }
     
     const handlePasswordChange = () => {
@@ -543,3 +550,5 @@ export default function ProfilePage() {
         </div>
     );
 }
+
+    
