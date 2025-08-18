@@ -77,6 +77,8 @@ export default function ProfilePage() {
     const [address, setAddress] = useState('');
     const [state, setState] = useState('');
     const [city, setCity] = useState('');
+    const [otherState, setOtherState] = useState('');
+    const [otherCity, setOtherCity] = useState('');
     const [profileImage, setProfileImage] = useState<string | null>(null);
 
     // Settings
@@ -97,8 +99,25 @@ export default function ProfilePage() {
             setGender(userData.gender || '');
             setBloodGroup(userData.bloodGroup || '');
             setAddress(userData.address || '');
-            setState(userData.state || '');
-            setCity(userData.city || '');
+            
+            const userState = userData.state || '';
+            const isKnownState = Object.keys(indianStates).includes(userState);
+            if (isKnownState) {
+                setState(userState);
+            } else if (userState) {
+                setState('Other');
+                setOtherState(userState);
+            }
+
+            const userCity = userData.city || '';
+            const isKnownCity = userState && isKnownState && indianStates[userState]?.includes(userCity);
+            if (isKnownCity) {
+                setCity(userCity);
+            } else if (userCity) {
+                setCity('Other');
+                setOtherCity(userCity);
+            }
+
             setAllowDataSharing(userData.allowDataSharing !== false);
             setEmailNotifications(userData.emailNotifications !== false);
         }
@@ -151,8 +170,8 @@ export default function ProfilePage() {
                 gender,
                 bloodGroup,
                 address,
-                state,
-                city,
+                state: state === 'Other' ? otherState : state,
+                city: city === 'Other' ? otherCity : city,
                 allowDataSharing,
                 emailNotifications,
             };
@@ -170,9 +189,7 @@ export default function ProfilePage() {
     }
     
     const handlePasswordChange = () => {
-        // In a real app, this would involve re-authenticating the user and then calling Firebase's updatePassword function.
-        // For now, it's a UI demonstration.
-         toast({
+        toast({
             title: "Password Change (UI Demo)",
             description: "Password change functionality would be implemented here.",
         });
@@ -285,26 +302,40 @@ export default function ProfilePage() {
                         <div className="grid md:grid-cols-2 gap-4">
                              <div className="space-y-2">
                                 <Label htmlFor="state">State</Label>
-                                <Select value={state} onValueChange={(value) => {setState(value); setCity('');}}>
+                                <Select value={state} onValueChange={(value) => {setState(value); setCity(''); setOtherState(''); setOtherCity('');}}>
                                     <SelectTrigger id="state"><SelectValue placeholder="Select state..." /></SelectTrigger>
                                     <SelectContent>
                                         {Object.keys(indianStates).map(s => (
                                             <SelectItem key={s} value={s}>{s}</SelectItem>
                                         ))}
+                                        <SelectItem value="Other">Other</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
+                            {state === 'Other' && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="other-state">Please specify your state</Label>
+                                    <Input id="other-state" value={otherState} onChange={(e) => setOtherState(e.target.value)} />
+                                </div>
+                            )}
                              <div className="space-y-2">
                                 <Label htmlFor="city">City</Label>
-                                <Select value={city} onValueChange={setCity} disabled={!state}>
+                                <Select value={city} onValueChange={(value) => {setCity(value); setOtherCity('');}} disabled={!state || state === 'Other'}>
                                     <SelectTrigger id="city"><SelectValue placeholder="Select city..." /></SelectTrigger>
                                     <SelectContent>
                                         {state && indianStates[state]?.map(c => (
                                             <SelectItem key={c} value={c}>{c}</SelectItem>
                                         ))}
+                                        <SelectItem value="Other">Other</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
+                            {city === 'Other' && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="other-city">Please specify your city</Label>
+                                    <Input id="other-city" value={otherCity} onChange={(e) => setOtherCity(e.target.value)} />
+                                </div>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="address">Address (Street, Zip Code)</Label>
@@ -390,7 +421,7 @@ export default function ProfilePage() {
                         </div>
                     </CardContent>
                 </Card>
-
+                
                  <div className="flex justify-start">
                     <Button onClick={handleSaveChanges} disabled={isSaving}>
                         {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -434,5 +465,3 @@ export default function ProfilePage() {
         </div>
     );
 }
-
-    
