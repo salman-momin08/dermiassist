@@ -35,10 +35,35 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 
 const indianStates: Record<string, string[]> = {
-    "Maharashtra": ["Mumbai", "Pune", "Nagpur"],
-    "Karnataka": ["Bengaluru", "Mysuru", "Hubballi"],
-    "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai"],
-    "Delhi": ["New Delhi"],
+    "Andhra Pradesh": ["Visakhapatnam", "Vijayawada", "Guntur", "Tirupati"],
+    "Arunachal Pradesh": ["Itanagar", "Naharlagun"],
+    "Assam": ["Guwahati", "Dibrugarh", "Silchar"],
+    "Bihar": ["Patna", "Gaya", "Bhagalpur"],
+    "Chhattisgarh": ["Raipur", "Bhilai", "Bilaspur"],
+    "Goa": ["Panaji", "Vasco da Gama", "Margao"],
+    "Gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot"],
+    "Haryana": ["Faridabad", "Gurugram", "Panipat"],
+    "Himachal Pradesh": ["Shimla", "Dharamshala", "Solan"],
+    "Jharkhand": ["Ranchi", "Jamshedpur", "Dhanbad"],
+    "Karnataka": ["Bengaluru", "Mysuru", "Hubballi", "Mangaluru"],
+    "Kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode"],
+    "Madhya Pradesh": ["Indore", "Bhopal", "Jabalpur", "Gwalior"],
+    "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Thane", "Nashik"],
+    "Manipur": ["Imphal"],
+    "Meghalaya": ["Shillong"],
+    "Mizoram": ["Aizawl"],
+    "Nagaland": ["Kohima", "Dimapur"],
+    "Odisha": ["Bhubaneswar", "Cuttack", "Rourkela"],
+    "Punjab": ["Ludhiana", "Amritsar", "Jalandhar"],
+    "Rajasthan": ["Jaipur", "Jodhpur", "Kota", "Udaipur"],
+    "Sikkim": ["Gangtok"],
+    "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Tiruchirappalli"],
+    "Telangana": ["Hyderabad", "Warangal", "Nizamabad"],
+    "Tripura": ["Agartala"],
+    "Uttar Pradesh": ["Lucknow", "Kanpur", "Ghaziabad", "Agra", "Varanasi"],
+    "Uttarakhand": ["Dehradun", "Haridwar", "Roorkee"],
+    "West Bengal": ["Kolkata", "Howrah", "Asansol", "Siliguri"],
+    "Delhi": ["New Delhi", "North Delhi", "South Delhi", "West Delhi", "East Delhi"],
 };
 
 
@@ -290,7 +315,7 @@ export default function ProfilePage() {
                 
                  <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Lock /></CardTitle>
+                        <CardTitle className="flex items-center gap-2"><Lock className="w-5 h-5" /> Account Security</CardTitle>
                         <CardDescription>Manage your account security settings.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -350,7 +375,7 @@ export default function ProfilePage() {
                     <CardContent className="space-y-6">
                          <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
-                                <Label className="flex items-center gap-2"></Label>
+                                <Label className="text-base font-semibold">Current Plan</Label>
                                 <p className="text-2xl font-bold">{userData?.subscriptionPlan || 'Free'}</p>
                             </div>
                             <Button variant="outline" asChild>
@@ -358,7 +383,7 @@ export default function ProfilePage() {
                             </Button>
                         </div>
                         <div>
-                             <Label className="text-lg font-semibold flex items-center gap-2 mb-2"></Label>
+                             <Label className="text-lg font-semibold flex items-center gap-2 mb-2">Payment History</Label>
                              <div className="rounded-md border p-8 text-center text-muted-foreground">
                                 <p>You have no payment history.</p>
                              </div>
@@ -408,5 +433,6 @@ export default function ProfilePage() {
             </div>
         </div>
     );
+}
 
     
