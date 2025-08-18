@@ -135,6 +135,7 @@ export default function SignupPage() {
           displayName: `${values.firstName} ${values.lastName}`,
           role: values.role,
           createdAt: new Date().toISOString(),
+          subscriptionPlan: 'Free', // Assign Free plan by default
       };
 
       if (values.role === 'doctor') {

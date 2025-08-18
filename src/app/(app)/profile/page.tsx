@@ -33,7 +33,6 @@ import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const indianStates: Record<string, string[]> = {
     "Maharashtra": ["Mumbai", "Pune", "Nagpur"],
@@ -352,7 +351,7 @@ export default function ProfilePage() {
                          <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
                                 <Label className="flex items-center gap-2"><CreditCard /> Your Current Plan</Label>
-                                <p className="text-2xl font-bold">Monthly</p>
+                                <p className="text-2xl font-bold">{userData?.subscriptionPlan || 'Free'}</p>
                                 <p className="text-xs text-muted-foreground">Renews on: 2024-02-15</p>
                             </div>
                             <Button variant="outline" asChild>
@@ -368,7 +367,7 @@ export default function ProfilePage() {
                     </CardContent>
                 </Card>
 
-                <div className="flex justify-start">
+                 <div className="flex justify-start">
                     <Button onClick={handleSaveChanges} disabled={isSaving}>
                         {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Save All Changes

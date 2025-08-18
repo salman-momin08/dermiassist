@@ -14,6 +14,7 @@ interface UserData {
     email: string;
     displayName: string;
     role: UserRole;
+    subscriptionPlan?: string;
     [key: string]: any; // Allow other properties
 }
 

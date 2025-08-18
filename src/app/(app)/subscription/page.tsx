@@ -5,7 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { 
   AlertDialog, 
@@ -19,6 +19,9 @@ import {
   AlertDialogTrigger 
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const plans = [
     {
@@ -31,7 +34,6 @@ const plans = [
             "Access to community forum",
             "Standard email support"
         ],
-        current: false,
     },
     {
         name: "Monthly",
@@ -44,7 +46,6 @@ const plans = [
             "Access to all features",
             "Priority email support"
         ],
-        current: true,
     },
     {
         name: "Yearly",
@@ -57,22 +58,59 @@ const plans = [
             "Access to all features",
             "24/7 Priority support"
         ],
-        current: false,
     }
 ]
 
 export default function SubscriptionPage() {
     const { toast } = useToast();
+    const { user, userData, forceReload, loading } = useAuth();
+    const [isUpdating, setIsUpdating] = useState(false);
     
-    const handlePlanChange = (planName: string) => {
-        // In a real app, you would handle the plan change logic here.
-        // For now, we'll just show a success toast.
-        toast({
-            title: "Plan Changed!",
-            description: `You have successfully switched to the ${planName} plan.`,
-        });
+    const handlePlanChange = async (planName: string) => {
+        if (!user) {
+            toast({
+                title: "Not Logged In",
+                description: "You must be logged in to change your plan.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setIsUpdating(true);
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            await updateDoc(userDocRef, {
+                subscriptionPlan: planName
+            });
+            
+            forceReload(); // Refresh user data across the app
+
+            toast({
+                title: "Plan Changed!",
+                description: `You have successfully switched to the ${planName} plan.`,
+            });
+        } catch (error) {
+            console.error("Failed to update plan:", error);
+            toast({
+                title: "Update Failed",
+                description: "Could not update your subscription plan. Please try again.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsUpdating(false);
+        }
     }
     
+    const currentPlan = userData?.subscriptionPlan;
+
+     if (loading) {
+        return (
+            <div className="container mx-auto p-4 md:p-8 flex justify-center">
+                <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            </div>
+        )
+    }
+
     return (
         <div className="container mx-auto p-4 md:p-8">
             <div className="flex flex-col items-center justify-center space-y-2 mb-8 text-center">
@@ -86,7 +124,7 @@ export default function SubscriptionPage() {
 
             <div className="grid gap-8 sm:grid-cols-1 lg:grid-cols-3 max-w-6xl mx-auto">
                 {plans.map(plan => (
-                    <Card key={plan.name} className={cn("flex flex-col", plan.current && "border-primary")}>
+                    <Card key={plan.name} className={cn("flex flex-col", currentPlan === plan.name && "border-primary")}>
                         <CardHeader>
                             <CardTitle className="text-2xl">{plan.name}</CardTitle>
                              <div className="flex items-baseline gap-2">
@@ -106,12 +144,15 @@ export default function SubscriptionPage() {
                             </ul>
                         </CardContent>
                         <CardFooter>
-                            {plan.current ? (
+                            {currentPlan === plan.name ? (
                                  <Button className="w-full" disabled>Current Plan</Button>
                             ) : (
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                        <Button className="w-full">Choose Plan</Button>
+                                        <Button className="w-full" disabled={isUpdating}>
+                                            {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                            Choose Plan
+                                        </Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                         <AlertDialogHeader>
