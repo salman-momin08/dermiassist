@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onAuthStateChanged, User, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
-    const fetchUserData = async (firebaseUser: User) => {
+    const fetchUserData = useCallback(async (firebaseUser: User) => {
         try {
             const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
             if (userDoc.exists()) {
@@ -51,10 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+            setLoading(true);
             if (firebaseUser) {
                 setUser(firebaseUser);
                 fetchUserData(firebaseUser);
@@ -66,14 +67,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [fetchUserData]);
 
-    const forceReload = () => {
+    const forceReload = useCallback(() => {
         if (user) {
             setLoading(true);
             fetchUserData(user);
         }
-    }
+    }, [user, fetchUserData]);
 
     const signOut = async () => {
         await firebaseSignOut(auth);

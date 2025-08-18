@@ -88,8 +88,8 @@ export default function ProfilePage() {
     const [emailNotifications, setEmailNotifications] = useState(true);
 
     const [isUploading, setIsUploading] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     
@@ -159,8 +159,6 @@ export default function ProfilePage() {
             if (result.success && result.url && result.publicId) {
                  await updateProfile(auth.currentUser!, { photoURL: result.url });
                  await updateDoc(doc(db, "users", user.uid), { photoURL: result.url, photoPublicId: result.publicId });
-                 setProfileImage(result.url);
-                 setProfileImagePublicId(result.publicId);
                  toast({
                     title: "Image Uploaded",
                     description: "Your profile picture has been updated.",
@@ -191,8 +189,6 @@ export default function ProfilePage() {
             if (result.success) {
                 await updateProfile(auth.currentUser!, { photoURL: "" });
                 await updateDoc(doc(db, 'users', user.uid), { photoURL: null, photoPublicId: null });
-                setProfileImage(null);
-                setProfileImagePublicId(null);
                 toast({ title: "Profile Picture Deleted" });
                 forceReload();
             } else {
@@ -550,5 +546,3 @@ export default function ProfilePage() {
         </div>
     );
 }
-
-    
