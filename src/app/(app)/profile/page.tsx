@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, ArrowLeft, Loader2, Upload } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2, Upload, CalendarIcon, CreditCard, FileText } from "lucide-react";
 import Link from "next/link";
 import {
   AlertDialog,
@@ -26,23 +26,54 @@ import { useAuth } from "@/hooks/use-auth";
 import { updateProfile } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+const mockPayments = [
+    { id: 'inv-001', plan: 'Monthly Plan', date: '2023-11-15', amount: '$15.00', status: 'Paid'},
+    { id: 'inv-002', plan: 'Monthly Plan', date: '2023-12-15', amount: '$15.00', status: 'Paid'},
+    { id: 'inv-003', plan: 'Monthly Plan', date: '2024-01-15', amount: '$15.00', status: 'Paid'},
+];
 
 
 export default function ProfilePage() {
     const { user, userData, loading, forceReload } = useAuth();
     const [name, setName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [dob, setDob] = useState<Date | undefined>();
+    const [gender, setGender] = useState('');
+    const [bloodGroup, setBloodGroup] = useState('');
+    const [address, setAddress] = useState('');
     const [profileImage, setProfileImage] = useState<string | null>(null);
+
+    // Settings
+    const [allowDataSharing, setAllowDataSharing] = useState(true);
+    const [emailNotifications, setEmailNotifications] = useState(true);
+
     const [isUploading, setIsUploading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
 
     useEffect(() => {
-        if (user) {
-            setName(user.displayName || '');
-            setProfileImage(user.photoURL || null);
+        if (userData) {
+            setName(userData.displayName || '');
+            setProfileImage(user?.photoURL || null);
+            setPhone(userData.phone || '');
+            if (userData.dob) setDob(new Date(userData.dob));
+            setGender(userData.gender || '');
+            setBloodGroup(userData.bloodGroup || '');
+            setAddress(userData.address || '');
+            setAllowDataSharing(userData.allowDataSharing !== false);
+            setEmailNotifications(userData.emailNotifications !== false);
         }
-    }, [user]);
+    }, [user, userData]);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -81,11 +112,27 @@ export default function ProfilePage() {
         if (!user || !name.trim()) return;
         setIsSaving(true);
         try {
+            const userDocRef = doc(db, 'users', user.uid);
+            const updatedData = {
+                displayName: name,
+                firstName: name.split(' ')[0] || '',
+                lastName: name.split(' ').slice(1).join(' ') || '',
+                phone,
+                dob: dob ? dob.toISOString() : null,
+                gender,
+                bloodGroup,
+                address,
+                allowDataSharing,
+                emailNotifications,
+            };
+
             await updateProfile(user, { displayName: name });
-            await updateDoc(doc(db, 'users', user.uid), { displayName: name, firstName: name.split(' ')[0], lastName: name.split(' ').slice(1).join(' ') });
-            toast({ title: "Profile Updated", description: "Your name has been updated." });
+            await updateDoc(userDocRef, updatedData);
+
+            toast({ title: "Profile Updated", description: "Your information has been updated." });
             forceReload();
         } catch (error) {
+            console.error("Profile update error:", error);
             toast({ title: "Error", description: "Could not update your profile.", variant: "destructive"});
         }
         setIsSaving(false);
@@ -103,8 +150,8 @@ export default function ProfilePage() {
 
 
     return (
-        <div className="container mx-auto p-4 md:p-8 max-w-2xl">
-            <div className="mb-6">
+        <div className="container mx-auto p-4 md:p-8 max-w-4xl">
+             <div className="mb-6">
                 <Button variant="outline" asChild>
                     <Link href="/dashboard">
                         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -141,60 +188,150 @@ export default function ProfilePage() {
                                 <Input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                             </div>
                             <div className="space-y-1">
-                                <h3 className="text-xl font-bold">{name}</h3>
+                                <h3 className="text-xl font-bold">{userData?.displayName}</h3>
                                 <p className="text-muted-foreground">{user.email}</p>
                             </div>
                         </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Full Name</Label>
-                            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+                        <Separator />
+                         <div className="grid md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="name">Full Name</Label>
+                                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="phone">Phone Number</Label>
+                                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your phone number" />
+                            </div>
+                        </div>
+                        <div className="grid md:grid-cols-3 gap-4">
+                             <div className="space-y-2">
+                                <Label htmlFor="dob">Date of Birth</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !dob && "text-muted-foreground")}>
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {dob ? format(dob, "PPP") : <span>Pick a date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar mode="single" selected={dob} onSelect={setDob} initialFocus disabled={(date) => date > new Date() || date < new Date("1900-01-01")} />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="gender">Gender</Label>
+                                <Select value={gender} onValueChange={setGender}>
+                                    <SelectTrigger id="gender"><SelectValue placeholder="Select..." /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="male">Male</SelectItem>
+                                        <SelectItem value="female">Female</SelectItem>
+                                        <SelectItem value="other">Other</SelectItem>
+                                        <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                             <div className="space-y-2">
+                                <Label htmlFor="blood-group">Blood Group</Label>
+                                <Select value={bloodGroup} onValueChange={setBloodGroup}>
+                                    <SelectTrigger id="blood-group"><SelectValue placeholder="Select..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(group => (
+                                            <SelectItem key={group} value={group}>{group}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" value={user.email || ''} disabled />
-                            <p className="text-xs text-muted-foreground">Your email address is used for logging in and cannot be changed.</p>
+                            <Label htmlFor="address">Address</Label>
+                            <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="e.g. 123 Main St, Anytown, USA" />
                         </div>
                     </CardContent>
-                    <CardFooter>
-                        <Button onClick={handleSaveChanges} disabled={isSaving}>
-                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Save Changes
-                        </Button>
-                    </CardFooter>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Change Password</CardTitle>
-                        <CardDescription>For your security, we recommend using a strong password.</CardDescription>
+                        <CardTitle>Settings & Privacy</CardTitle>
+                        <CardDescription>Manage your notification and data sharing preferences.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="current-password">Current Password</Label>
-                            <Input id="current-password" type="password" />
+                    <CardContent className="space-y-6">
+                        <div className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="email-notifications">Email Notifications</Label>
+                                <p className="text-xs text-muted-foreground">Receive emails about appointments and platform updates.</p>
+                            </div>
+                            <Switch id="email-notifications" checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+                        </div>
+                         <div className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="data-sharing">Share Data with Doctors</Label>
+                                <p className="text-xs text-muted-foreground">Allow your analysis reports to be shared with doctors during consultations.</p>
+                            </div>
+                             <Switch id="data-sharing" checked={allowDataSharing} onCheckedChange={setAllowDataSharing} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="new-password">New Password</Label>
-                            <Input id="new-password" type="password" />
-                        </div>
-                         <div className="space-y-2">
-                            <Label htmlFor="confirm-password">Confirm New Password</Label>
-                            <Input id="confirm-password" type="password" />
+                            <Label htmlFor="email-auth">Email Address</Label>
+                            <Input id="email-auth" type="email" value={user.email || ''} disabled />
+                            <p className="text-xs text-muted-foreground">Your email address is used for logging in and cannot be changed.</p>
                         </div>
                     </CardContent>
-                    <CardFooter>
-                        <Button>Update Password</Button>
-                    </CardFooter>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Subscription & Billing</CardTitle>
+                        <CardDescription>Manage your plan and view payment history.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                         <div className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                                <Label className="flex items-center gap-2"><CreditCard /> Active Plan</Label>
+                                <p className="text-2xl font-bold">Monthly</p>
+                                <p className="text-sm text-muted-foreground">Renews on {format(new Date().setDate(new Date().getDate() + 20), "PPP")}</p>
+                            </div>
+                            <Button variant="outline">Manage Subscription</Button>
+                        </div>
+                        <div>
+                             <Label className="text-lg font-semibold flex items-center gap-2 mb-2"><FileText /> Payment History</Label>
+                             <div className="rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Invoice</TableHead>
+                                            <TableHead>Plan</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {mockPayments.map((payment) => (
+                                            <TableRow key={payment.id}>
+                                                <TableCell className="font-medium">{payment.id}</TableCell>
+                                                <TableCell>{payment.plan}</TableCell>
+                                                <TableCell>{payment.date}</TableCell>
+                                                <TableCell>{payment.amount}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                             </div>
+                        </div>
+                    </CardContent>
                 </Card>
                 
+                 <CardFooter className="px-0 flex-col items-stretch gap-y-4">
+                    <Button onClick={handleSaveChanges} disabled={isSaving} className="w-full" size="lg">
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save All Changes
+                    </Button>
+                </CardFooter>
+
                 <Card className="border-destructive">
                     <CardHeader>
                         <CardTitle className="text-destructive flex items-center gap-2">
                             <AlertTriangle />
                             Danger Zone
                         </CardTitle>
-                        <CardDescription>These actions are irreversible. Please be certain.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-center justify-between">
@@ -226,3 +363,5 @@ export default function ProfilePage() {
         </div>
     )
 }
+
+    
