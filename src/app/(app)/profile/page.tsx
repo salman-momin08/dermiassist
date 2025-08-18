@@ -302,9 +302,6 @@ export default function ProfilePage() {
                                                     Delete Photo
                                                 </Button>
                                             )}
-                                            <DialogClose asChild>
-                                                <Button variant="outline">Close</Button>
-                                            </DialogClose>
                                         </DialogFooter>
                                     </DialogContent>
                                 </Dialog>
@@ -546,3 +543,5 @@ export default function ProfilePage() {
         </div>
     );
 }
+
+    
