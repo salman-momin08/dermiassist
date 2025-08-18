@@ -23,7 +23,10 @@ export async function uploadFile(formData: FormData) {
   try {
     const results = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream({
-          // Optionally, you can add upload presets, tags, etc. here
+          // By default, assets are uploaded as 'private'. 
+          // Setting 'public_id' or using an unsigned upload preset would make them public.
+          // For simplicity here, we assume the default will suffice and URLs are accessible.
+          // For truly public assets, you would configure an "upload_preset" in Cloudinary.
       }, (error, result) => {
         if (error) {
           reject(error);

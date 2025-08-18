@@ -92,7 +92,7 @@ export default function ProfilePage() {
     
     // Calendar state
     const [calendarView, setCalendarView] = useState<'day' | 'month' | 'year'>('day');
-    const [calendarMonth, setCalendarMonth] = useState(dob || new Date());
+    const [calendarMonth, setCalendarMonth] = useState(new Date());
 
     useEffect(() => {
         if (user && userData) {
@@ -103,6 +103,8 @@ export default function ProfilePage() {
                 const userDob = new Date(userData.dob);
                 setDob(userDob);
                 setCalendarMonth(userDob);
+            } else {
+                setCalendarMonth(new Date());
             }
             setGender(userData.gender || '');
             setBloodGroup(userData.bloodGroup || '');
@@ -142,10 +144,10 @@ export default function ProfilePage() {
         const formData = new FormData();
         formData.append('file', file);
 
-        const result = await uploadFile(formData);
+        try {
+            const result = await uploadFile(formData);
 
-        if (result.success && result.url) {
-            try {
+            if (result.success && result.url) {
                  await updateProfile(user, { photoURL: result.url });
                  await updateDoc(doc(db, "users", user.uid), { photoURL: result.url });
                  setProfileImage(result.url);
@@ -153,16 +155,16 @@ export default function ProfilePage() {
                     title: "Image Uploaded",
                     description: "Your profile picture has been updated.",
                 });
-                forceReload();
-            } catch (error) {
-                 toast({ title: "Update Failed", description: "Could not update profile picture.", variant: "destructive"});
+                forceReload(); // This will re-fetch user data and update the UI everywhere
+            } else {
+                toast({
+                    title: "Upload Failed",
+                    description: result.message || "An error occurred during upload.",
+                    variant: "destructive",
+                });
             }
-        } else {
-            toast({
-                title: "Upload Failed",
-                description: result.message || "An error occurred during upload.",
-                variant: "destructive",
-            });
+        } catch (error) {
+             toast({ title: "Update Failed", description: "Could not update profile picture.", variant: "destructive"});
         }
         setIsUploading(false);
     };
@@ -289,6 +291,7 @@ export default function ProfilePage() {
                                             month={calendarMonth}
                                             onMonthChange={setCalendarMonth}
                                             disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                            initialFocus
                                             view={calendarView}
                                             onViewChange={setCalendarView}
                                         />
@@ -332,31 +335,32 @@ export default function ProfilePage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            {state === 'Other' && (
+                            {state === 'Other' ? (
                                 <div className="space-y-2">
                                     <Label htmlFor="other-state">Please specify your state</Label>
                                     <Input id="other-state" value={otherState} onChange={(e) => setOtherState(e.target.value)} />
                                 </div>
-                            )}
-                             <div className="space-y-2">
-                                <Label htmlFor="city">City</Label>
-                                <Select value={city} onValueChange={(value) => {setCity(value); setOtherCity('');}} disabled={!state || state === 'Other'}>
-                                    <SelectTrigger id="city"><SelectValue placeholder="Select city..." /></SelectTrigger>
-                                    <SelectContent>
-                                        {state && indianStates[state as keyof typeof indianStates]?.map(c => (
-                                            <SelectItem key={c} value={c}>{c}</SelectItem>
-                                        ))}
-                                        <SelectItem value="Other">Other</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {city === 'Other' && (
+                            ) : (
                                 <div className="space-y-2">
-                                    <Label htmlFor="other-city">Please specify your city</Label>
-                                    <Input id="other-city" value={otherCity} onChange={(e) => setOtherCity(e.target.value)} />
+                                    <Label htmlFor="city">City</Label>
+                                    <Select value={city} onValueChange={(value) => {setCity(value); setOtherCity('');}} disabled={!state}>
+                                        <SelectTrigger id="city"><SelectValue placeholder="Select city..." /></SelectTrigger>
+                                        <SelectContent>
+                                            {state && indianStates[state as keyof typeof indianStates]?.map(c => (
+                                                <SelectItem key={c} value={c}>{c}</SelectItem>
+                                            ))}
+                                            <SelectItem value="Other">Other</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             )}
                         </div>
+                         {state !== 'Other' && city === 'Other' && (
+                            <div className="space-y-2">
+                                <Label htmlFor="other-city">Please specify your city</Label>
+                                <Input id="other-city" value={otherCity} onChange={(e) => setOtherCity(e.target.value)} />
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <Label htmlFor="address">Address (Street, Zip Code)</Label>
                             <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="e.g. 123 Main St, 400001" />
