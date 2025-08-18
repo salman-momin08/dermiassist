@@ -9,6 +9,7 @@ import { format, set } from "date-fns"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import { Button } from "@/components/ui/button"
+import { ScrollArea } from "./scroll-area"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
     view?: 'day' | 'month' | 'year';
@@ -44,18 +45,20 @@ function Calendar({
         const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
         return (
             <div className="p-3">
-                <div className="grid grid-cols-3 gap-2">
-                    {years.map(year => (
-                        <Button 
-                            key={year}
-                            variant="ghost"
-                            className="w-full"
-                            onClick={() => handleYearSelect(year)}
-                        >
-                            {year}
-                        </Button>
-                    ))}
-                </div>
+                <ScrollArea className="h-80">
+                    <div className="grid grid-cols-3 gap-2 pr-4">
+                        {years.map(year => (
+                            <Button 
+                                key={year}
+                                variant="ghost"
+                                className="w-full"
+                                onClick={() => handleYearSelect(year)}
+                            >
+                                {year}
+                            </Button>
+                        ))}
+                    </div>
+                </ScrollArea>
             </div>
         )
     }
