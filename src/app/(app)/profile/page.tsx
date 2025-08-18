@@ -159,15 +159,20 @@ export default function ProfilePage() {
             if (result.success && result.url && result.publicId) {
                  await updateProfile(auth.currentUser!, { photoURL: result.url });
                  await updateDoc(doc(db, "users", user.uid), { photoURL: result.url, photoPublicId: result.publicId });
+                 
+                 // Directly update state
+                 setProfileImage(result.url);
+                 setProfileImagePublicId(result.publicId);
+
                  toast({
                     title: "Image Uploaded",
                     description: "Your profile picture has been updated.",
                 });
-                forceReload(); // This will re-fetch user data and update the UI everywhere
+                forceReload();
             } else {
                 toast({
                     title: "Upload Failed",
-                    description: result.message || "An error occurred during upload.",
+                    description: result.message || "An error occurred during upload. Please ensure your credentials are set in .env.",
                     variant: "destructive",
                 });
             }
@@ -189,6 +194,11 @@ export default function ProfilePage() {
             if (result.success) {
                 await updateProfile(auth.currentUser!, { photoURL: "" });
                 await updateDoc(doc(db, 'users', user.uid), { photoURL: null, photoPublicId: null });
+                
+                // Directly update state
+                setProfileImage(null);
+                setProfileImagePublicId(null);
+                
                 toast({ title: "Profile Picture Deleted" });
                 forceReload();
             } else {
@@ -546,3 +556,5 @@ export default function ProfilePage() {
         </div>
     );
 }
+
+    
