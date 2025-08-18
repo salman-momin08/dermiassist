@@ -1,3 +1,4 @@
+
 "use server";
 
 import { v2 as cloudinary } from 'cloudinary';
@@ -23,10 +24,13 @@ export async function uploadFile(formData: FormData) {
   try {
     const results = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream({
-          // By default, assets are uploaded as 'private'. 
-          // Setting 'public_id' or using an unsigned upload preset would make them public.
-          // For simplicity here, we assume the default will suffice and URLs are accessible.
-          // For truly public assets, you would configure an "upload_preset" in Cloudinary.
+          // Use AI to detect the main face and crop around it
+          // This creates a 400x400px thumbnail centered on the face
+          // 'thumb' crop will intelligently crop the image without distorting it
+          gravity: "face",
+          crop: "thumb",
+          width: 400,
+          height: 400,
       }, (error, result) => {
         if (error) {
           reject(error);
