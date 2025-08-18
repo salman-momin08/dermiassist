@@ -35,12 +35,6 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-const mockPayments = [
-    { id: 'inv-001', plan: 'Monthly Plan', date: '2023-11-15', amount: '$15.00', status: 'Paid'},
-    { id: 'inv-002', plan: 'Monthly Plan', date: '2023-12-15', amount: '$15.00', status: 'Paid'},
-    { id: 'inv-003', plan: 'Monthly Plan', date: '2024-01-15', amount: '$15.00', status: 'Paid'},
-];
-
 const indianStates: Record<string, string[]> = {
     "Maharashtra": ["Mumbai", "Pune", "Nagpur"],
     "Karnataka": ["Bengaluru", "Mysuru", "Hubballi"],
@@ -367,27 +361,8 @@ export default function ProfilePage() {
                         </div>
                         <div>
                              <Label className="text-lg font-semibold flex items-center gap-2 mb-2"><FileText /> Payment History</Label>
-                             <div className="rounded-md border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Invoice ID</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Amount</TableHead>
-                                            <TableHead className="text-right">Status</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {mockPayments.map((payment) => (
-                                            <TableRow key={payment.id}>
-                                                <TableCell className="font-medium">{payment.id}</TableCell>
-                                                <TableCell>{payment.date}</TableCell>
-                                                <TableCell>{payment.amount}</TableCell>
-                                                <TableCell className="text-right">{payment.status}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                             <div className="rounded-md border p-8 text-center text-muted-foreground">
+                                <p>You have no payment history.</p>
                              </div>
                         </div>
                     </CardContent>

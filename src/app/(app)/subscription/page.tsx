@@ -9,14 +9,27 @@ import { cn } from "@/lib/utils";
 
 const plans = [
     {
+        name: "Free",
+        price: "$0",
+        priceSuffix: "/month",
+        description: "Get started with our basic features, completely free.",
+        features: [
+            "2 AI Analyses per month",
+            "Access to community forum",
+            "Standard email support"
+        ],
+        current: false,
+    },
+    {
         name: "Monthly",
         price: "$15",
         priceSuffix: "/month",
+        description: "Unlock premium features and get more done.",
         features: [
             "10 AI Analyses per month",
             "5 Doctor Consultations",
             "Access to all features",
-            "Email support"
+            "Priority email support"
         ],
         current: true,
     },
@@ -24,11 +37,12 @@ const plans = [
         name: "Yearly",
         price: "$150",
         priceSuffix: "/year",
+        description: "Save big with our annual plan and get the best value.",
         features: [
             "Unlimited AI Analyses",
             "60 Doctor Consultations",
             "Access to all features",
-            "Priority email support"
+            "24/7 Priority support"
         ],
         current: false,
     }
@@ -46,15 +60,16 @@ export default function SubscriptionPage() {
                 </p>
             </div>
 
-            <div className="grid gap-8 sm:grid-cols-1 lg:grid-cols-2 max-w-4xl mx-auto">
+            <div className="grid gap-8 sm:grid-cols-1 lg:grid-cols-3 max-w-6xl mx-auto">
                 {plans.map(plan => (
                     <Card key={plan.name} className={cn("flex flex-col", plan.current && "border-primary")}>
                         <CardHeader>
                             <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                            <CardDescription>
+                             <div className="flex items-baseline gap-2">
                                 <span className="text-4xl font-bold">{plan.price}</span>
                                 <span className="text-muted-foreground">{plan.priceSuffix}</span>
-                            </CardDescription>
+                             </div>
+                            <CardDescription>{plan.description}</CardDescription>
                         </CardHeader>
                         <CardContent className="flex-grow space-y-4">
                             <ul className="space-y-2">
