@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,67 +24,124 @@ import {
 } from "@/components/ui/alert-dialog";
 import Image from "next/image";
 import { uploadFile } from "@/lib/actions";
+import { useAuth } from "@/hooks/use-auth";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 type VerificationStatus = 'Verified' | 'Pending' | 'Not Verified';
 
 export default function DoctorProfilePage() {
+    const { user, userData, loading, forceReload } = useAuth();
     const { toast } = useToast();
-    // In a real app, this data would come from an API/auth context
-    const [name, setName] = useState("Doctor");
-    const [email, setEmail] = useState("doctor@example.com");
-    const [specialization, setSpecialization] = useState("General Dermatology");
+
+    // Profile State
+    const [name, setName] = useState("");
+    const [specialization, setSpecialization] = useState("");
     const [bio, setBio] = useState("");
-    const [notifications, setNotifications] = useState(true);
     const [location, setLocation] = useState("");
     const [phone, setPhone] = useState("");
     
+    // Settings State
+    const [notifications, setNotifications] = useState(true);
+    
+    // Verification State
     const [signature, setSignature] = useState<string | null>(null);
     const [certificate, setCertificate] = useState<string | null>(null);
     const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>('Not Verified');
 
+    // Loading States
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
     const [isUploadingSignature, setIsUploadingSignature] = useState(false);
     const [isUploadingCertificate, setIsUploadingCertificate] = useState(false);
 
     const signatureInputRef = useRef<HTMLInputElement>(null);
     const certificateInputRef = useRef<HTMLInputElement>(null);
 
+    useEffect(() => {
+        if (userData) {
+            setName(userData.displayName || '');
+            setSpecialization(userData.specialization || 'General Dermatology');
+            setBio(userData.bio || '');
+            setLocation(userData.location || '');
+            setPhone(userData.phone || '');
+            setSignature(userData.signatureUrl || null);
+            setCertificate(userData.certificateUrl || null);
+            if (userData.verified) {
+                setVerificationStatus('Verified');
+            } else if (userData.verificationPending) {
+                setVerificationStatus('Pending');
+            } else {
+                setVerificationStatus('Not Verified');
+            }
+        }
+    }, [userData]);
 
-    const handleProfileSave = () => {
-        console.log("Saving profile:", { name, specialization, bio, location, phone, signature });
-        toast({
-            title: "Profile Saved",
-            description: "Your professional information has been updated.",
-        });
+
+    const handleProfileSave = async () => {
+        if (!user) return;
+        setIsSavingProfile(true);
+        try {
+            const updatedData = {
+                displayName: name,
+                specialization,
+                bio,
+                location,
+                phone,
+            };
+            await updateDoc(doc(db, 'users', user.uid), updatedData);
+            toast({
+                title: "Profile Saved",
+                description: "Your professional information has been updated.",
+            });
+            forceReload();
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to save profile.", variant: "destructive" });
+        } finally {
+            setIsSavingProfile(false);
+        }
     };
     
     const handleSettingsSave = () => {
+        // This is a mock for now as we don't have a field for it
         console.log("Saving settings:", { notifications });
+        setIsSavingSettings(true);
         toast({
             title: "Settings Updated",
             description: "Your account settings have been saved.",
         });
+        setTimeout(() => setIsSavingSettings(false), 1000);
     };
 
      const handleFileUpload = async (file: File, type: 'signature' | 'certificate') => {
+        if (!user) return;
         const stateSetter = type === 'signature' ? setIsUploadingSignature : setIsUploadingCertificate;
+        const urlField = type === 'signature' ? 'signatureUrl' : 'certificateUrl';
+        const stateUrlSetter = type === 'signature' ? setSignature : setCertificate;
+        
         stateSetter(true);
 
         const formData = new FormData();
         formData.append('file', file);
         const result = await uploadFile(formData);
 
-        stateSetter(false);
-
         if (result.success && result.url) {
-            if (type === 'signature') setSignature(result.url);
-            if (type === 'certificate') setCertificate(result.url);
-            toast({ title: "Upload Successful", description: `Your ${type} has been updated.` });
+            try {
+                await updateDoc(doc(db, 'users', user.uid), { [urlField]: result.url });
+                stateUrlSetter(result.url);
+                toast({ title: "Upload Successful", description: `Your ${type} has been updated.` });
+                forceReload();
+            } catch (error) {
+                toast({ title: "Database Error", description: `Failed to save ${type} URL.`, variant: "destructive" });
+            }
         } else {
             toast({ title: "Upload Failed", description: result.message || "Upload failed", variant: "destructive" });
         }
+        stateSetter(false);
     };
     
-    const handleRequestVerification = () => {
+    const handleRequestVerification = async () => {
         if (!certificate) {
             toast({
                 title: "Certificate Required",
@@ -93,12 +150,32 @@ export default function DoctorProfilePage() {
             });
             return;
         }
-        setVerificationStatus('Pending');
-        toast({
-            title: "Verification Request Sent",
-            description: "Your request has been submitted for admin review. This may take 2-3 business days.",
-        });
+        if (!user) return;
+        
+        try {
+            await updateDoc(doc(db, 'users', user.uid), { verificationPending: true });
+            setVerificationStatus('Pending');
+            toast({
+                title: "Verification Request Sent",
+                description: "Your request has been submitted for admin review. This may take 2-3 business days.",
+            });
+            forceReload();
+        } catch (error) {
+             toast({ title: "Error", description: "Failed to submit verification request.", variant: "destructive" });
+        }
     }
+    
+     if (loading) {
+      return (
+        <div className="container mx-auto p-4 md:p-8 flex justify-center">
+          <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        </div>
+      )
+    }
+
+    if (!user || !userData) return null;
+    
+    const isProfileComplete = !!(userData.specialization && userData.location && userData.phone && userData.signatureUrl);
 
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-2xl">
@@ -118,6 +195,17 @@ export default function DoctorProfilePage() {
                     Manage your professional profile and account settings.
                 </p>
             </div>
+
+            {!isProfileComplete && verificationStatus !== 'Verified' && (
+                <Alert className="mb-8">
+                    <BadgeHelp className="h-4 w-4" />
+                    <AlertTitle>Complete Your Profile!</AlertTitle>
+                    <AlertDescription>
+                       Please fill out all fields in your professional information, including your signature, to be eligible for verification.
+                    </AlertDescription>
+                </Alert>
+            )}
+
              <div className="space-y-8">
                 <Card>
                     <CardHeader>
@@ -181,7 +269,10 @@ export default function DoctorProfilePage() {
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button onClick={handleProfileSave}>Save Profile</Button>
+                        <Button onClick={handleProfileSave} disabled={isSavingProfile}>
+                            {isSavingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save Profile
+                        </Button>
                     </CardFooter>
                 </Card>
 
@@ -240,7 +331,7 @@ export default function DoctorProfilePage() {
                                         <h3 className="font-semibold">Complete Your Verification</h3>
                                         <p className="text-sm text-muted-foreground">Upload your certificate and submit for review.</p>
                                     </div>
-                                    <Button className="mt-4 sm:mt-0" onClick={handleRequestVerification} disabled={!certificate}>Request Verification</Button>
+                                    <Button className="mt-4 sm:mt-0" onClick={handleRequestVerification} disabled={!certificate || !isProfileComplete}>Request Verification</Button>
                                 </div>
                             </div>
                         )}
@@ -255,7 +346,7 @@ export default function DoctorProfilePage() {
                      <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" value={email} disabled />
+                            <Input id="email" type="email" value={user.email || ''} disabled />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="new-password">Change Password</Label>
@@ -272,7 +363,10 @@ export default function DoctorProfilePage() {
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button onClick={handleSettingsSave}>Update Settings</Button>
+                        <Button onClick={handleSettingsSave} disabled={isSavingSettings}>
+                             {isSavingSettings && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                             Update Settings
+                        </Button>
                     </CardFooter>
                 </Card>
 

@@ -1,17 +1,35 @@
 
+"use client";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function AdminProfilePage() {
-    // In a real app, this data would come from an authentication context or API
-    const user = {
-        name: "Admin",
-        email: "admin@example.com"
-    };
+    const { user, loading } = useAuth();
+    const [name, setName] = useState('');
+
+    useEffect(() => {
+        if(user) {
+            setName(user.displayName || 'Admin');
+        }
+    }, [user]);
+
+    if (loading) {
+      return (
+        <div className="container mx-auto p-4 md:p-8 flex justify-center">
+          <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        </div>
+      )
+    }
+
+    if (!user) return null;
+
 
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-2xl">
@@ -41,11 +59,11 @@ export default function AdminProfilePage() {
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="name">Full Name</Label>
-                            <Input id="name" defaultValue={user.name} />
+                            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" defaultValue={user.email} disabled />
+                            <Input id="email" type="email" value={user.email || ''} disabled />
                             <p className="text-xs text-muted-foreground">Your email address is used for logging in and cannot be changed.</p>
                         </div>
                     </CardContent>

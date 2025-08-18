@@ -28,8 +28,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 
 function GoogleIcon() {
@@ -114,9 +115,35 @@ export default function SignupPage() {
 
   const onSubmit = async (values: z.infer<typeof signupSchema>) => {
     try {
+      // 1. Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      // In a real app, you would also save the additional user data (name, role, etc.) to your database (e.g., Firestore) here.
-      console.log("User created:", userCredential.user);
+      const user = userCredential.user;
+
+      // 2. Update Firebase Auth profile
+      await updateProfile(user, {
+        displayName: `${values.firstName} ${values.lastName}`
+      });
+
+      // 3. Create user document in Firestore
+      const userDocRef = doc(db, "users", user.uid);
+      
+      const userData: any = {
+          uid: user.uid,
+          email: values.email,
+          firstName: values.firstName,
+          lastName: values.lastName,
+          displayName: `${values.firstName} ${values.lastName}`,
+          role: values.role,
+          createdAt: new Date().toISOString(),
+      };
+
+      if (values.role === 'doctor') {
+        userData.specialization = values.specialization;
+        userData.medicalId = values.medicalId;
+        userData.verified = false; // Doctors start as unverified
+      }
+      
+      await setDoc(userDocRef, userData);
 
       toast({
         title: "Account Created Successfully",
@@ -128,9 +155,13 @@ export default function SignupPage() {
 
     } catch (error: any) {
       console.error("Signup failed:", error);
+      const errorMessage = error.code === 'auth/email-already-in-use' 
+        ? "This email is already registered. Please login instead."
+        : error.message || "An unexpected error occurred. Please try again.";
+
       toast({
         title: "Signup Failed",
-        description: error.message || "An unexpected error occurred. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }

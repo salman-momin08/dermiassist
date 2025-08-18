@@ -6,13 +6,14 @@ import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { UserNav } from './user-nav';
 import { ThemeToggle } from './theme-toggle';
+import { useAuth } from '@/hooks/use-auth';
+import { Skeleton } from '../ui/skeleton';
 
-type AppHeaderProps = {
-  authenticated?: boolean;
-  role?: 'patient' | 'doctor' | 'admin';
-};
+export function AppHeader() {
+  const { user, role, loading } = useAuth();
 
-export function AppHeader({ authenticated = false, role = 'patient' }: AppHeaderProps) {
+  const authenticated = !!user;
+
   const patientLinks = (
     <>
       <Link href="/dashboard" className="transition-colors hover:text-foreground/80 text-foreground/60">Dashboard</Link>
@@ -29,7 +30,6 @@ export function AppHeader({ authenticated = false, role = 'patient' }: AppHeader
       <Link href="/doctor/appointments" className="transition-colors hover:text-foreground/80 text-foreground/60">Appointments</Link>
       <Link href="/doctor/cases" className="transition-colors hover:text-foreground/80 text-foreground/60">Patient Cases</Link>
       <Link href="/doctor/chat" className="transition-colors hover:text-foreground/80 text-foreground/60">Chat</Link>
-      <Link href="/doctor/profile" className="transition-colors hover:text-foreground/80 text-foreground/60">Profile</Link>
     </>
   );
 
@@ -65,21 +65,6 @@ export function AppHeader({ authenticated = false, role = 'patient' }: AppHeader
     }
   }
 
-  const getUserNavProps = () => {
-    // In a real app, this data would come from an authentication context or API
-    const defaultUser = { name: "User", email: "user@example.com" };
-    
-    switch(role) {
-      case 'doctor':
-        return { name: 'Doctor', email: 'doctor@example.com', role: 'doctor' as const };
-      case 'admin':
-        return { name: 'Admin', email: 'admin@example.com', role: 'admin' as const };
-      case 'patient':
-      default:
-        return { name: 'Patient', email: 'patient@example.com', role: 'patient' as const };
-    }
-  }
-
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
@@ -97,8 +82,10 @@ export function AppHeader({ authenticated = false, role = 'patient' }: AppHeader
 
         <div className="flex flex-1 items-center justify-end space-x-4">
             <ThemeToggle />
-            {authenticated ? (
-                <UserNav {...getUserNavProps()} />
+            {loading ? (
+                <Skeleton className="h-8 w-8 rounded-full" />
+            ) : authenticated && user ? (
+                <UserNav name={user.displayName || 'User'} email={user.email || ''} role={role} />
             ) : (
                 <nav className="space-x-2">
                     <Button variant="ghost" asChild>

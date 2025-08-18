@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,23 +22,31 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { uploadFile } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { updateProfile } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 
 export default function ProfilePage() {
+    const { user, userData, loading, forceReload } = useAuth();
+    const [name, setName] = useState('');
     const [profileImage, setProfileImage] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
 
-    // In a real app, this user data would come from a context or API
-    const user = {
-        name: 'Patient',
-        email: 'patient@example.com'
-    };
+    useEffect(() => {
+        if (user) {
+            setName(user.displayName || '');
+            setProfileImage(user.photoURL || null);
+        }
+    }, [user]);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) return;
+        if (!file || !user) return;
 
         setIsUploading(true);
         const formData = new FormData();
@@ -46,13 +54,19 @@ export default function ProfilePage() {
 
         const result = await uploadFile(formData);
 
-        setIsUploading(false);
         if (result.success && result.url) {
-            setProfileImage(result.url);
-            toast({
-                title: "Image Uploaded",
-                description: "Your profile picture has been updated.",
-            });
+            try {
+                 await updateProfile(user, { photoURL: result.url });
+                 await updateDoc(doc(db, "users", user.uid), { photoURL: result.url });
+                 setProfileImage(result.url);
+                 toast({
+                    title: "Image Uploaded",
+                    description: "Your profile picture has been updated.",
+                });
+                forceReload();
+            } catch (error) {
+                 toast({ title: "Update Failed", description: "Could not update profile picture.", variant: "destructive"});
+            }
         } else {
             toast({
                 title: "Upload Failed",
@@ -60,7 +74,32 @@ export default function ProfilePage() {
                 variant: "destructive",
             });
         }
+        setIsUploading(false);
     };
+
+    const handleSaveChanges = async () => {
+        if (!user || !name.trim()) return;
+        setIsSaving(true);
+        try {
+            await updateProfile(user, { displayName: name });
+            await updateDoc(doc(db, 'users', user.uid), { displayName: name, firstName: name.split(' ')[0], lastName: name.split(' ').slice(1).join(' ') });
+            toast({ title: "Profile Updated", description: "Your name has been updated." });
+            forceReload();
+        } catch (error) {
+            toast({ title: "Error", description: "Could not update your profile.", variant: "destructive"});
+        }
+        setIsSaving(false);
+    }
+
+    if (loading) {
+      return (
+        <div className="container mx-auto p-4 md:p-8 flex justify-center">
+          <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        </div>
+      )
+    }
+
+    if (!user) return null;
 
 
     return (
@@ -92,8 +131,8 @@ export default function ProfilePage() {
                         <div className="flex items-center space-x-6">
                             <div className="relative">
                                 <Avatar className="h-24 w-24">
-                                    <AvatarImage src={profileImage || "https://placehold.co/100x100.png?text=P"} alt="Patient" />
-                                    <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                                    <AvatarImage src={profileImage || `https://placehold.co/100x100.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
+                                    <AvatarFallback>{name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                                 <Button size="icon" variant="outline" className="absolute bottom-0 right-0 rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                                     {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -102,23 +141,26 @@ export default function ProfilePage() {
                                 <Input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                             </div>
                             <div className="space-y-1">
-                                <h3 className="text-xl font-bold">{user.name}</h3>
+                                <h3 className="text-xl font-bold">{name}</h3>
                                 <p className="text-muted-foreground">{user.email}</p>
                             </div>
                         </div>
 
                         <div className="space-y-2">
                             <Label htmlFor="name">Full Name</Label>
-                            <Input id="name" defaultValue={user.name} />
+                            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" defaultValue={user.email} disabled />
+                            <Input id="email" type="email" value={user.email || ''} disabled />
                             <p className="text-xs text-muted-foreground">Your email address is used for logging in and cannot be changed.</p>
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button>Save Changes</Button>
+                        <Button onClick={handleSaveChanges} disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save Changes
+                        </Button>
                     </CardFooter>
                 </Card>
 

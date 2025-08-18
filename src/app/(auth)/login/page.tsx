@@ -21,7 +21,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 function GoogleIcon() {
     return (
@@ -61,17 +62,34 @@ export default function LoginPage() {
 
   const onSubmit = async (values: z.infer<typeof loginSchema>) => {
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      
+      const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+      if (!userDoc.exists()) {
+        throw new Error("User data not found.");
+      }
+      const userData = userDoc.data();
+      
       toast({
         title: "Login Successful",
         description: "Welcome back! Redirecting you to your dashboard.",
       });
-      router.push("/dashboard");
+
+      const destination = userData.role === 'doctor' ? '/doctor/dashboard' : '/dashboard';
+      router.push(destination);
+
     } catch (error: any) {
       console.error("Login failed:", error);
+      let description = "An unexpected error occurred. Please try again.";
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        description = "Invalid email or password. Please check your credentials.";
+      } else if (error.message) {
+        description = error.message;
+      }
+      
       toast({
         title: "Login Failed",
-        description: error.message || "An unexpected error occurred. Please try again.",
+        description,
         variant: "destructive",
       });
     }

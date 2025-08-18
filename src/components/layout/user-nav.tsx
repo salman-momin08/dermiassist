@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { User, LogOut, Settings } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 
 type UserNavProps = {
     name: string;
@@ -26,6 +27,8 @@ type UserNavProps = {
 }
 
 export function UserNav({ name, email, role }: UserNavProps) {
+  const { signOut, user } = useAuth();
+
   const getProfileLink = () => {
     switch(role) {
       case 'doctor':
@@ -44,7 +47,7 @@ export function UserNav({ name, email, role }: UserNavProps) {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={`https://placehold.co/40x40.png?text=${name.charAt(0)}`} alt="@user" />
+            <AvatarImage src={user?.photoURL || `https://placehold.co/40x40.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
             <AvatarFallback>
               <User className="h-4 w-4"/>
             </AvatarFallback>
@@ -68,7 +71,7 @@ export function UserNav({ name, email, role }: UserNavProps) {
               <span>Profile</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
+           <DropdownMenuItem asChild>
              <Link href={profileLink}>
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
@@ -76,11 +79,9 @@ export function UserNav({ name, email, role }: UserNavProps) {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/">
+        <DropdownMenuItem onClick={signOut}>
             <LogOut className="mr-2 h-4 w-4" />
             <span>Log out</span>
-          </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
