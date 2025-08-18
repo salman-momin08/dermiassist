@@ -17,31 +17,29 @@ export async function uploadFile(formData: FormData) {
     return { success: false, message: "No file provided." };
   }
 
-  // Convert file to buffer
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = new Uint8Array(arrayBuffer);
-
   try {
-    const results = await new Promise((resolve, reject) => {
-      cloudinary.uploader.upload_stream({
-          // Use AI to detect the face and crop a 400x400px thumbnail around it.
-          // This is the most reliable method for ensuring the face is centered.
-          gravity: "face",
-          crop: "thumb",
-          width: 400,
-          height: 400,
-      }, (error, result) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(result);
-      }).end(buffer);
+    // Convert file to buffer and then to a Base64 data URI
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const dataUri = `data:${file.type};base64,${buffer.toString('base64')}`;
+
+    // Upload the data URI to Cloudinary with AI cropping
+    const result = await cloudinary.uploader.upload(dataUri, {
+      // Use AI to detect the face and crop a 400x400px thumbnail around it.
+      // This is the most reliable method for ensuring the face is centered.
+      gravity: "face",
+      crop: "thumb",
+      width: 400,
+      height: 400,
+      zoom: "0.8" // Optional: zoom out slightly from the face for better framing
     });
 
-    return { success: true, url: (results as any).secure_url };
+    return { success: true, url: result.secure_url };
+
   } catch (error) {
     console.error("Upload failed", error);
-    return { success: false, message: "Upload failed." };
+    // It's helpful to return a more specific error message if possible
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return { success: false, message: `Upload failed: ${errorMessage}` };
   }
 }
