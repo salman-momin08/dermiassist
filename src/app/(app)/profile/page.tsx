@@ -352,7 +352,6 @@ export default function ProfilePage() {
                             <div className="space-y-0.5">
                                 <Label className="flex items-center gap-2"><CreditCard /> Your Current Plan</Label>
                                 <p className="text-2xl font-bold">{userData?.subscriptionPlan || 'Free'}</p>
-                                <p className="text-xs text-muted-foreground">Renews on: 2024-02-15</p>
                             </div>
                             <Button variant="outline" asChild>
                                 <Link href="/subscription">Change Plan</Link>
