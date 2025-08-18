@@ -290,7 +290,7 @@ export default function ProfilePage() {
                 
                  <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Lock /> Security</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><Lock /></CardTitle>
                         <CardDescription>Manage your account security settings.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -314,7 +314,7 @@ export default function ProfilePage() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Settings & Privacy</CardTitle>
+                        <CardTitle>Settings &amp; Privacy</CardTitle>
                         <CardDescription>Manage your notification and data sharing preferences.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -344,13 +344,13 @@ export default function ProfilePage() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Subscription & Billing</CardTitle>
+                        <CardTitle>Subscription &amp; Billing</CardTitle>
                         <CardDescription>Manage your plan and view payment history.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                          <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
-                                <Label className="flex items-center gap-2"><CreditCard /> Your Current Plan</Label>
+                                <Label className="flex items-center gap-2"><CreditCard /></Label>
                                 <p className="text-2xl font-bold">{userData?.subscriptionPlan || 'Free'}</p>
                             </div>
                             <Button variant="outline" asChild>
@@ -358,7 +358,7 @@ export default function ProfilePage() {
                             </Button>
                         </div>
                         <div>
-                             <Label className="text-lg font-semibold flex items-center gap-2 mb-2"><FileText /> Payment History</Label>
+                             <Label className="text-lg font-semibold flex items-center gap-2 mb-2"><FileText /></Label>
                              <div className="rounded-md border p-8 text-center text-muted-foreground">
                                 <p>You have no payment history.</p>
                              </div>
@@ -377,8 +377,7 @@ export default function ProfilePage() {
                     <CardHeader>
                         <CardTitle className="text-destructive flex items-center gap-2">
                             <AlertTriangle />
-                            Danger Zone
-                        </Title>
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-center justify-between">
