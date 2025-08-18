@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { uploadFile } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
@@ -256,10 +256,16 @@ export default function ProfilePage() {
                                         </Avatar>
                                     </DialogTrigger>
                                     <DialogContent className="p-0 bg-transparent border-0 w-auto flex items-center justify-center">
-                                       <Avatar className="h-64 w-64">
-                                            <AvatarImage src={profileImage || `https://placehold.co/256x256.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
-                                            <AvatarFallback>{name.charAt(0)}</AvatarFallback>
-                                        </Avatar>
+                                       <div className="flex flex-col items-center gap-4 p-4">
+                                            <DialogHeader>
+                                                <DialogTitle className="text-center">{name}'s Profile Photo</DialogTitle>
+                                                <DialogDescription className="text-center">A larger view of your profile photo.</DialogDescription>
+                                            </DialogHeader>
+                                            <Avatar className="h-64 w-64">
+                                                <AvatarImage src={profileImage || `https://placehold.co/256x256.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
+                                                <AvatarFallback>{name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                       </div>
                                     </DialogContent>
                                 </Dialog>
                                 <Button size="icon" variant="outline" className="absolute bottom-0 right-0 rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
@@ -500,5 +506,3 @@ export default function ProfilePage() {
         </div>
     );
 }
-
-    
