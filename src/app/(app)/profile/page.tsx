@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, ArrowLeft, Loader2, Upload, CalendarIcon, CreditCard, FileText, Lock, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2, Upload, CalendarIcon, CreditCard, FileText, Lock, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import {
   AlertDialog,
@@ -296,7 +296,7 @@ export default function ProfilePage() {
                                             <DialogTitle>{name}'s Profile Photo</DialogTitle>
                                             <DialogDescription>A larger view of your profile photo.</DialogDescription>
                                         </DialogHeader>
-                                        <div className="flex flex-col items-center gap-4 p-4">
+                                        <div className="flex justify-center p-4">
                                             <Avatar className="h-64 w-64">
                                                 <AvatarImage src={profileImage || `https://placehold.co/256x256.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
                                                 <AvatarFallback>{name.charAt(0)}</AvatarFallback>
