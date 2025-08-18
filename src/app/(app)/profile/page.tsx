@@ -361,7 +361,9 @@ export default function ProfilePage() {
                                 <p className="text-2xl font-bold">Monthly</p>
                                 <p className="text-xs text-muted-foreground">Renews on: 2024-02-15</p>
                             </div>
-                            <Button variant="outline">Change Plan</Button>
+                            <Button variant="outline" asChild>
+                                <Link href="/subscription">Change Plan</Link>
+                            </Button>
                         </div>
                         <div>
                              <Label className="text-lg font-semibold flex items-center gap-2 mb-2"><FileText /> Payment History</Label>
@@ -390,16 +392,14 @@ export default function ProfilePage() {
                         </div>
                     </CardContent>
                 </Card>
-                
-                 <Card>
-                    <CardFooter>
-                        <Button onClick={handleSaveChanges} disabled={isSaving}>
-                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Save All Changes
-                        </Button>
-                    </CardFooter>
-                </Card>
 
+                <div className="flex justify-start">
+                    <Button onClick={handleSaveChanges} disabled={isSaving}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save All Changes
+                    </Button>
+                </div>
+                
                 <Card className="border-destructive">
                     <CardHeader>
                         <CardTitle className="text-destructive flex items-center gap-2">
