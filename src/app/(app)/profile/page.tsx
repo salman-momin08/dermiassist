@@ -379,7 +379,7 @@ export default function ProfilePage() {
                         <CardTitle className="text-destructive flex items-center gap-2">
                             <AlertTriangle />
                             Danger Zone
-                        </CardTitle>
+                        </Title>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-center justify-between">
