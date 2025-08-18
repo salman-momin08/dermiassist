@@ -24,8 +24,8 @@ export async function uploadFile(formData: FormData) {
   try {
     const results = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream({
-          // Use AI to detect the face and crop around it
-          // This creates a 400x400px thumbnail centered on the face
+          // Use AI to detect the face and crop a 400x400px thumbnail around it.
+          // This is the most reliable method for ensuring the face is centered.
           gravity: "face",
           crop: "thumb",
           width: 400,
