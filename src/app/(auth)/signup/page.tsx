@@ -28,6 +28,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 
 function GoogleIcon() {
@@ -110,16 +112,28 @@ export default function SignupPage() {
 
   const role = form.watch("role");
 
-  const onSubmit = (values: z.infer<typeof signupSchema>) => {
-    // In a real app, you would handle account creation here (e.g., call an API)
-    console.log("Signup form submitted with values:", values);
-     toast({
-        title: "Account Creation Submitted",
-        description: "Check the console for the submitted form data.",
-    });
-    // On successful account creation from your API, you would then redirect.
-    // const destination = values.role === 'doctor' ? '/doctor/dashboard' : '/dashboard';
-    // router.push(destination);
+  const onSubmit = async (values: z.infer<typeof signupSchema>) => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      // In a real app, you would also save the additional user data (name, role, etc.) to your database (e.g., Firestore) here.
+      console.log("User created:", userCredential.user);
+
+      toast({
+        title: "Account Created Successfully",
+        description: "Welcome! We're redirecting you to your dashboard.",
+      });
+      
+      const destination = values.role === 'doctor' ? '/doctor/dashboard' : '/dashboard';
+      router.push(destination);
+
+    } catch (error: any) {
+      console.error("Signup failed:", error);
+      toast({
+        title: "Signup Failed",
+        description: error.message || "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

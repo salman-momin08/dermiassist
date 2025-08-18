@@ -14,13 +14,14 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
 import Link from 'next/link';
 import { X, Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 function GoogleIcon() {
     return (
@@ -58,16 +59,22 @@ export default function LoginPage() {
     },
   });
 
-  const onSubmit = (values: z.infer<typeof loginSchema>) => {
-    // In a real app, you'd handle the login logic here, e.g., call an API.
-    console.log("Login form submitted with values:", values);
-    toast({
-      title: "Form Submitted",
-      description: "Check the console for the submitted data.",
-    });
-    // On successful login from your API, you would then redirect.
-    // For now, we'll just log it.
-    // router.push("/dashboard");
+  const onSubmit = async (values: z.infer<typeof loginSchema>) => {
+    try {
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      toast({
+        title: "Login Successful",
+        description: "Welcome back! Redirecting you to your dashboard.",
+      });
+      router.push("/dashboard");
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      toast({
+        title: "Login Failed",
+        description: error.message || "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
