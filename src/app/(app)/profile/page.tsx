@@ -64,9 +64,9 @@ export default function ProfilePage() {
     const { toast } = useToast();
 
     useEffect(() => {
-        if (userData) {
-            setName(userData.displayName || '');
-            setProfileImage(user?.photoURL || null);
+        if (user && userData) {
+            setName(userData.displayName || user.displayName || '');
+            setProfileImage(user.photoURL || null);
             setPhone(userData.phone || '');
             if (userData.dob) setDob(new Date(userData.dob));
             setGender(userData.gender || '');
@@ -350,7 +350,7 @@ export default function ProfilePage() {
                     <CardContent className="space-y-6">
                          <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
-                                <Label className="flex items-center gap-2"><CreditCard /></Label>
+                                <Label className="flex items-center gap-2"></Label>
                                 <p className="text-2xl font-bold">{userData?.subscriptionPlan || 'Free'}</p>
                             </div>
                             <Button variant="outline" asChild>
@@ -358,7 +358,7 @@ export default function ProfilePage() {
                             </Button>
                         </div>
                         <div>
-                             <Label className="text-lg font-semibold flex items-center gap-2 mb-2"><FileText /></Label>
+                             <Label className="text-lg font-semibold flex items-center gap-2 mb-2"></Label>
                              <div className="rounded-md border p-8 text-center text-muted-foreground">
                                 <p>You have no payment history.</p>
                              </div>
@@ -376,7 +376,7 @@ export default function ProfilePage() {
                 <Card className="border-destructive">
                     <CardHeader>
                         <CardTitle className="text-destructive flex items-center gap-2">
-                            <AlertTriangle />
+                            <AlertTriangle /> Danger Zone
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -408,6 +408,5 @@ export default function ProfilePage() {
             </div>
         </div>
     );
-}
 
     
