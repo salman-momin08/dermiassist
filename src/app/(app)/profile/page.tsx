@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, ArrowLeft, Loader2, Upload, CalendarIcon, CreditCard, FileText, Lock } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2, Upload, CalendarIcon, CreditCard, FileText, Lock, Trash2 } from "lucide-react";
 import Link from "next/link";
 import {
   AlertDialog,
@@ -19,9 +19,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { uploadFile } from "@/lib/actions";
+import { uploadFile, deleteFile } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { updateProfile } from "firebase/auth";
@@ -81,6 +81,7 @@ export default function ProfilePage() {
     const [otherState, setOtherState] = useState('');
     const [otherCity, setOtherCity] = useState('');
     const [profileImage, setProfileImage] = useState<string | null>(null);
+    const [profileImagePublicId, setProfileImagePublicId] = useState<string | null>(null);
 
     // Settings
     const [allowDataSharing, setAllowDataSharing] = useState(true);
@@ -88,6 +89,7 @@ export default function ProfilePage() {
 
     const [isUploading, setIsUploading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     
@@ -99,6 +101,7 @@ export default function ProfilePage() {
         if (user && userData) {
             setName(userData.displayName || user.displayName || '');
             setProfileImage(user.photoURL || null);
+            setProfileImagePublicId(userData.photoPublicId || null);
             setPhone(userData.phone || '');
             if (userData.dob) {
                 const userDob = new Date(userData.dob);
@@ -148,10 +151,11 @@ export default function ProfilePage() {
         try {
             const result = await uploadFile(formData);
 
-            if (result.success && result.url) {
+            if (result.success && result.url && result.publicId) {
                  await updateProfile(auth.currentUser!, { photoURL: result.url });
-                 await updateDoc(doc(db, "users", user.uid), { photoURL: result.url });
+                 await updateDoc(doc(db, "users", user.uid), { photoURL: result.url, photoPublicId: result.publicId });
                  setProfileImage(result.url);
+                 setProfileImagePublicId(result.publicId);
                  toast({
                     title: "Image Uploaded",
                     description: "Your profile picture has been updated.",
@@ -168,6 +172,31 @@ export default function ProfilePage() {
              toast({ title: "Update Failed", description: "Could not update profile picture.", variant: "destructive"});
         }
         setIsUploading(false);
+    };
+    
+    const handleDeletePicture = async () => {
+        if (!user || !profileImagePublicId) {
+            toast({ title: "Error", description: "No profile picture to delete or public ID missing.", variant: "destructive" });
+            return;
+        }
+        setIsDeleting(true);
+        try {
+            const result = await deleteFile(profileImagePublicId);
+            if (result.success) {
+                await updateProfile(auth.currentUser!, { photoURL: "" });
+                await updateDoc(doc(db, 'users', user.uid), { photoURL: null, photoPublicId: null });
+                setProfileImage(null);
+                setProfileImagePublicId(null);
+                toast({ title: "Profile Picture Deleted" });
+                forceReload();
+            } else {
+                toast({ title: "Deletion Failed", description: result.message, variant: "destructive" });
+            }
+        } catch (error) {
+             toast({ title: "Error", description: "Failed to delete profile picture.", variant: "destructive" });
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const handleSaveChanges = async () => {
@@ -255,17 +284,28 @@ export default function ProfilePage() {
                                             <AvatarFallback>{name.charAt(0)}</AvatarFallback>
                                         </Avatar>
                                     </DialogTrigger>
-                                    <DialogContent className="p-0 bg-transparent border-0 w-auto flex items-center justify-center">
-                                       <div className="flex flex-col items-center gap-4 p-4">
-                                            <DialogHeader>
-                                                <DialogTitle className="text-center">{name}'s Profile Photo</DialogTitle>
-                                                <DialogDescription className="text-center">A larger view of your profile photo.</DialogDescription>
-                                            </DialogHeader>
+                                    <DialogContent className="sm:max-w-md">
+                                        <DialogHeader>
+                                            <DialogTitle>{name}'s Profile Photo</DialogTitle>
+                                            <DialogDescription>A larger view of your profile photo.</DialogDescription>
+                                        </DialogHeader>
+                                        <div className="flex flex-col items-center gap-4 p-4">
                                             <Avatar className="h-64 w-64">
                                                 <AvatarImage src={profileImage || `https://placehold.co/256x256.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
                                                 <AvatarFallback>{name.charAt(0)}</AvatarFallback>
                                             </Avatar>
-                                       </div>
+                                        </div>
+                                         <DialogFooter>
+                                            {profileImage && (
+                                                <Button variant="destructive" onClick={handleDeletePicture} disabled={isDeleting}>
+                                                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Trash2 className="mr-2 h-4 w-4"/>}
+                                                    Delete Photo
+                                                </Button>
+                                            )}
+                                            <DialogClose asChild>
+                                                <Button variant="outline">Close</Button>
+                                            </DialogClose>
+                                        </DialogFooter>
                                     </DialogContent>
                                 </Dialog>
                                 <Button size="icon" variant="outline" className="absolute bottom-0 right-0 rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
