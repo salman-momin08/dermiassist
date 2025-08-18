@@ -27,7 +27,7 @@ type UserNavProps = {
 }
 
 export function UserNav({ name, email, role }: UserNavProps) {
-  const { signOut, user } = useAuth();
+  const { signOut, user, userData } = useAuth();
 
   const getProfileLink = () => {
     switch(role) {
@@ -47,7 +47,7 @@ export function UserNav({ name, email, role }: UserNavProps) {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user?.photoURL || `https://placehold.co/40x40.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
+            <AvatarImage src={userData?.photoURL || `https://placehold.co/40x40.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
             <AvatarFallback>
               <User className="h-4 w-4"/>
             </AvatarFallback>
