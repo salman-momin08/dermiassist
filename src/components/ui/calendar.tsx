@@ -44,7 +44,7 @@ function Calendar({
         const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
         return (
             <div className="p-3">
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                     {years.map(year => (
                         <Button 
                             key={year}
