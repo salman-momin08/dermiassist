@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { uploadFile } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
@@ -148,7 +149,7 @@ export default function ProfilePage() {
             const result = await uploadFile(formData);
 
             if (result.success && result.url) {
-                 await updateProfile(user, { photoURL: result.url });
+                 await updateProfile(auth.currentUser!, { photoURL: result.url });
                  await updateDoc(doc(db, "users", user.uid), { photoURL: result.url });
                  setProfileImage(result.url);
                  toast({
@@ -189,7 +190,7 @@ export default function ProfilePage() {
                 emailNotifications,
             };
 
-            await updateProfile(user, { displayName: name });
+            await updateProfile(auth.currentUser!, { displayName: name });
             await updateDoc(userDocRef, updatedData);
 
             toast({ title: "Profile Updated", description: "Your information has been updated." });
@@ -247,10 +248,20 @@ export default function ProfilePage() {
                     <CardContent className="space-y-6">
                         <div className="flex items-center space-x-6">
                             <div className="relative">
-                                <Avatar className="h-24 w-24">
-                                    <AvatarImage src={profileImage || `https://placehold.co/100x100.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
-                                    <AvatarFallback>{name.charAt(0)}</AvatarFallback>
-                                </Avatar>
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Avatar className="h-24 w-24 cursor-pointer">
+                                            <AvatarImage src={profileImage || `https://placehold.co/100x100.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
+                                            <AvatarFallback>{name.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                    </DialogTrigger>
+                                    <DialogContent className="p-0 bg-transparent border-0 w-auto flex items-center justify-center">
+                                       <Avatar className="h-64 w-64">
+                                            <AvatarImage src={profileImage || `https://placehold.co/256x256.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
+                                            <AvatarFallback>{name.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                    </DialogContent>
+                                </Dialog>
                                 <Button size="icon" variant="outline" className="absolute bottom-0 right-0 rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                                     {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                                     <span className="sr-only">Upload Profile Picture</span>
@@ -489,3 +500,5 @@ export default function ProfilePage() {
         </div>
     );
 }
+
+    
