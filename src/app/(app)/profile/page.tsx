@@ -89,13 +89,21 @@ export default function ProfilePage() {
     const [isSaving, setIsSaving] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
+    
+    // Calendar state
+    const [calendarView, setCalendarView] = useState<'day' | 'month' | 'year'>('day');
+    const [calendarMonth, setCalendarMonth] = useState(dob || new Date());
 
     useEffect(() => {
         if (user && userData) {
             setName(userData.displayName || user.displayName || '');
             setProfileImage(user.photoURL || null);
             setPhone(userData.phone || '');
-            if (userData.dob) setDob(new Date(userData.dob));
+            if (userData.dob) {
+                const userDob = new Date(userData.dob);
+                setDob(userDob);
+                setCalendarMonth(userDob);
+            }
             setGender(userData.gender || '');
             setBloodGroup(userData.bloodGroup || '');
             setAddress(userData.address || '');
@@ -266,7 +274,7 @@ export default function ProfilePage() {
                         <div className="grid md:grid-cols-3 gap-4">
                              <div className="space-y-2">
                                 <Label htmlFor="dob">Date of Birth</Label>
-                                <Popover>
+                                <Popover onOpenChange={() => setCalendarView('day')}>
                                     <PopoverTrigger asChild>
                                         <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !dob && "text-muted-foreground")}>
                                             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -274,12 +282,16 @@ export default function ProfilePage() {
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0">
-                                        <Calendar 
-                                            mode="single" 
-                                            selected={dob} 
-                                            onSelect={setDob} 
-                                            initialFocus 
+                                       <Calendar
+                                            mode="single"
+                                            selected={dob}
+                                            onSelect={setDob}
+                                            month={calendarMonth}
+                                            onMonthChange={setCalendarMonth}
                                             disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                            captionLayout="dropdown-buttons"
+                                            fromYear={1900}
+                                            toYear={new Date().getFullYear()}
                                         />
                                     </PopoverContent>
                                 </Popover>
@@ -474,7 +486,3 @@ export default function ProfilePage() {
         </div>
     );
 }
-
-    
-
-    
