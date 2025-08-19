@@ -18,6 +18,7 @@ import { generateHealingVideo } from '@/ai/flows/generate-healing-video';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function AnalysisDetailPage() {
     const params = useParams();
@@ -49,8 +50,10 @@ export default function AnalysisDetailPage() {
     }, [user, id, getAnalysisById]);
 
     useEffect(() => {
-        fetchAnalysis();
-    }, [fetchAnalysis]);
+        if (id) {
+            fetchAnalysis();
+        }
+    }, [id, fetchAnalysis]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
@@ -102,6 +105,10 @@ export default function AnalysisDetailPage() {
         setVideoUri(null);
 
         try {
+            toast({
+                title: "Video Generation Starting",
+                description: "This is an experimental feature and may take up to a minute.",
+            });
             const result = await generateHealingVideo({
                 originalPhotoDataUri: analysis.image,
                 newPhotoDataUri: progressImage,
@@ -109,10 +116,10 @@ export default function AnalysisDetailPage() {
             setVideoUri(result.videoDataUri);
         } catch (err) {
             console.error("Video generation failed:", err);
-            setError("An unexpected error occurred while generating the video. Please try again.");
+            setError("Video generation requires a GCP project with billing enabled. Please check your setup.");
             toast({
                 title: "Video Generation Failed",
-                description: "This is an experimental feature and may not always work. Please try again later.",
+                description: "This feature requires a Google Cloud project with billing enabled.",
                 variant: "destructive",
             });
         } finally {
@@ -173,10 +180,11 @@ export default function AnalysisDetailPage() {
     }
 
     if (!analysis) {
+        // Only show notFound if loading is finished and analysis is still not there.
         if (!isLoading) {
             notFound();
         }
-        return null;
+        return null; // Return null while loading to avoid premature notFound() call
     }
 
     return (
@@ -229,7 +237,7 @@ export default function AnalysisDetailPage() {
                                 </CardHeader>
                                 <CardContent>
                                    <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
-                                        {analysis.donts.map((item, index) => <li key={index}>{item}</li>)}
+                                        {analysis.donts.map((item, index) => <li key={index}</li>)}
                                     </ul>
                                 </CardContent>
                             </Card>
@@ -336,13 +344,21 @@ export default function AnalysisDetailPage() {
                                         <><Sparkles className="mr-2 h-4 w-4" />Analyze Progress</>
                                     )}
                                 </Button>
-                                <Button onClick={handleGenerateVideo} disabled={!progressSummary || isGeneratingVideo} className="w-full" variant="secondary">
-                                    {isGeneratingVideo ? (
-                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating Video...</>
-                                    ) : (
-                                        <><Video className="mr-2 h-4 w-4" />Generate Healing Video</>
-                                    )}
-                                </Button>
+                                 <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            {/* This div is needed for the tooltip to work on a disabled button */}
+                                            <div className="w-full">
+                                                <Button onClick={handleGenerateVideo} disabled={true} className="w-full" variant="secondary">
+                                                    <Video className="mr-2 h-4 w-4" />Generate Healing Video
+                                                </Button>
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>This premium feature requires GCP billing to be enabled.</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
@@ -365,3 +381,5 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
+
+    
