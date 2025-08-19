@@ -289,21 +289,50 @@ export default function ProfilePage() {
                     <CardContent className="space-y-6">
                         <div className="flex items-center space-x-6">
                             <div className="relative">
-                                <Avatar className="h-24 w-24">
-                                    <AvatarImage src={formState.photoURL || `https://placehold.co/100x100.png?text=${formState.displayName.charAt(0)}`} alt={formState.displayName} data-ai-hint="person portrait"/>
-                                    <AvatarFallback>{formState.displayName.charAt(0) || <User />}</AvatarFallback>
-                                </Avatar>
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Avatar className="h-24 w-24 cursor-pointer">
+                                            <AvatarImage src={formState.photoURL || `https://placehold.co/100x100.png?text=${formState.displayName.charAt(0)}`} alt={formState.displayName} data-ai-hint="person portrait"/>
+                                            <AvatarFallback>{formState.displayName.charAt(0) || <User />}</AvatarFallback>
+                                        </Avatar>
+                                    </DialogTrigger>
+                                    <DialogContent className="w-auto bg-transparent border-none shadow-none flex items-center justify-center">
+                                         <div className="relative">
+                                            <Avatar className="h-64 w-64 border-4 border-background shadow-lg">
+                                                <AvatarImage src={formState.photoURL || `https://placehold.co/256x256.png`} alt={formState.displayName} className="object-cover" data-ai-hint="person portrait"/>
+                                                <AvatarFallback><User className="w-32 h-32" /></AvatarFallback>
+                                            </Avatar>
+                                            {formState.photoURL && (
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button size="icon" variant="destructive" className="absolute bottom-4 right-4 rounded-full h-10 w-10">
+                                                            <Trash2 className="h-5 w-5" />
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Delete Profile Picture?</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                This will remove your profile picture. This action will be saved when you click "Save All Changes".
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <DialogClose asChild>
+                                                                <AlertDialogAction onClick={handleDeleteImage} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                                            </DialogClose>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            )}
+                                         </div>
+                                    </DialogContent>
+                                </Dialog>
                                 <div className="absolute bottom-0 right-0 flex gap-1">
                                     <Button size="icon" variant="outline" className="rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
                                         <Upload className="h-4 w-4" />
                                         <span className="sr-only">Upload Profile Picture</span>
                                     </Button>
-                                    {formState.photoURL && (
-                                        <Button size="icon" variant="destructive" className="rounded-full h-8 w-8" onClick={handleDeleteImage} disabled={isSaving}>
-                                            <Trash2 className="h-4 w-4" />
-                                            <span className="sr-only">Delete Profile Picture</span>
-                                        </Button>
-                                    )}
                                 </div>
                                 <Input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                             </div>
@@ -539,6 +568,5 @@ export default function ProfilePage() {
             </div>
         </div>
     );
-}
 
     
