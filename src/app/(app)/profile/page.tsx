@@ -67,183 +67,180 @@ const indianStates: Record<string, string[]> = {
     "Delhi": ["New Delhi", "North Delhi", "South Delhi", "West Delhi", "East Delhi"],
 };
 
+// This will hold all form data, including image info
+type ProfileFormState = {
+    displayName: string;
+    phone: string;
+    dob?: Date;
+    gender: string;
+    bloodGroup: string;
+    address: string;
+    state: string;
+    city: string;
+    otherState: string;
+    otherCity: string;
+    allowDataSharing: boolean;
+    emailNotifications: boolean;
+    photoURL: string | null;
+    photoPublicId: string | null;
+    // For pending uploads
+    newImageFile: File | null;
+};
+
 
 export default function ProfilePage() {
     const { user, userData, loading, forceReload } = useAuth();
-    
-    // Form fields state
-    const [name, setName] = useState('');
-    const [phone, setPhone] = useState('');
-    const [dob, setDob] = useState<Date | undefined>();
-    const [gender, setGender] = useState('');
-    const [bloodGroup, setBloodGroup] = useState('');
-    const [address, setAddress] = useState('');
-    const [state, setState] = useState('');
-    const [city, setCity] = useState('');
-    const [otherState, setOtherState] = useState('');
-    const [otherCity, setOtherCity] = useState('');
-
-    // Local state for image preview and pending upload/delete
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [pendingImage, setPendingImage] = useState<{file: File, publicIdToReplace: string | null} | null>(null);
-    const [pendingDelete, setPendingDelete] = useState(false);
-
-
-    // Settings
-    const [allowDataSharing, setAllowDataSharing] = useState(true);
-    const [emailNotifications, setEmailNotifications] = useState(true);
-
-    const [isUploading, setIsUploading] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     
-    // Calendar state
-    const [calendarView, setCalendarView] = useState<'day' | 'month' | 'year'>('day');
+    // Single state object for the form
+    const [formState, setFormState] = useState<ProfileFormState>({
+        displayName: '',
+        phone: '',
+        dob: undefined,
+        gender: '',
+        bloodGroup: '',
+        address: '',
+        state: '',
+        city: '',
+        otherState: '',
+        otherCity: '',
+        allowDataSharing: true,
+        emailNotifications: true,
+        photoURL: null,
+        photoPublicId: null,
+        newImageFile: null,
+    });
+
+    const [isSaving, setIsSaving] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [calendarMonth, setCalendarMonth] = useState(new Date());
 
     useEffect(() => {
         if (userData) {
-            setName(userData.displayName || '');
-            setPhone(userData.phone || userData.mobile || '');
-            setImagePreview(userData.photoURL || null);
-            setGender(userData.gender || '');
-            setBloodGroup(userData.bloodGroup || '');
-            setAddress(userData.address || '');
-
-            if (userData.dob) {
-                const userDob = new Date(userData.dob);
-                setDob(userDob);
-                setCalendarMonth(userDob);
-            } else {
-                setDob(undefined);
-                setCalendarMonth(new Date());
-            }
+            const userDob = userData.dob ? new Date(userData.dob) : undefined;
+            if(userDob) setCalendarMonth(userDob);
 
             const userState = userData.state || '';
             const isKnownState = Object.keys(indianStates).includes(userState);
-            if (isKnownState) {
-                setState(userState);
-                setOtherState('');
-            } else if (userState) {
-                setState('Other');
-                setOtherState(userState);
-            } else {
-                setState('');
-                setOtherState('');
-            }
-
             const userCity = userData.city || '';
-            if (userState && isKnownState && indianStates[userState as keyof typeof indianStates]?.includes(userCity)) {
-                setCity(userCity);
-                setOtherCity('');
-            } else if (userCity) {
-                setCity('Other');
-                setOtherCity(userCity);
-            } else {
-                setCity('');
-                setOtherCity('');
-            }
+            const isKnownCity = userState && isKnownState && indianStates[userState as keyof typeof indianStates]?.includes(userCity);
 
-            setAllowDataSharing(userData.allowDataSharing !== false);
-            setEmailNotifications(userData.emailNotifications !== false);
-
-            // Reset pending actions when data is reloaded
-            setPendingImage(null);
-            setPendingDelete(false);
+            setFormState({
+                displayName: userData.displayName || '',
+                phone: userData.phone || userData.mobile || '',
+                dob: userDob,
+                gender: userData.gender || '',
+                bloodGroup: userData.bloodGroup || '',
+                address: userData.address || '',
+                state: isKnownState ? userState : (userState ? 'Other' : ''),
+                city: isKnownCity ? userCity : (userCity ? 'Other' : ''),
+                otherState: isKnownState ? '' : userState,
+                otherCity: isKnownCity ? '' : userCity,
+                allowDataSharing: userData.allowDataSharing !== false,
+                emailNotifications: userData.emailNotifications !== false,
+                photoURL: userData.photoURL || null,
+                photoPublicId: userData.photoPublicId || null,
+                newImageFile: null, // Reset pending file on data reload
+            });
         }
     }, [userData]);
 
+    const handleInputChange = (field: keyof ProfileFormState, value: any) => {
+        setFormState(prev => ({ ...prev, [field]: value }));
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Set up for preview and pending upload
         const reader = new FileReader();
         reader.onloadend = () => {
-            setImagePreview(reader.result as string);
+            // Update state with the new file and its preview URL
+            setFormState(prev => ({
+                ...prev,
+                newImageFile: file,
+                photoURL: reader.result as string, // Show preview immediately
+            }));
         };
         reader.readAsDataURL(file);
-
-        setPendingImage({file, publicIdToReplace: userData?.photoPublicId || null});
-        setPendingDelete(false); // An upload cancels a pending delete
     };
-    
-    const handleDeletePreview = () => {
-        if (!imagePreview) return;
-        setPendingDelete(true);
-        setPendingImage(null); // A delete cancels a pending upload
-        setImagePreview(null);
+
+    const handleDeleteImage = () => {
+        // Clear the image fields in the state
+        setFormState(prev => ({
+            ...prev,
+            photoURL: null,
+            newImageFile: null, // Cancel any pending upload
+        }));
     };
 
     const handleSaveChanges = async () => {
-        if (!user || !name.trim()) return;
+        if (!user || !formState.displayName.trim()) return;
         setIsSaving(true);
         
-        let newPhotoUrl: string | null = userData?.photoURL || null;
-        let newPublicId: string | null = userData?.photoPublicId || null;
+        const finalFormState = { ...formState };
+        const oldPublicId = userData?.photoPublicId; // Get the ID from before any changes
 
         try {
-            // 1. Handle pending image delete
-            if (pendingDelete && userData?.photoPublicId) {
-                await deleteFile(userData.photoPublicId);
-                newPhotoUrl = null;
-                newPublicId = null;
+            // 1. Handle image deletion if necessary
+            // This happens if there was an old image but the new state has no photoURL.
+            if (oldPublicId && !finalFormState.photoURL) {
+                await deleteFile(oldPublicId);
+                finalFormState.photoPublicId = null;
             }
 
-            // 2. Handle pending image upload
-            if (pendingImage) {
-                setIsUploading(true);
-                // If there was an old picture, delete it first
-                if (pendingImage.publicIdToReplace) {
-                    await deleteFile(pendingImage.publicIdToReplace);
+            // 2. Handle image upload if a new file is pending
+            if (finalFormState.newImageFile) {
+                // If an old image existed, delete it first.
+                if (oldPublicId) {
+                    await deleteFile(oldPublicId);
                 }
                 
                 const formData = new FormData();
-                formData.append('file', pendingImage.file);
+                formData.append('file', finalFormState.newImageFile);
                 const result = await uploadFile(formData);
 
                 if (result.success && result.url && result.publicId) {
-                    newPhotoUrl = result.url;
-                    newPublicId = result.publicId;
+                    finalFormState.photoURL = result.url;
+                    finalFormState.photoPublicId = result.publicId;
                 } else {
                     throw new Error(result.message || 'Image upload failed.');
                 }
-                setIsUploading(false);
             }
 
-            // 3. Update Firestore with all changes
-            const userDocRef = doc(db, 'users', user.uid);
-            const updatedData = {
-                displayName: name,
-                firstName: name.split(' ')[0] || '',
-                lastName: name.split(' ').slice(1).join(' ') || '',
-                phone,
-                dob: dob ? dob.toISOString() : null,
-                gender,
-                bloodGroup,
-                address,
-                state: state === 'Other' ? otherState : state,
-                city: city === 'Other' ? otherCity : city,
-                allowDataSharing,
-                emailNotifications,
-                photoURL: newPhotoUrl,
-                photoPublicId: newPublicId,
+            // 3. Prepare data for Firestore and Auth update
+            const firestoreData = {
+                displayName: finalFormState.displayName,
+                firstName: finalFormState.displayName.split(' ')[0] || '',
+                lastName: finalFormState.displayName.split(' ').slice(1).join(' ') || '',
+                phone: finalFormState.phone,
+                dob: finalFormState.dob ? finalFormState.dob.toISOString() : null,
+                gender: finalFormState.gender,
+                bloodGroup: finalFormState.bloodGroup,
+                address: finalFormState.address,
+                state: finalFormState.state === 'Other' ? finalFormState.otherState : finalFormState.state,
+                city: finalFormState.city === 'Other' ? finalFormState.otherCity : finalFormState.city,
+                allowDataSharing: finalFormState.allowDataSharing,
+                emailNotifications: finalFormState.emailNotifications,
+                photoURL: finalFormState.photoURL,
+                photoPublicId: finalFormState.photoPublicId,
             };
 
-            // 4. Update auth profile (name and photo)
-            await updateProfile(auth.currentUser!, { displayName: name, photoURL: newPhotoUrl });
-            await updateDoc(userDocRef, updatedData);
+            const userDocRef = doc(db, 'users', user.uid);
+            
+            // 4. Run Firestore and Auth updates in parallel
+            await Promise.all([
+                updateDoc(userDocRef, firestoreData),
+                updateProfile(auth.currentUser!, { displayName: finalFormState.displayName, photoURL: finalFormState.photoURL })
+            ]);
 
             toast({ title: "Profile Updated", description: "Your information has been successfully saved." });
-            forceReload(); // This will re-fetch userData and reset the component state
+            forceReload(); // Re-fetch data to sync with the new state
         } catch (error: any) {
             console.error("Profile update error:", error);
             toast({ title: "Error Saving Profile", description: error.message || "Could not update your profile.", variant: "destructive"});
         } finally {
             setIsSaving(false);
-            setIsUploading(false);
         }
     }
     
@@ -263,7 +260,6 @@ export default function ProfilePage() {
     }
 
     if (!user) return null;
-
 
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-4xl">
@@ -294,16 +290,16 @@ export default function ProfilePage() {
                         <div className="flex items-center space-x-6">
                             <div className="relative">
                                 <Avatar className="h-24 w-24">
-                                    <AvatarImage src={imagePreview || `https://placehold.co/100x100.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
-                                    <AvatarFallback>{name.charAt(0)}</AvatarFallback>
+                                    <AvatarImage src={formState.photoURL || `https://placehold.co/100x100.png?text=${formState.displayName.charAt(0)}`} alt={formState.displayName} data-ai-hint="person portrait"/>
+                                    <AvatarFallback>{formState.displayName.charAt(0) || <User /></AvatarFallback>
                                 </Avatar>
                                 <div className="absolute bottom-0 right-0 flex gap-1">
                                     <Button size="icon" variant="outline" className="rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
                                         <Upload className="h-4 w-4" />
                                         <span className="sr-only">Upload Profile Picture</span>
                                     </Button>
-                                    {imagePreview && (
-                                        <Button size="icon" variant="destructive" className="rounded-full h-8 w-8" onClick={handleDeletePreview} disabled={isSaving}>
+                                    {formState.photoURL && (
+                                        <Button size="icon" variant="destructive" className="rounded-full h-8 w-8" onClick={handleDeleteImage} disabled={isSaving}>
                                             <Trash2 className="h-4 w-4" />
                                             <span className="sr-only">Delete Profile Picture</span>
                                         </Button>
@@ -312,7 +308,7 @@ export default function ProfilePage() {
                                 <Input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                             </div>
                             <div className="space-y-1">
-                                <h3 className="text-xl font-bold">{userData?.displayName}</h3>
+                                <h3 className="text-xl font-bold">{formState.displayName}</h3>
                                 <p className="text-muted-foreground">{user.email}</p>
                             </div>
                         </div>
@@ -320,28 +316,28 @@ export default function ProfilePage() {
                          <div className="grid md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="name">Full Name</Label>
-                                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+                                <Input id="name" value={formState.displayName} onChange={(e) => handleInputChange('displayName', e.target.value)} />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="phone">Phone Number</Label>
-                                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your phone number" />
+                                <Input id="phone" value={formState.phone} onChange={(e) => handleInputChange('phone', e.target.value)} placeholder="Your phone number" />
                             </div>
                         </div>
                         <div className="grid md:grid-cols-3 gap-4">
                              <div className="space-y-2">
                                 <Label htmlFor="dob">Date of Birth</Label>
-                                <Popover onOpenChange={() => setCalendarView('day')}>
+                                <Popover>
                                     <PopoverTrigger asChild>
-                                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !dob && "text-muted-foreground")}>
+                                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !formState.dob && "text-muted-foreground")}>
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {dob ? format(dob, "PPP") : <span>Pick a date</span>}
+                                            {formState.dob ? format(formState.dob, "PPP") : <span>Pick a date</span>}
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0">
                                        <Calendar
                                             mode="single"
-                                            selected={dob}
-                                            onSelect={setDob}
+                                            selected={formState.dob}
+                                            onSelect={(date) => handleInputChange('dob', date)}
                                             month={calendarMonth}
                                             onMonthChange={setCalendarMonth}
                                             disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
@@ -355,7 +351,7 @@ export default function ProfilePage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="gender">Gender</Label>
-                                <Select value={gender} onValueChange={setGender}>
+                                <Select value={formState.gender} onValueChange={(value) => handleInputChange('gender', value)}>
                                     <SelectTrigger id="gender"><SelectValue placeholder="Select..." /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="male">Male</SelectItem>
@@ -367,7 +363,7 @@ export default function ProfilePage() {
                             </div>
                              <div className="space-y-2">
                                 <Label htmlFor="blood-group">Blood Group</Label>
-                                <Select value={bloodGroup} onValueChange={setBloodGroup}>
+                                <Select value={formState.bloodGroup} onValueChange={(value) => handleInputChange('bloodGroup', value)}>
                                     <SelectTrigger id="blood-group"><SelectValue placeholder="Select..." /></SelectTrigger>
                                     <SelectContent>
                                         {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(group => (
@@ -380,7 +376,7 @@ export default function ProfilePage() {
                         <div className="grid md:grid-cols-2 gap-4">
                              <div className="space-y-2">
                                 <Label htmlFor="state">State</Label>
-                                <Select value={state} onValueChange={(value) => {setState(value); setCity(''); setOtherState(''); setOtherCity('');}}>
+                                <Select value={formState.state} onValueChange={(value) => {handleInputChange('state', value); handleInputChange('city', ''); handleInputChange('otherState', ''); handleInputChange('otherCity', '');}}>
                                     <SelectTrigger id="state"><SelectValue placeholder="Select state..." /></SelectTrigger>
                                     <SelectContent>
                                         {Object.keys(indianStates).map(s => (
@@ -390,18 +386,18 @@ export default function ProfilePage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            {state === 'Other' ? (
+                            {formState.state === 'Other' ? (
                                 <div className="space-y-2">
                                     <Label htmlFor="other-state">Please specify your state</Label>
-                                    <Input id="other-state" value={otherState} onChange={(e) => setOtherState(e.target.value)} />
+                                    <Input id="other-state" value={formState.otherState} onChange={(e) => handleInputChange('otherState', e.target.value)} />
                                 </div>
                             ) : (
                                 <div className="space-y-2">
                                     <Label htmlFor="city">City</Label>
-                                    <Select value={city} onValueChange={(value) => {setCity(value); setOtherCity('');}} disabled={!state}>
+                                    <Select value={formState.city} onValueChange={(value) => {handleInputChange('city', value); handleInputChange('otherCity', '');}} disabled={!formState.state}>
                                         <SelectTrigger id="city"><SelectValue placeholder="Select city..." /></SelectTrigger>
                                         <SelectContent>
-                                            {state && indianStates[state as keyof typeof indianStates]?.map(c => (
+                                            {formState.state && indianStates[formState.state as keyof typeof indianStates]?.map(c => (
                                                 <SelectItem key={c} value={c}>{c}</SelectItem>
                                             ))}
                                             <SelectItem value="Other">Other</SelectItem>
@@ -410,15 +406,15 @@ export default function ProfilePage() {
                                 </div>
                             )}
                         </div>
-                         {state !== 'Other' && city === 'Other' && (
+                         {formState.state !== 'Other' && formState.city === 'Other' && (
                             <div className="space-y-2">
                                 <Label htmlFor="other-city">Please specify your city</Label>
-                                <Input id="other-city" value={otherCity} onChange={(e) => setOtherCity(e.target.value)} />
+                                <Input id="other-city" value={formState.otherCity} onChange={(e) => handleInputChange('otherCity', e.target.value)} />
                             </div>
                         )}
                         <div className="space-y-2">
                             <Label htmlFor="address">Address (Street, Zip Code)</Label>
-                            <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="e.g. 123 Main St, 400001" />
+                            <Input id="address" value={formState.address} onChange={(e) => handleInputChange('address', e.target.value)} placeholder="e.g. 123 Main St, 400001" />
                         </div>
                     </CardContent>
                 </Card>
@@ -458,14 +454,14 @@ export default function ProfilePage() {
                                 <Label htmlFor="email-notifications">Email Notifications</Label>
                                 <p className="text-xs text-muted-foreground">Receive emails about appointments and platform updates.</p>
                             </div>
-                             <Switch id="email-notifications" checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+                             <Switch id="email-notifications" checked={formState.emailNotifications} onCheckedChange={(checked) => handleInputChange('emailNotifications', checked)} />
                         </div>
                          <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
                                 <Label htmlFor="data-sharing">Share Data with Doctors</Label>
                                 <p className="text-xs text-muted-foreground">Allow your analysis reports to be shared with doctors during consultations.</p>
                             </div>
-                             <Switch id="data-sharing" checked={allowDataSharing} onCheckedChange={setAllowDataSharing} />
+                             <Switch id="data-sharing" checked={formState.allowDataSharing} onCheckedChange={(checked) => handleInputChange('allowDataSharing', checked)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email-auth">Email Address</Label>
@@ -504,7 +500,7 @@ export default function ProfilePage() {
                  <div className="flex justify-start">
                     <Button onClick={handleSaveChanges} disabled={isSaving}>
                         {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isUploading ? 'Uploading Image...' : 'Save All Changes'}
+                        Save All Changes
                     </Button>
                 </div>
                 
@@ -544,3 +540,4 @@ export default function ProfilePage() {
         </div>
     );
 }
+
