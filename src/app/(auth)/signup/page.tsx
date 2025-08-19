@@ -129,14 +129,8 @@ export default function SignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      // 2. Update Firebase Auth profile
-      await updateProfile(user, {
-        displayName: `${values.firstName} ${values.lastName}`
-      });
-
-      // 3. Create user document in Firestore
+      // 2. Prepare user data and profile update promises
       const userDocRef = doc(db, "users", user.uid);
-      
       const userData: any = {
           uid: user.uid,
           email: values.email,
@@ -156,7 +150,14 @@ export default function SignupPage() {
         userData.verified = false; // Doctors start as unverified
       }
       
-      await setDoc(userDocRef, userData);
+      // These promises will run in parallel
+      const profileUpdatePromise = updateProfile(user, {
+        displayName: `${values.firstName} ${values.lastName}`
+      });
+      const firestorePromise = setDoc(userDocRef, userData);
+
+      // 3. Wait for both to complete
+      await Promise.all([profileUpdatePromise, firestorePromise]);
 
       toast({
         title: "Account Created Successfully",
