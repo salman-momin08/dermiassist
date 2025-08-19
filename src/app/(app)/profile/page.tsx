@@ -105,7 +105,7 @@ export default function ProfilePage() {
     useEffect(() => {
         if (userData) {
             setName(userData.displayName || '');
-            setPhone(userData.phone || '');
+            setPhone(userData.phone || userData.mobile || '');
             setImagePreview(userData.photoURL || null);
             setGender(userData.gender || '');
             setBloodGroup(userData.bloodGroup || '');
@@ -544,5 +544,3 @@ export default function ProfilePage() {
         </div>
     );
 }
-
-    
