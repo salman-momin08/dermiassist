@@ -19,6 +19,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 export default function AnalysisDetailPage({ params }: { params: { id: string } }) {
+    const { id } = params;
     const { getAnalysisById, isLoading } = useAnalyses();
     const [analysis, setAnalysis] = useState<AnalysisReport | undefined>(undefined);
     const [progressImage, setProgressImage] = useState<string | null>(null);
@@ -35,10 +36,10 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
 
     useEffect(() => {
         if (!isLoading) {
-            const foundAnalysis = getAnalysisById(params.id);
+            const foundAnalysis = getAnalysisById(id);
             setAnalysis(foundAnalysis);
         }
-    }, [isLoading, params.id, getAnalysisById]);
+    }, [isLoading, id, getAnalysisById]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
