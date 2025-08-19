@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, ArrowLeft, Loader2, Upload, CalendarIcon, Lock, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2, Upload, CalendarIcon, Lock, Trash2, X, User } from "lucide-react";
 import Link from "next/link";
 import {
   AlertDialog,
@@ -291,7 +291,7 @@ export default function ProfilePage() {
                             <div className="relative">
                                 <Avatar className="h-24 w-24">
                                     <AvatarImage src={formState.photoURL || `https://placehold.co/100x100.png?text=${formState.displayName.charAt(0)}`} alt={formState.displayName} data-ai-hint="person portrait"/>
-                                    <AvatarFallback>{formState.displayName.charAt(0) || <User /></AvatarFallback>
+                                    <AvatarFallback>{formState.displayName.charAt(0) || <User />}</AvatarFallback>
                                 </Avatar>
                                 <div className="absolute bottom-0 right-0 flex gap-1">
                                     <Button size="icon" variant="outline" className="rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
@@ -541,3 +541,4 @@ export default function ProfilePage() {
     );
 }
 
+    
