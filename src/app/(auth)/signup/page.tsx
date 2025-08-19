@@ -27,6 +27,18 @@ import { Separator } from "@/components/ui/separator";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
+import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 
 function GoogleIcon() {
@@ -88,6 +100,7 @@ const signupSchema = z.object({
 export default function SignupPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const [isRoleChangeDialogOpen, setIsRoleChangeDialogOpen] = useState(false);
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
@@ -175,197 +188,215 @@ export default function SignupPage() {
          <Button variant="ghost" size="icon" className="absolute top-4 right-4 z-10" asChild>
             <Link href="/"><X className="h-4 w-4" /></Link>
         </Button>
-        <Card>
-          <CardHeader className="text-center">
-            <div className="mb-4 flex justify-center">
-                <Link href="/">
-                    <Logo />
-                </Link>
-            </div>
-            <CardTitle className="text-2xl font-headline">Create a Secure Account</CardTitle>
-            <CardDescription>
-              Join SkinWise to take control of your skin health.
-            </CardDescription>
-          </CardHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
-              <CardContent className="space-y-6">
-                 <FormField
-                  control={form.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>I am a...<RequiredIndicator /></FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex space-x-4"
-                        >
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="patient" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Patient
-                            </FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="doctor" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Doctor
-                            </FormLabel>
-                          </FormItem>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <Separator />
-                
-                <div className="grid sm:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="firstName" render={({ field }) => (
-                        <FormItem><FormLabel>First Name<RequiredIndicator /></FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="lastName" render={({ field }) => (
-                        <FormItem><FormLabel>Last Name<RequiredIndicator /></FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
+        <AlertDialog open={isRoleChangeDialogOpen} onOpenChange={setIsRoleChangeDialogOpen}>
+            <Card>
+            <CardHeader className="text-center">
+                <div className="mb-4 flex justify-center">
+                    <Link href="/">
+                        <Logo />
+                    </Link>
                 </div>
-                
-                 <div className="grid sm:grid-cols-2 gap-4">
-                     <FormField control={form.control} name="dob" render={({ field }) => (
-                        <FormItem><FormLabel>Date of Birth<RequiredIndicator /></FormLabel><FormControl><Input placeholder="YYYY-MM-DD" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                     <FormField control={form.control} name="gender" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Gender</FormLabel>
-                             <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="Select a gender" /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                    <SelectItem value="male">Male</SelectItem>
-                                    <SelectItem value="female">Female</SelectItem>
-                                    <SelectItem value="other">Other</SelectItem>
-                                    <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
+                <CardTitle className="text-2xl font-headline">Create a Secure Account</CardTitle>
+                <CardDescription>
+                Join SkinWise to take control of your skin health.
+                </CardDescription>
+            </CardHeader>
+            <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)}>
+                <CardContent className="space-y-6">
+                    <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                        <FormItem className="space-y-3">
+                        <FormLabel>I am a...<RequiredIndicator /></FormLabel>
+                        <FormControl>
+                            <RadioGroup
+                            onValueChange={(value) => {
+                                if (value === 'doctor') {
+                                    setIsRoleChangeDialogOpen(true);
+                                } else {
+                                    field.onChange(value);
+                                }
+                            }}
+                            value={field.value}
+                            className="flex space-x-4"
+                            >
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                <RadioGroupItem value="patient" />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                Patient
+                                </FormLabel>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                <RadioGroupItem value="doctor" />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                Doctor
+                                </FormLabel>
+                            </FormItem>
+                            </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
                         </FormItem>
-                     )} />
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="email" render={({ field }) => (
-                        <FormItem><FormLabel>Email Address<RequiredIndicator /></FormLabel><FormControl><Input type="email" placeholder="m@example.com" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="mobile" render={({ field }) => (
-                        <FormItem><FormLabel>Mobile Number<RequiredIndicator /></FormLabel><FormControl><Input placeholder="e.g. +1 123 456 7890" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="password" render={({ field }) => (
-                        <FormItem><FormLabel>Password<RequiredIndicator /></FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                     <FormField control={form.control} name="confirmPassword" render={({ field }) => (
-                        <FormItem><FormLabel>Confirm Password<RequiredIndicator /></FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                </div>
-                
-                {role === 'doctor' && (
-                  <>
+                    )}
+                    />
+                    
                     <Separator />
-                    <div className="space-y-4 rounded-md border p-4">
-                        <p className="text-sm font-medium">Doctor Verification</p>
-                         <FormField control={form.control} name="medicalId" render={({ field }) => (
-                            <FormItem><FormLabel>Medical Registration Number<RequiredIndicator /></FormLabel><FormControl><Input placeholder="Your medical ID" {...field} /></FormControl><FormMessage /></FormItem>
+                    
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <FormField control={form.control} name="firstName" render={({ field }) => (
+                            <FormItem><FormLabel>First Name<RequiredIndicator /></FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
-                        <FormField control={form.control} name="specialization" render={({ field }) => (
+                        <FormField control={form.control} name="lastName" render={({ field }) => (
+                            <FormItem><FormLabel>Last Name<RequiredIndicator /></FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                    </div>
+                    
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <FormField control={form.control} name="dob" render={({ field }) => (
+                            <FormItem><FormLabel>Date of Birth<RequiredIndicator /></FormLabel><FormControl><Input placeholder="YYYY-MM-DD" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="gender" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Specialization<RequiredIndicator /></FormLabel>
+                                <FormLabel>Gender</FormLabel>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Select your specialization" /></SelectTrigger></FormControl>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Select a gender" /></SelectTrigger></FormControl>
                                     <SelectContent>
-                                        <SelectItem value="general-dermatology">General Dermatology</SelectItem>
-                                        <SelectItem value="cosmetic-dermatology">Cosmetic Dermatology</SelectItem>
-                                        <SelectItem value="pediatric-dermatology">Pediatric Dermatology</SelectItem>
-                                        <SelectItem value="dermatopathology">Dermatopathology</SelectItem>
-                                        <SelectItem value="mohs-surgery">Mohs Surgery</SelectItem>
+                                        <SelectItem value="male">Male</SelectItem>
+                                        <SelectItem value="female">Female</SelectItem>
+                                        <SelectItem value="other">Other</SelectItem>
+                                        <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
                             </FormItem>
-                         )} />
+                        )} />
                     </div>
-                  </>
-                )}
-                
-                <Separator />
 
-                <div className="space-y-4">
-                    <FormField control={form.control} name="acceptTerms" render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                            <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                            <div className="space-y-1 leading-none">
-                                <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Terms & Conditions</Link>.<RequiredIndicator /></FormLabel>
-                                <FormMessage />
-                            </div>
-                        </FormItem>
-                    )} />
-                     <FormField control={form.control} name="acceptPrivacy" render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                            <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                            <div className="space-y-1 leading-none">
-                                <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>.<RequiredIndicator /></FormLabel>
-                                <FormMessage />
-                            </div>
-                        </FormItem>
-                    )} />
-                </div>
-
-
-                 <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                   {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                   Create Account
-                </Button>
-                <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <FormField control={form.control} name="email" render={({ field }) => (
+                            <FormItem><FormLabel>Email Address<RequiredIndicator /></FormLabel><FormControl><Input type="email" placeholder="m@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="mobile" render={({ field }) => (
+                            <FormItem><FormLabel>Mobile Number<RequiredIndicator /></FormLabel><FormControl><Input placeholder="e.g. +1 123 456 7890" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
                     </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-card px-2 text-muted-foreground">
-                        Or sign up with
-                        </span>
+
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <FormField control={form.control} name="password" render={({ field }) => (
+                            <FormItem><FormLabel>Password<RequiredIndicator /></FormLabel><FormControl><Input type="password" placeholder="********" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="confirmPassword" render={({ field }) => (
+                            <FormItem><FormLabel>Confirm Password<RequiredIndicator /></FormLabel><FormControl><Input type="password" placeholder="********" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
                     </div>
-                </div>
-                 <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" className="w-full">
-                      <GoogleIcon />
-                      Google
+                    
+                    {role === 'doctor' && (
+                    <>
+                        <Separator />
+                        <div className="space-y-4 rounded-md border p-4">
+                            <p className="text-sm font-medium">Doctor Verification</p>
+                            <FormField control={form.control} name="medicalId" render={({ field }) => (
+                                <FormItem><FormLabel>Medical Registration Number<RequiredIndicator /></FormLabel><FormControl><Input placeholder="Your medical ID" {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                            <FormField control={form.control} name="specialization" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Specialization<RequiredIndicator /></FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Select your specialization" /></SelectTrigger></FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="general-dermatology">General Dermatology</SelectItem>
+                                            <SelectItem value="cosmetic-dermatology">Cosmetic Dermatology</SelectItem>
+                                            <SelectItem value="pediatric-dermatology">Pediatric Dermatology</SelectItem>
+                                            <SelectItem value="dermatopathology">Dermatopathology</SelectItem>
+                                            <SelectItem value="mohs-surgery">Mohs Surgery</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
+                    </>
+                    )}
+                    
+                    <Separator />
+
+                    <div className="space-y-4">
+                        <FormField control={form.control} name="acceptTerms" render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                                <div className="space-y-1 leading-none">
+                                    <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Terms & Conditions</Link>.<RequiredIndicator /></FormLabel>
+                                    <FormMessage />
+                                </div>
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="acceptPrivacy" render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                                <div className="space-y-1 leading-none">
+                                    <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>.<RequiredIndicator /></FormLabel>
+                                    <FormMessage />
+                                </div>
+                            </FormItem>
+                        )} />
+                    </div>
+
+
+                    <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Create Account
                     </Button>
-                    <Button variant="outline" className="w-full">
-                      <FacebookIcon />
-                      Facebook
-                    </Button>
-                </div>
-              </CardContent>
-            </form>
-          </Form>
-          <CardFooter className="text-sm">
-            <p className="w-full text-center text-muted-foreground">
-              Already have an account?{' '}
-              <Link href="/login" className="font-semibold text-primary underline-offset-4 hover:underline">
-                Login
-              </Link>
-            </p>
-          </CardFooter>
-        </Card>
+                    <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-card px-2 text-muted-foreground">
+                            Or sign up with
+                            </span>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <Button variant="outline" className="w-full">
+                        <GoogleIcon />
+                        Google
+                        </Button>
+                        <Button variant="outline" className="w-full">
+                        <FacebookIcon />
+                        Facebook
+                        </Button>
+                    </div>
+                </CardContent>
+                </form>
+            </Form>
+            <CardFooter className="text-sm">
+                <p className="w-full text-center text-muted-foreground">
+                Already have an account?{' '}
+                <Link href="/login" className="font-semibold text-primary underline-offset-4 hover:underline">
+                    Login
+                </Link>
+                </p>
+            </CardFooter>
+            </Card>
+             <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm Role Selection</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        You have selected the 'Doctor' role. This choice cannot be changed after creating your account. Are you sure you want to proceed?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => form.setValue('role', 'doctor')}>Confirm</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
 }
-
-    
