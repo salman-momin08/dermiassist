@@ -1,13 +1,19 @@
+
+"use client";
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Bot, Stethoscope, FileText } from 'lucide-react';
+import { CheckCircle, Bot, Stethoscope, FileText, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AppHeader } from '@/components/layout/header';
 import { AppFooter } from '@/components/layout/footer';
 import { Logo } from '@/components/logo';
 
-export default function LandingPage() {
+function LandingPageContent() {
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader />
@@ -115,4 +121,34 @@ export default function LandingPage() {
       <AppFooter />
     </div>
   );
+}
+
+export default function LandingPage() {
+  const { user, role, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        let destination = '/dashboard'; // Default for patient
+        if (role === 'doctor') {
+          destination = '/doctor/dashboard';
+        } else if (role === 'admin') {
+          destination = '/admin/dashboard';
+        }
+        router.replace(destination);
+      }
+    }
+  }, [user, role, loading, router]);
+
+  if (loading || user) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">Loading your dashboard...</p>
+      </div>
+    );
+  }
+  
+  return <LandingPageContent />;
 }
