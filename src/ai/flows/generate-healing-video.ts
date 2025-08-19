@@ -13,7 +13,7 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'genkit';
 
-export const GenerateHealingVideoInputSchema = z.object({
+const GenerateHealingVideoInputSchema = z.object({
   originalPhotoDataUri: z
     .string()
     .describe(
@@ -27,7 +27,7 @@ export const GenerateHealingVideoInputSchema = z.object({
 });
 export type GenerateHealingVideoInput = z.infer<typeof GenerateHealingVideoInputSchema>;
 
-export const GenerateHealingVideoOutputSchema = z.object({
+const GenerateHealingVideoOutputSchema = z.object({
     videoDataUri: z.string().describe("The generated video as a data URI.")
 });
 export type GenerateHealingVideoOutput = z.infer<typeof GenerateHealingVideoOutputSchema>;
