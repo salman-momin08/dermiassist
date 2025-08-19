@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Dialog, DialogContent, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { uploadFile, deleteFile } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
@@ -297,6 +297,10 @@ export default function ProfilePage() {
                                         </Avatar>
                                     </DialogTrigger>
                                     <DialogContent className="w-auto bg-transparent border-none shadow-none flex items-center justify-center">
+                                         <DialogHeader className="sr-only">
+                                            <DialogTitle>Profile Picture</DialogTitle>
+                                            <DialogDescription>A larger view of your current profile picture.</DialogDescription>
+                                        </DialogHeader>
                                          <div className="relative">
                                             <Avatar className="h-64 w-64 border-4 border-background shadow-lg">
                                                 <AvatarImage src={formState.photoURL || `https://placehold.co/256x256.png`} alt={formState.displayName} className="object-cover" data-ai-hint="person portrait"/>
@@ -568,5 +572,6 @@ export default function ProfilePage() {
             </div>
         </div>
     );
+}
 
     
