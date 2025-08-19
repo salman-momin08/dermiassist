@@ -18,8 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export default function AnalysisDetailPage({ params }: { params: { id: string } }) {
-    const { id } = params;
+export default function AnalysisDetailPage({ params: { id } }: { params: { id: string } }) {
     const { getAnalysisById, isLoading } = useAnalyses();
     const [analysis, setAnalysis] = useState<AnalysisReport | undefined>(undefined);
     const [progressImage, setProgressImage] = useState<string | null>(null);
@@ -351,3 +350,5 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
         </div>
     );
 }
+
+    
