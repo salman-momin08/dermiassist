@@ -1,12 +1,17 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can create, read, update, and delete their own user document.
-    // No one can read or write to other users' documents.
+    // Users can read and update their own user document, but not create or delete it through the app.
+    // Creation is handled during signup, deletion via the Firebase console or admin SDK.
     match /users/{userId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+
+      // Users can create, read, and delete their own analysis reports.
+      match /analyses/{analysisId} {
+        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
   }
 }
