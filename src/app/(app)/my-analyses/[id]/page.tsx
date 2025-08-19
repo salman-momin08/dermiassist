@@ -1,9 +1,10 @@
 
 "use client";
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { notFound, useParams } from 'next/navigation';
 import { useAnalyses, type AnalysisReport } from '@/hooks/use-analyses';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -21,8 +22,11 @@ import html2canvas from 'html2canvas';
 export default function AnalysisDetailPage() {
     const params = useParams();
     const id = params.id as string;
-    const { getAnalysisById, isLoading } = useAnalyses();
+    const { getAnalysisById } = useAnalyses();
+    const { user } = useAuth();
+
     const [analysis, setAnalysis] = useState<AnalysisReport | undefined>(undefined);
+    const [isLoading, setIsLoading] = useState(true);
     const [progressImage, setProgressImage] = useState<string | null>(null);
     const [isComparing, setIsComparing] = useState(false);
     const [progressSummary, setProgressSummary] = useState<string | null>(null);
@@ -35,12 +39,18 @@ export default function AnalysisDetailPage() {
     const reportRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
 
-    useEffect(() => {
-        if (!isLoading && id) {
-            const foundAnalysis = getAnalysisById(id);
+    const fetchAnalysis = useCallback(async () => {
+        if (user && id) {
+            setIsLoading(true);
+            const foundAnalysis = await getAnalysisById(user.uid, id);
             setAnalysis(foundAnalysis);
+            setIsLoading(false);
         }
-    }, [isLoading, id, getAnalysisById]);
+    }, [user, id, getAnalysisById]);
+
+    useEffect(() => {
+        fetchAnalysis();
+    }, [fetchAnalysis]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
@@ -186,7 +196,7 @@ export default function AnalysisDetailPage() {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-3xl font-headline">Analysis Report: {analysis.condition}</CardTitle>
-                                <CardDescription>Generated on {analysis.date} | Severity: {analysis.severity}</CardDescription>
+                                <CardDescription>Generated on {new Date(analysis.date).toLocaleDateString()} | Severity: {analysis.severity}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                  <h3 className="font-semibold text-xl mb-4 text-primary">Expert Recommendations</h3>

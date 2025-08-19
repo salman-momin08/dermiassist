@@ -9,6 +9,7 @@ import { FileText, MoreHorizontal, PlusCircle, Trash2, Eye } from "lucide-react"
 import Link from "next/link";
 import Image from 'next/image';
 import { useAnalyses } from "@/hooks/use-analyses";
+import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
@@ -24,9 +25,11 @@ import {
 
 export default function MyAnalysesPage() {
     const { analyses, deleteAnalysis, isLoading } = useAnalyses();
+    const { user } = useAuth();
 
     const handleDelete = (id: string) => {
-        deleteAnalysis(id);
+        if (!user) return;
+        deleteAnalysis(user.uid, id);
     };
 
     return (
@@ -84,7 +87,7 @@ export default function MyAnalysesPage() {
                                             />
                                         </TableCell>
                                         <TableCell className="font-medium">{analysis.condition}</TableCell>
-                                        <TableCell>{analysis.date}</TableCell>
+                                        <TableCell>{new Date(analysis.date).toLocaleDateString()}</TableCell>
                                         <TableCell className="hidden md:table-cell">{analysis.severity}</TableCell>
                                         <TableCell className="text-right">
                                             <AlertDialog>
@@ -109,7 +112,7 @@ export default function MyAnalysesPage() {
                                                     <AlertDialogHeader>
                                                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                                         <AlertDialogDescription>
-                                                            This action cannot be undone. This will permanently delete this analysis report.
+                                                            This action cannot be undone. This will permanently delete this analysis report from the database.
                                                         </AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>

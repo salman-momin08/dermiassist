@@ -2,13 +2,16 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from './use-auth';
+import { db } from '@/lib/firebase';
+import { collection, doc, addDoc, getDoc, getDocs, deleteDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 
 // Define the structure of a single analysis report
 export interface AnalysisReport {
     id: string;
     condition: string;
     date: string;
-    severity: string; // This can be derived or a static value for now
+    severity: string;
     image: string; // data URI
     recommendations: string;
     dos: string[];
@@ -19,60 +22,77 @@ export interface AnalysisReport {
     };
 }
 
-
-const STORAGE_KEY = 'skinwise-analyses';
-
 export function useAnalyses() {
+    const { user } = useAuth();
     const [analyses, setAnalyses] = useState<AnalysisReport[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        try {
-            const item = window.localStorage.getItem(STORAGE_KEY);
-            if (item) {
-                setAnalyses(JSON.parse(item));
-            }
-        } catch (error) {
-            console.warn(`Error reading localStorage key “${STORAGE_KEY}”:`, error);
+        if (!user) {
+            setAnalyses([]);
+            setIsLoading(false);
+            return;
         }
-        setIsLoading(false);
-    }, []);
 
-    const addAnalysis = useCallback((newAnalysis: Omit<AnalysisReport, 'id' | 'date' | 'severity'>) => {
-        const report: AnalysisReport = {
+        setIsLoading(true);
+        const analysesColRef = collection(db, 'users', user.uid, 'analyses');
+        const q = query(analysesColRef, orderBy('date', 'desc'));
+
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const userAnalyses = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as AnalysisReport));
+            setAnalyses(userAnalyses);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching analyses:", error);
+            setIsLoading(false);
+        });
+
+        // Cleanup subscription on unmount
+        return () => unsubscribe();
+    }, [user]);
+
+    const addAnalysis = useCallback(async (userId: string, newAnalysis: Omit<AnalysisReport, 'id' | 'date' | 'severity'>) => {
+        if (!userId) throw new Error("User not authenticated.");
+
+        const report: Omit<AnalysisReport, 'id'> = {
             ...newAnalysis,
-            id: new Date().getTime().toString(),
-            date: new Date().toISOString().split('T')[0],
+            date: new Date().toISOString(),
             severity: 'Mild', // AI doesn't provide severity, so mocking it.
         };
 
-        setAnalyses(prevAnalyses => {
-            const updatedAnalyses = [report, ...prevAnalyses];
-            try {
-                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedAnalyses));
-            } catch (error) {
-                console.warn(`Error writing to localStorage key “${STORAGE_KEY}”:`, error);
-            }
-            return updatedAnalyses;
-        });
+        const analysesColRef = collection(db, 'users', userId, 'analyses');
+        const docRef = await addDoc(analysesColRef, report);
 
-        return report;
+        return { ...report, id: docRef.id } as AnalysisReport;
     }, []);
 
-    const getAnalysisById = useCallback((id: string): AnalysisReport | undefined => {
-        return analyses.find(a => a.id === id);
-    }, [analyses]);
+    const getAnalysisById = useCallback(async (userId: string, analysisId: string): Promise<AnalysisReport | undefined> => {
+        if (!userId || !analysisId) return undefined;
+        
+        try {
+            const docRef = doc(db, 'users', userId, 'analyses', analysisId);
+            const docSnap = await getDoc(docRef);
 
-    const deleteAnalysis = useCallback((id: string) => {
-        setAnalyses(prevAnalyses => {
-            const updatedAnalyses = prevAnalyses.filter(a => a.id !== id);
-             try {
-                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedAnalyses));
-            } catch (error) {
-                console.warn(`Error writing to localStorage key “${STORAGE_KEY}”:`, error);
+            if (docSnap.exists()) {
+                return { id: docSnap.id, ...docSnap.data() } as AnalysisReport;
+            } else {
+                console.log("No such document!");
+                return undefined;
             }
-            return updatedAnalyses;
-        });
+        } catch (error) {
+            console.error("Error fetching document:", error);
+            return undefined;
+        }
+    }, []);
+
+    const deleteAnalysis = useCallback(async (userId: string, id: string) => {
+        if (!userId) throw new Error("User not authenticated.");
+        const docRef = doc(db, 'users', userId, 'analyses', id);
+        await deleteDoc(docRef);
+        // The onSnapshot listener will automatically update the local state
     }, []);
 
     return { analyses, addAnalysis, getAnalysisById, deleteAnalysis, isLoading };

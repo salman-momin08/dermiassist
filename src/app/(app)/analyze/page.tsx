@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAnalyses } from "@/hooks/use-analyses";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -38,6 +39,7 @@ export default function AnalyzePage() {
 
   const { toast } = useToast();
   const { addAnalysis } = useAnalyses();
+  const { user } = useAuth();
   const router = useRouter();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,6 +55,10 @@ export default function AnalyzePage() {
   };
 
   const handleAnalyze = async () => {
+    if (!user) {
+        toast({ title: "Authentication Error", description: "You must be logged in to perform an analysis.", variant: "destructive"});
+        return;
+    }
     if (!file || !preview) {
       toast({
         title: "No image selected",
@@ -80,7 +86,7 @@ export default function AnalyzePage() {
         diseaseDuration,
       });
 
-      const newReport = addAnalysis({
+      const newReport = await addAnalysis(user.uid, {
         condition: result.condition,
         image: preview,
         recommendations: result.recommendations,
