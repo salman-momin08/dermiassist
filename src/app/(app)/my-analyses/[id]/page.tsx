@@ -23,11 +23,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 export default function AnalysisDetailPage() {
     const params = useParams();
     const id = params.id as string;
-    const { getAnalysisById } = useAnalyses();
+    const { getAnalysisById, isLoading: isAnalysisLoading } = useAnalyses();
     const { user } = useAuth();
 
     const [analysis, setAnalysis] = useState<AnalysisReport | undefined>(undefined);
-    const [isLoading, setIsLoading] = useState(true);
     const [progressImage, setProgressImage] = useState<string | null>(null);
     const [isComparing, setIsComparing] = useState(false);
     const [progressSummary, setProgressSummary] = useState<string | null>(null);
@@ -42,18 +41,14 @@ export default function AnalysisDetailPage() {
 
     const fetchAnalysis = useCallback(async () => {
         if (user && id) {
-            setIsLoading(true);
             const foundAnalysis = await getAnalysisById(user.uid, id);
             setAnalysis(foundAnalysis);
-            setIsLoading(false);
         }
     }, [user, id, getAnalysisById]);
 
     useEffect(() => {
-        if (id) {
-            fetchAnalysis();
-        }
-    }, [id, fetchAnalysis]);
+        fetchAnalysis();
+    }, [fetchAnalysis]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
@@ -171,7 +166,7 @@ export default function AnalysisDetailPage() {
         setVideoUri(null);
     };
 
-    if (isLoading) {
+    if (isAnalysisLoading) {
         return (
             <div className="container mx-auto p-4 md:p-8 flex justify-center items-center h-[60vh]">
                 <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -180,11 +175,7 @@ export default function AnalysisDetailPage() {
     }
 
     if (!analysis) {
-        // Only show notFound if loading is finished and analysis is still not there.
-        if (!isLoading) {
-            notFound();
-        }
-        return null; // Return null while loading to avoid premature notFound() call
+        notFound();
     }
 
     return (
@@ -237,7 +228,7 @@ export default function AnalysisDetailPage() {
                                 </CardHeader>
                                 <CardContent>
                                    <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
-                                        {analysis.donts.map((item, index) => <li key={index}</li>)}
+                                        {analysis.donts.map((item, index) => <li key={index}>{item}</li>)}
                                     </ul>
                                 </CardContent>
                             </Card>
@@ -349,13 +340,13 @@ export default function AnalysisDetailPage() {
                                         <TooltipTrigger asChild>
                                             {/* This div is needed for the tooltip to work on a disabled button */}
                                             <div className="w-full">
-                                                <Button onClick={handleGenerateVideo} disabled={true} className="w-full" variant="secondary">
+                                                <Button onClick={handleGenerateVideo} disabled={!progressImage || isGeneratingVideo || isComparing} className="w-full" variant="secondary">
                                                     <Video className="mr-2 h-4 w-4" />Generate Healing Video
                                                 </Button>
                                             </div>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                            <p>This premium feature requires GCP billing to be enabled.</p>
+                                            <p>This premium feature may require GCP billing to be enabled.</p>
                                         </TooltipContent>
                                     </Tooltip>
                                 </TooltipProvider>
@@ -381,5 +372,3 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
-
-    
