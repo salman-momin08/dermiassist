@@ -150,14 +150,14 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
         setProgressSummary(null);
         setError(null);
         setVideoUri(null);
-    }
+    };
 
     if (isLoading) {
         return (
             <div className="container mx-auto p-4 md:p-8 flex justify-center items-center h-[60vh]">
                 <Loader2 className="h-16 w-16 animate-spin text-primary" />
             </div>
-        )
+        );
     }
 
     if (!analysis) {
@@ -350,5 +350,3 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
         </div>
     );
 }
-
-    
