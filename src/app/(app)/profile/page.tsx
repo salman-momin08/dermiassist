@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, ArrowLeft, Loader2, Upload, CalendarIcon, CreditCard, FileText, Lock, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2, Upload, CalendarIcon, Lock, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import {
   AlertDialog,
@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { uploadFile, deleteFile } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
@@ -70,6 +70,8 @@ const indianStates: Record<string, string[]> = {
 
 export default function ProfilePage() {
     const { user, userData, loading, forceReload } = useAuth();
+    
+    // Form fields state
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [dob, setDob] = useState<Date | undefined>();
@@ -80,15 +82,18 @@ export default function ProfilePage() {
     const [city, setCity] = useState('');
     const [otherState, setOtherState] = useState('');
     const [otherCity, setOtherCity] = useState('');
-    const [profileImage, setProfileImage] = useState<string | null>(null);
-    const [profileImagePublicId, setProfileImagePublicId] = useState<string | null>(null);
+
+    // Local state for image preview and pending upload/delete
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [pendingImage, setPendingImage] = useState<{file: File, publicIdToReplace: string | null} | null>(null);
+    const [pendingDelete, setPendingDelete] = useState(false);
+
 
     // Settings
     const [allowDataSharing, setAllowDataSharing] = useState(true);
     const [emailNotifications, setEmailNotifications] = useState(true);
 
     const [isUploading, setIsUploading] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
@@ -98,123 +103,117 @@ export default function ProfilePage() {
     const [calendarMonth, setCalendarMonth] = useState(new Date());
 
     useEffect(() => {
-        if (user && userData) {
-            setName(userData.displayName || user.displayName || '');
-            setProfileImage(userData.photoURL || user.photoURL || null);
-            setProfileImagePublicId(userData.photoPublicId || null);
+        if (userData) {
+            setName(userData.displayName || '');
             setPhone(userData.phone || '');
+            setImagePreview(userData.photoURL || null);
+            setGender(userData.gender || '');
+            setBloodGroup(userData.bloodGroup || '');
+            setAddress(userData.address || '');
+
             if (userData.dob) {
                 const userDob = new Date(userData.dob);
                 setDob(userDob);
                 setCalendarMonth(userDob);
             } else {
+                setDob(undefined);
                 setCalendarMonth(new Date());
             }
-            setGender(userData.gender || '');
-            setBloodGroup(userData.bloodGroup || '');
-            setAddress(userData.address || '');
-            
+
             const userState = userData.state || '';
             const isKnownState = Object.keys(indianStates).includes(userState);
             if (isKnownState) {
                 setState(userState);
+                setOtherState('');
             } else if (userState) {
                 setState('Other');
                 setOtherState(userState);
             } else {
                 setState('');
+                setOtherState('');
             }
 
             const userCity = userData.city || '';
             if (userState && isKnownState && indianStates[userState as keyof typeof indianStates]?.includes(userCity)) {
                 setCity(userCity);
+                setOtherCity('');
             } else if (userCity) {
                 setCity('Other');
                 setOtherCity(userCity);
             } else {
                 setCity('');
+                setOtherCity('');
             }
 
             setAllowDataSharing(userData.allowDataSharing !== false);
             setEmailNotifications(userData.emailNotifications !== false);
-        }
-    }, [user, userData]);
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+            // Reset pending actions when data is reloaded
+            setPendingImage(null);
+            setPendingDelete(false);
+        }
+    }, [userData]);
+
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !user) return;
+        if (!file) return;
 
-        setIsUploading(true);
-        const formData = new FormData();
-        formData.append('file', file);
+        // Set up for preview and pending upload
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
 
-        try {
-            // If there's an old picture, delete it from Cloudinary first
-            if (profileImagePublicId) {
-                await deleteFile(profileImagePublicId);
-            }
-
-            const result = await uploadFile(formData);
-
-            if (result.success && result.url && result.publicId) {
-                 await updateProfile(auth.currentUser!, { photoURL: result.url });
-                 await updateDoc(doc(db, "users", user.uid), { photoURL: result.url, photoPublicId: result.publicId });
-                 
-                 // Directly update state
-                 setProfileImage(result.url);
-                 setProfileImagePublicId(result.publicId);
-
-                 toast({
-                    title: "Image Uploaded",
-                    description: "Your profile picture has been updated.",
-                });
-                forceReload();
-            } else {
-                toast({
-                    title: "Upload Failed",
-                    description: result.message || "An error occurred during upload. Please ensure your credentials are set in .env.",
-                    variant: "destructive",
-                });
-            }
-        } catch (error) {
-             toast({ title: "Update Failed", description: "Could not update profile picture.", variant: "destructive"});
-        } finally {
-            setIsUploading(false);
-        }
+        setPendingImage({file, publicIdToReplace: userData?.photoPublicId || null});
+        setPendingDelete(false); // An upload cancels a pending delete
     };
     
-    const handleDeletePicture = async () => {
-        if (!user || !profileImagePublicId) {
-            toast({ title: "Error", description: "No profile picture to delete or public ID missing.", variant: "destructive" });
-            return;
-        }
-        setIsDeleting(true);
-        try {
-            const result = await deleteFile(profileImagePublicId);
-            if (result.success) {
-                await updateProfile(auth.currentUser!, { photoURL: "" });
-                await updateDoc(doc(db, 'users', user.uid), { photoURL: null, photoPublicId: null });
-                
-                // Directly update state
-                setProfileImage(null);
-                setProfileImagePublicId(null);
-                
-                toast({ title: "Profile Picture Deleted" });
-                forceReload();
-            } else {
-                toast({ title: "Deletion Failed", description: result.message, variant: "destructive" });
-            }
-        } catch (error) {
-             toast({ title: "Error", description: "Failed to delete profile picture.", variant: "destructive" });
-        } finally {
-            setIsDeleting(false);
-        }
+    const handleDeletePreview = () => {
+        if (!imagePreview) return;
+        setPendingDelete(true);
+        setPendingImage(null); // A delete cancels a pending upload
+        setImagePreview(null);
     };
 
     const handleSaveChanges = async () => {
         if (!user || !name.trim()) return;
         setIsSaving(true);
+        
+        let newPhotoUrl: string | null = userData?.photoURL || null;
+        let newPublicId: string | null = userData?.photoPublicId || null;
+
         try {
+            // 1. Handle pending image delete
+            if (pendingDelete && userData?.photoPublicId) {
+                await deleteFile(userData.photoPublicId);
+                newPhotoUrl = null;
+                newPublicId = null;
+            }
+
+            // 2. Handle pending image upload
+            if (pendingImage) {
+                setIsUploading(true);
+                // If there was an old picture, delete it first
+                if (pendingImage.publicIdToReplace) {
+                    await deleteFile(pendingImage.publicIdToReplace);
+                }
+                
+                const formData = new FormData();
+                formData.append('file', pendingImage.file);
+                const result = await uploadFile(formData);
+
+                if (result.success && result.url && result.publicId) {
+                    newPhotoUrl = result.url;
+                    newPublicId = result.publicId;
+                } else {
+                    throw new Error(result.message || 'Image upload failed.');
+                }
+                setIsUploading(false);
+            }
+
+            // 3. Update Firestore with all changes
             const userDocRef = doc(db, 'users', user.uid);
             const updatedData = {
                 displayName: name,
@@ -229,18 +228,22 @@ export default function ProfilePage() {
                 city: city === 'Other' ? otherCity : city,
                 allowDataSharing,
                 emailNotifications,
+                photoURL: newPhotoUrl,
+                photoPublicId: newPublicId,
             };
 
-            await updateProfile(auth.currentUser!, { displayName: name });
+            // 4. Update auth profile (name and photo)
+            await updateProfile(auth.currentUser!, { displayName: name, photoURL: newPhotoUrl });
             await updateDoc(userDocRef, updatedData);
 
-            toast({ title: "Profile Updated", description: "Your information has been updated." });
-            forceReload();
-        } catch (error) {
+            toast({ title: "Profile Updated", description: "Your information has been successfully saved." });
+            forceReload(); // This will re-fetch userData and reset the component state
+        } catch (error: any) {
             console.error("Profile update error:", error);
-            toast({ title: "Error", description: "Could not update your profile.", variant: "destructive"});
+            toast({ title: "Error Saving Profile", description: error.message || "Could not update your profile.", variant: "destructive"});
         } finally {
             setIsSaving(false);
+            setIsUploading(false);
         }
     }
     
@@ -290,38 +293,22 @@ export default function ProfilePage() {
                     <CardContent className="space-y-6">
                         <div className="flex items-center space-x-6">
                             <div className="relative">
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Avatar className="h-24 w-24 cursor-pointer">
-                                            <AvatarImage src={profileImage || `https://placehold.co/100x100.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
-                                            <AvatarFallback>{name.charAt(0)}</AvatarFallback>
-                                        </Avatar>
-                                    </DialogTrigger>
-                                    <DialogContent className="sm:max-w-md">
-                                        <DialogHeader>
-                                            <DialogTitle>{name}'s Profile Photo</DialogTitle>
-                                            <DialogDescription>A larger view of your profile photo.</DialogDescription>
-                                        </DialogHeader>
-                                        <div className="flex justify-center p-4">
-                                            <Avatar className="h-64 w-64">
-                                                <AvatarImage src={profileImage || `https://placehold.co/256x256.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
-                                                <AvatarFallback>{name.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                        </div>
-                                         <DialogFooter>
-                                            {profileImage && (
-                                                <Button variant="destructive" onClick={handleDeletePicture} disabled={isDeleting}>
-                                                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Trash2 className="mr-2 h-4 w-4"/>}
-                                                    Delete Photo
-                                                </Button>
-                                            )}
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                                <Button size="icon" variant="outline" className="absolute bottom-0 right-0 rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-                                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                                    <span className="sr-only">Upload Profile Picture</span>
-                                </Button>
+                                <Avatar className="h-24 w-24">
+                                    <AvatarImage src={imagePreview || `https://placehold.co/100x100.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="person portrait"/>
+                                    <AvatarFallback>{name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div className="absolute bottom-0 right-0 flex gap-1">
+                                    <Button size="icon" variant="outline" className="rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
+                                        <Upload className="h-4 w-4" />
+                                        <span className="sr-only">Upload Profile Picture</span>
+                                    </Button>
+                                    {imagePreview && (
+                                        <Button size="icon" variant="destructive" className="rounded-full h-8 w-8" onClick={handleDeletePreview} disabled={isSaving}>
+                                            <Trash2 className="h-4 w-4" />
+                                            <span className="sr-only">Delete Profile Picture</span>
+                                        </Button>
+                                    )}
+                                </div>
                                 <Input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                             </div>
                             <div className="space-y-1">
@@ -359,8 +346,9 @@ export default function ProfilePage() {
                                             onMonthChange={setCalendarMonth}
                                             disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                                             initialFocus
-                                            view={calendarView}
-                                            onViewChange={setCalendarView}
+                                            captionLayout="dropdown-nav"
+                                            fromYear={1920}
+                                            toYear={new Date().getFullYear()}
                                         />
                                     </PopoverContent>
                                 </Popover>
@@ -516,7 +504,7 @@ export default function ProfilePage() {
                  <div className="flex justify-start">
                     <Button onClick={handleSaveChanges} disabled={isSaving}>
                         {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Save All Changes
+                        {isUploading ? 'Uploading Image...' : 'Save All Changes'}
                     </Button>
                 </div>
                 
