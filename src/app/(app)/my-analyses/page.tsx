@@ -97,7 +97,7 @@ export default function MyAnalysesPage() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem asChild><Link href={`/my-analyses/${analysis.id}`} className="flex items-center cursor-pointer"><Eye className="mr-2 h-4 w-4" />View Details</Link></DropdownMenuItem>
-                                                        <DropdownMenuItem className="flex items-center" disabled><FileText className="mr-2 h-4 w-4" />Download</DropdownMenuItem>
+                                                        <DropdownMenuItem asChild><Link href={`/my-analyses/${analysis.id}`} className="flex items-center cursor-pointer"><FileText className="mr-2 h-4 w-4" />Download</Link></DropdownMenuItem>
                                                         <AlertDialogTrigger asChild>
                                                             <DropdownMenuItem className="flex items-center text-red-600 dark:text-red-500 focus:text-red-600 focus:dark:text-red-500" onSelect={(e) => e.preventDefault()}>
                                                                 <Trash2 className="mr-2 h-4 w-4" />Delete
