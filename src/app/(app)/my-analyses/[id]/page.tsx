@@ -350,5 +350,3 @@ export default function AnalysisDetailPage({ params: { id } }: { params: { id: s
         </div>
     );
 }
-
-    
