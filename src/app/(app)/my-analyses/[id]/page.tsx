@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, useParams } from 'next/navigation';
 import { useAnalyses, type AnalysisReport } from '@/hooks/use-analyses';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +18,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export default function AnalysisDetailPage({ params: { id } }: { params: { id: string } }) {
+export default function AnalysisDetailPage() {
+    const params = useParams();
+    const id = params.id as string;
     const { getAnalysisById, isLoading } = useAnalyses();
     const [analysis, setAnalysis] = useState<AnalysisReport | undefined>(undefined);
     const [progressImage, setProgressImage] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export default function AnalysisDetailPage({ params: { id } }: { params: { id: s
     const [isDownloading, setIsDownloading] = useState(false);
 
     useEffect(() => {
-        if (!isLoading) {
+        if (!isLoading && id) {
             const foundAnalysis = getAnalysisById(id);
             setAnalysis(foundAnalysis);
         }
@@ -161,7 +163,10 @@ export default function AnalysisDetailPage({ params: { id } }: { params: { id: s
     }
 
     if (!analysis) {
-        return notFound();
+        if (!isLoading) {
+            notFound();
+        }
+        return null;
     }
 
     return (
