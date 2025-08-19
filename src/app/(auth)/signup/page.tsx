@@ -16,15 +16,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/logo';
 import Link from 'next/link';
-import { X, Loader2, CalendarIcon } from 'lucide-react';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { X, Loader2 } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
@@ -55,7 +51,7 @@ const signupSchema = z.object({
   role: z.enum(["patient", "doctor"], { required_error: "You must select a role."}),
   firstName: z.string().min(1, { message: "First name is required." }),
   lastName: z.string().min(1, { message: "Last name is required." }),
-  dob: z.date({ required_error: "Date of birth is required."}),
+  dob: z.string().min(1, { message: "Date of birth is required." }).regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format."),
   gender: z.string().optional(),
   email: z.string().email({ message: "Invalid email address." }),
   mobile: z.string().min(10, { message: "Please enter a valid mobile number."}),
@@ -99,6 +95,7 @@ export default function SignupPage() {
       role: "patient",
       firstName: "",
       lastName: "",
+      dob: "",
       gender: "prefer-not-to-say",
       email: "",
       mobile: "",
@@ -133,6 +130,8 @@ export default function SignupPage() {
           firstName: values.firstName,
           lastName: values.lastName,
           displayName: `${values.firstName} ${values.lastName}`,
+          dob: new Date(values.dob).toISOString(),
+          gender: values.gender,
           role: values.role,
           createdAt: new Date().toISOString(),
           subscriptionPlan: 'Free', // Assign Free plan by default
@@ -167,6 +166,8 @@ export default function SignupPage() {
       });
     }
   };
+  
+  const RequiredIndicator = () => <span className="text-destructive"> *</span>;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4 py-12">
@@ -194,7 +195,7 @@ export default function SignupPage() {
                   name="role"
                   render={({ field }) => (
                     <FormItem className="space-y-3">
-                      <FormLabel>I am a...</FormLabel>
+                      <FormLabel>I am a...<RequiredIndicator /></FormLabel>
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
@@ -228,41 +229,16 @@ export default function SignupPage() {
                 
                 <div className="grid sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="firstName" render={({ field }) => (
-                        <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>First Name<RequiredIndicator /></FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={form.control} name="lastName" render={({ field }) => (
-                        <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Last Name<RequiredIndicator /></FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                 </div>
                 
                  <div className="grid sm:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="dob" render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                            <FormLabel>Date of Birth</FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <FormControl>
-                                        <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                            {field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}
-                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                        </Button>
-                                    </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar 
-                                        mode="single" 
-                                        selected={field.value} 
-                                        onSelect={field.onChange} 
-                                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")} 
-                                        initialFocus 
-                                        captionLayout="dropdown-nav"
-                                        fromYear={1920}
-                                        toYear={new Date().getFullYear()}
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                             <FormMessage />
-                        </FormItem>
+                     <FormField control={form.control} name="dob" render={({ field }) => (
+                        <FormItem><FormLabel>Date of Birth<RequiredIndicator /></FormLabel><FormControl><Input placeholder="YYYY-MM-DD" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                      <FormField control={form.control} name="gender" render={({ field }) => (
                         <FormItem>
@@ -283,19 +259,19 @@ export default function SignupPage() {
 
                 <div className="grid sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="email" render={({ field }) => (
-                        <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" placeholder="m@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Email Address<RequiredIndicator /></FormLabel><FormControl><Input type="email" placeholder="m@example.com" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={form.control} name="mobile" render={({ field }) => (
-                        <FormItem><FormLabel>Mobile Number</FormLabel><FormControl><Input placeholder="e.g. +1 123 456 7890" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Mobile Number<RequiredIndicator /></FormLabel><FormControl><Input placeholder="e.g. +1 123 456 7890" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="password" render={({ field }) => (
-                        <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Password<RequiredIndicator /></FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                      <FormField control={form.control} name="confirmPassword" render={({ field }) => (
-                        <FormItem><FormLabel>Confirm Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Confirm Password<RequiredIndicator /></FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                 </div>
                 
@@ -305,11 +281,11 @@ export default function SignupPage() {
                     <div className="space-y-4 rounded-md border p-4">
                         <p className="text-sm font-medium">Doctor Verification</p>
                          <FormField control={form.control} name="medicalId" render={({ field }) => (
-                            <FormItem><FormLabel>Medical Registration Number</FormLabel><FormControl><Input placeholder="Your medical ID" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel>Medical Registration Number<RequiredIndicator /></FormLabel><FormControl><Input placeholder="Your medical ID" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={form.control} name="specialization" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Specialization</FormLabel>
+                                <FormLabel>Specialization<RequiredIndicator /></FormLabel>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Select your specialization" /></SelectTrigger></FormControl>
                                     <SelectContent>
@@ -334,7 +310,7 @@ export default function SignupPage() {
                         <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                             <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                             <div className="space-y-1 leading-none">
-                                <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Terms & Conditions</Link>.</FormLabel>
+                                <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Terms & Conditions</Link>.<RequiredIndicator /></FormLabel>
                                 <FormMessage />
                             </div>
                         </FormItem>
@@ -343,7 +319,7 @@ export default function SignupPage() {
                         <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                             <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                             <div className="space-y-1 leading-none">
-                                <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>.</FormLabel>
+                                <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>.<RequiredIndicator /></FormLabel>
                                 <FormMessage />
                             </div>
                         </FormItem>
@@ -391,3 +367,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
+    
