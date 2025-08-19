@@ -197,7 +197,7 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
                                         Do's
                                     </CardTitle>
                                     <CardDescription>Recommended actions to take.</CardDescription>
-                                </Header>
+                                </CardHeader>
                                 <CardContent>
                                     <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
                                         {analysis.dos.map((item, index) => <li key={index}>{item}</li>)}
@@ -211,7 +211,7 @@ export default function AnalysisDetailPage({ params }: { params: { id: string } 
                                         Don'ts
                                     </CardTitle>
                                     <CardDescription>Things you should avoid.</CardDescription>
-                                </Header>
+                                </CardHeader>
                                 <CardContent>
                                    <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
                                         {analysis.donts.map((item, index) => <li key={index}>{item}</li>)}
