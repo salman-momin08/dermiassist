@@ -114,7 +114,8 @@ export default function AnalyzePage() {
         description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
-      setIsAnalyzing(false);
+    } finally {
+        setIsAnalyzing(false);
     }
   };
 
@@ -244,5 +245,3 @@ export default function AnalyzePage() {
     </div>
   );
 }
-
-    

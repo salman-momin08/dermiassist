@@ -139,12 +139,17 @@ export default function AnalysisDetailPage() {
             // --- Header ---
             pdf.setFontSize(18);
             pdf.setFont('helvetica', 'bold');
-            pdf.text('SkinWise AI Skin Analysis Report', pageWidth / 2, margin + 15, { align: 'center' });
+            pdf.text('SkinWise AI Skin Analysis Report', pageWidth / 2, margin + 5, { align: 'center' });
+            
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(`Report ID: ${analysis.id}`, pageWidth / 2, margin + 10, { align: 'center' });
+
 
             pdf.setLineWidth(0.5);
-            pdf.line(margin, margin + 20, pageWidth - margin, margin + 20);
+            pdf.line(margin, margin + 15, pageWidth - margin, margin + 15);
 
-            let yPos = margin + 30;
+            let yPos = margin + 25;
 
             // --- Patient Details ---
             pdf.setFontSize(12);
@@ -155,8 +160,13 @@ export default function AnalysisDetailPage() {
             pdf.setFont('helvetica', 'normal');
             pdf.text(`Name: ${userData.displayName || 'N/A'}`, margin, yPos);
             yPos += 7;
+            pdf.text(`Date of Birth: ${userData.dob ? new Date(userData.dob).toLocaleDateString() : 'N/A'}`, margin, yPos);
+            yPos += 7;
+            pdf.text(`Address: ${userData.address || 'N/A'}`, margin, yPos);
+            yPos += 10;
             
             pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
+            yPos += 7;
 
             // --- Analysis Details ---
             pdf.setFont('helvetica', 'bold');
@@ -172,6 +182,7 @@ export default function AnalysisDetailPage() {
             yPos += 10;
             
             pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
+            yPos += 7;
 
             // --- Submitted Photo & Info ---
             pdf.setFont('helvetica', 'bold');
@@ -200,7 +211,7 @@ export default function AnalysisDetailPage() {
                 pdf.setFont('helvetica', 'normal');
                 pdf.text(analysis.submittedInfo.diseaseDuration, textX, yPos + 25);
                 
-                yPos += imgHeight + 10; 
+                yPos += imgHeight > 35 ? imgHeight + 10 : 45;
 
                 // --- Recommendations ---
                 pdf.setFontSize(14);
@@ -274,7 +285,7 @@ export default function AnalysisDetailPage() {
 
     if (isAnalysisLoading) {
         return (
-            <div className="container mx-auto p-4 md:p-8 flex justify-center items-center h-[60vh]">
+            <div className="container mx-auto p-4 md:p-8 flex justify-center items-center min-h-[60vh]">
                 <Loader2 className="h-16 w-16 animate-spin text-primary" />
             </div>
         );
@@ -439,13 +450,25 @@ export default function AnalysisDetailPage() {
                                         <><Sparkles className="mr-2 h-4 w-4" />Analyze Progress</>
                                     )}
                                 </Button>
-                                <Button onClick={handleGenerateVideo} disabled={!progressImage || isComparing || isGeneratingVideo || !progressSummary} className="w-full" variant="secondary">
-                                    {isGeneratingVideo ? (
-                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
-                                    ) : (
-                                        <><Video className="mr-2 h-4 w-4" />Generate Healing Video</>
-                                    )}
-                                </Button>
+                                <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        {/* This div is necessary to prevent Tooltip from complaining about a disabled button */}
+                                        <div className="w-full">
+                                            <Button onClick={handleGenerateVideo} disabled={true || !progressImage || isComparing || isGeneratingVideo || !progressSummary} className="w-full" variant="secondary">
+                                                {isGeneratingVideo ? (
+                                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
+                                                ) : (
+                                                    <><Video className="mr-2 h-4 w-4" />Generate Healing Video</>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>This is a premium feature. Please enable billing in your GCP project.</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>

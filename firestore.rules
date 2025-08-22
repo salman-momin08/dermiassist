@@ -3,14 +3,32 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read and update their own user document, but not create or delete it through the app.
-    // Creation is handled during signup, deletion via the Firebase console or admin SDK.
-    match /users/{userId} {
-      allow read, update: if request.auth != null && request.auth.uid == userId;
 
-      // Users can create, read, and delete their own analysis reports.
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the requesting user is the owner of the data
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // Allow a user to read their own profile data
+      allow read: if isAuthenticated() && isOwner(userId);
+      // Allow a user to create their own profile during signup
+      allow create: if isAuthenticated() && isOwner(userId);
+      // Allow a user to update their own profile data
+      allow update: if isAuthenticated() && isOwner(userId);
+      // Disallow deleting user profiles for data integrity, can be changed based on app needs
+      allow delete: if false;
+
+      // Rules for the 'analyses' subcollection
       match /analyses/{analysisId} {
-        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+        // Allow a user to create, read, and delete their own analysis reports
+        allow read, write, delete: if isAuthenticated() && isOwner(userId);
       }
     }
   }

@@ -101,5 +101,3 @@ export function useAnalyses() {
 
     return { analyses, addAnalysis, getAnalysisById, deleteAnalysis, isLoading };
 }
-
-    
