@@ -39,7 +39,7 @@ export default function AnalyzePage() {
 
   const { toast } = useToast();
   const { addAnalysis } = useAnalyses();
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const router = useRouter();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,7 +55,7 @@ export default function AnalyzePage() {
   };
 
   const handleAnalyze = async () => {
-    if (!user) {
+    if (!user || !userData) {
         toast({ title: "Authentication Error", description: "You must be logged in to perform an analysis.", variant: "destructive"});
         return;
     }
@@ -86,7 +86,7 @@ export default function AnalyzePage() {
         diseaseDuration,
       });
 
-      const newReport = await addAnalysis(user.uid, {
+      const newReport = await addAnalysis(user.uid, userData.displayName || "Anonymous", {
         condition: result.condition,
         image: preview,
         recommendations: result.recommendations,
@@ -244,3 +244,5 @@ export default function AnalyzePage() {
     </div>
   );
 }
+
+    

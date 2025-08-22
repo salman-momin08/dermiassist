@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { notFound, useParams } from 'next/navigation';
+import { useParams, notFound } from 'next/navigation';
 import { useAnalyses, type AnalysisReport } from '@/hooks/use-analyses';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
@@ -14,19 +14,18 @@ import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { visualProgressAnalysis } from '@/ai/flows/visual-progress-analysis';
-import { generateHealingVideo } from '@/ai/flows/generate-healing-video';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Logo } from '@/components/logo';
 
 export default function AnalysisDetailPage() {
     const params = useParams();
     const id = params.id as string;
     const { getAnalysisById, isLoading: isAnalysisLoading } = useAnalyses();
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
 
-    const [analysis, setAnalysis] = useState<AnalysisReport | undefined>(undefined);
+    const [analysis, setAnalysis] = useState<AnalysisReport | null>(null);
     const [progressImage, setProgressImage] = useState<string | null>(null);
     const [isComparing, setIsComparing] = useState(false);
     const [progressSummary, setProgressSummary] = useState<string | null>(null);
@@ -36,13 +35,12 @@ export default function AnalysisDetailPage() {
     const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
     const [videoUri, setVideoUri] = useState<string | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const reportRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
 
     const fetchAnalysis = useCallback(async () => {
         if (user && id) {
             const foundAnalysis = await getAnalysisById(user.uid, id);
-            setAnalysis(foundAnalysis);
+            setAnalysis(foundAnalysis ?? null);
         }
     }, [user, id, getAnalysisById]);
 
@@ -91,62 +89,135 @@ export default function AnalysisDetailPage() {
             setIsComparing(false);
         }
     };
-    
-     const handleGenerateVideo = async () => {
-        if (!progressImage || !analysis) return;
-
-        setIsGeneratingVideo(true);
-        setError(null);
-        setVideoUri(null);
-
-        try {
-            toast({
-                title: "Video Generation Starting",
-                description: "This is an experimental feature and may take up to a minute.",
-            });
-            const result = await generateHealingVideo({
-                originalPhotoDataUri: analysis.image,
-                newPhotoDataUri: progressImage,
-            });
-            setVideoUri(result.videoDataUri);
-        } catch (err) {
-            console.error("Video generation failed:", err);
-            setError("Video generation requires a GCP project with billing enabled. Please check your setup.");
-            toast({
-                title: "Video Generation Failed",
-                description: "This feature requires a Google Cloud project with billing enabled.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsGeneratingVideo(false);
-        }
-    };
 
     const handleDownloadPdf = async () => {
-        const input = reportRef.current;
-        if (!input || !analysis) return;
+        if (!analysis || !userData) {
+            toast({ title: "Cannot generate PDF", description: "Report or user data is missing.", variant: "destructive" });
+            return;
+        }
 
         setIsDownloading(true);
 
         try {
-            const canvas = await html2canvas(input, {
-                 scale: 2,
-                 useCORS: true,
-                 backgroundColor: null,
-            });
-            const imgData = canvas.toDataURL('image/png');
-            // A4 page size in pixels at 96 DPI: 794x1123
-            const pdf = new jsPDF('p', 'px', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const imgWidth = canvas.width;
-            const imgHeight = canvas.height;
-            const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-            const imgX = (pdfWidth - imgWidth * ratio) / 2;
-            const imgY = 0;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 15;
+
+            // --- Header ---
+            // Cannot render Logo component directly, so recreating a simplified version
+            pdf.setFillColor(231, 48, 48); // Using HSL from theme, approx converted to RGB
+            pdf.circle(margin + 5, margin + 5, 5, 'F');
+            pdf.setTextColor(255, 255, 255);
+            pdf.text('+', margin + 3.5, margin + 6.5);
             
-            pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-            pdf.save(`SkinWise-Report-${analysis.condition}-${analysis.date}.pdf`);
+            pdf.setTextColor(0,0,0);
+            pdf.setFontSize(16);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('SkinWise', margin + 12, margin + 7);
+            
+            pdf.setFontSize(18);
+            pdf.text('AI Skin Analysis Report', pageWidth / 2, margin + 15, { align: 'center' });
+
+            pdf.setLineWidth(0.5);
+            pdf.line(margin, margin + 20, pageWidth - margin, margin + 20);
+
+            let yPos = margin + 30;
+
+            // --- Patient Details ---
+            pdf.setFontSize(12);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('Patient Information', margin, yPos);
+            yPos += 7;
+
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(`Name: ${userData.displayName || 'N/A'}`, margin, yPos);
+            pdf.text(`Date of Birth: ${userData.dob ? new Date(userData.dob).toLocaleDateString() : 'N/A'}`, pageWidth / 2, yPos);
+            yPos += 7;
+            pdf.text(`Gender: ${userData.gender || 'N/A'}`, margin, yPos);
+            pdf.text(`Blood Group: ${userData.bloodGroup || 'N/A'}`, pageWidth / 2, yPos);
+            yPos += 10;
+            
+            pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
+
+            // --- Analysis Details ---
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('Analysis Details', margin, yPos);
+            yPos += 7;
+            
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(`Analysis Date: ${new Date(analysis.date).toLocaleString()}`, margin, yPos);
+            yPos += 7;
+            pdf.text(`Condition Identified:`, margin, yPos);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(analysis.condition, margin + 45, yPos);
+            yPos += 10;
+            
+            pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
+
+            // --- Submitted Photo & Info ---
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('Submitted Information', margin, yPos);
+            yPos += 7;
+
+            const img = new Image();
+            img.src = analysis.image;
+            img.onload = () => {
+                const imgProps = pdf.getImageProperties(img);
+                const imgRatio = imgProps.width / imgProps.height;
+                const imgWidth = 60;
+                const imgHeight = imgWidth / imgRatio;
+
+                pdf.addImage(img, 'JPEG', margin, yPos, imgWidth, imgHeight);
+                
+                const textX = margin + imgWidth + 10;
+                pdf.setFont('helvetica', 'bold');
+                pdf.text('Pre-medication:', textX, yPos + 5);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text(analysis.submittedInfo.preMedication, textX, yPos + 10);
+                
+                pdf.setFont('helvetica', 'bold');
+                pdf.text('Disease Duration:', textX, yPos + 20);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text(analysis.submittedInfo.diseaseDuration, textX, yPos + 25);
+                
+                yPos += imgHeight + 10; // Move yPos past the image
+
+                // --- Recommendations ---
+                pdf.setFontSize(14);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text('Recommendations', margin, yPos);
+                yPos += 7;
+                pdf.setFontSize(10);
+                pdf.setFont('helvetica', 'normal');
+                const recommendationsText = pdf.splitTextToSize(analysis.recommendations, pageWidth - (margin * 2));
+                pdf.text(recommendationsText, margin, yPos);
+                yPos += recommendationsText.length * 4 + 5;
+
+                // --- Do's and Don'ts ---
+                const splitTextAndDraw = (title: string, items: string[], startY: number) => {
+                    pdf.setFontSize(12);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(title, margin, startY);
+                    startY += 6;
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'normal');
+                    items.forEach(item => {
+                        const itemText = pdf.splitTextToSize(`- ${item}`, (pageWidth / 2) - margin - 5);
+                        pdf.text(itemText, margin + 5, startY);
+                        startY += itemText.length * 4;
+                    });
+                    return startY;
+                }
+
+                const dosY = splitTextAndDraw("Do's:", analysis.dos, yPos);
+                const dontsY = splitTextAndDraw("Don'ts:", analysis.donts, yPos);
+
+                yPos = Math.max(dosY, dontsY) + 10;
+
+                pdf.save(`SkinWise-Report-${analysis.id}.pdf`);
+            };
+
         } catch (error) {
             console.error("Failed to generate PDF:", error);
             toast({
@@ -173,9 +244,29 @@ export default function AnalysisDetailPage() {
             </div>
         );
     }
-
+    
     if (!analysis) {
-        notFound();
+        // This condition handles both the initial state and the case where the analysis isn't found after loading.
+        return (
+            <div className="container mx-auto p-4 md:p-8">
+                 <div className="mb-6">
+                    <Button variant="outline" asChild>
+                        <Link href="/my-analyses">
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Back to My Analyses
+                        </Link>
+                    </Button>
+                </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Analysis Not Found</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-muted-foreground">The analysis report you are looking for does not exist or you do not have permission to view it.</p>
+                    </CardContent>
+                </Card>
+            </div>
+        )
     }
 
     return (
@@ -191,57 +282,55 @@ export default function AnalysisDetailPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
-                    <div ref={reportRef} className="space-y-6 bg-background p-4 sm:p-6 rounded-lg">
-                        <Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-3xl font-headline">Analysis Report: {analysis.condition}</CardTitle>
+                            <CardDescription>Generated on {new Date(analysis.date).toLocaleDateString()} | Severity: {analysis.severity}</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <h3 className="font-semibold text-xl mb-4 text-primary">Expert Recommendations</h3>
+                             <p className="text-muted-foreground leading-relaxed">{analysis.recommendations}</p>
+                        </CardContent>
+                    </Card>
+
+                     <div className="grid md:grid-cols-2 gap-6">
+                        <Card className="border-green-500/50 dark:border-green-500/50">
                             <CardHeader>
-                                <CardTitle className="text-3xl font-headline">Analysis Report: {analysis.condition}</CardTitle>
-                                <CardDescription>Generated on {new Date(analysis.date).toLocaleDateString()} | Severity: {analysis.severity}</CardDescription>
+                                <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                                    <CheckCircle size={24} />
+                                    Do's
+                                </CardTitle>
+                                <CardDescription>Recommended actions to take.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                 <h3 className="font-semibold text-xl mb-4 text-primary">Expert Recommendations</h3>
-                                 <p className="text-muted-foreground leading-relaxed">{analysis.recommendations}</p>
+                                <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
+                                    {analysis.dos.map((item, index) => <li key={index}>{item}</li>)}
+                                </ul>
                             </CardContent>
                         </Card>
-
-                         <div className="grid md:grid-cols-2 gap-6">
-                            <Card className="border-green-500/50 dark:border-green-500/50">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                                        <CheckCircle size={24} />
-                                        Do's
-                                    </CardTitle>
-                                    <CardDescription>Recommended actions to take.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
-                                        {analysis.dos.map((item, index) => <li key={index}>{item}</li>)}
-                                    </ul>
-                                </CardContent>
-                            </Card>
-                             <Card className="border-red-500/50 dark:border-red-500/50">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
-                                        <XCircle size={24} />
-                                        Don'ts
-                                    </CardTitle>
-                                    <CardDescription>Things you should avoid.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                   <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
-                                        {analysis.donts.map((item, index) => <li key={index}>{item}</li>)}
-                                    </ul>
-                                </CardContent>
-                            </Card>
-                        </div>
-                         <Card>
+                         <Card className="border-red-500/50 dark:border-red-500/50">
                             <CardHeader>
-                                <CardTitle>Your Submitted Photo</CardTitle>
+                                <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                                    <XCircle size={24} />
+                                    Don'ts
+                                </CardTitle>
+                                <CardDescription>Things you should avoid.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                 <Image src={analysis.image} alt="Skin condition" width={400} height={400} className="rounded-lg w-full aspect-square object-cover" data-ai-hint="skin condition" />
+                               <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
+                                    {analysis.donts.map((item, index) => <li key={index}>{item}</li>)}
+                                </ul>
                             </CardContent>
                         </Card>
                     </div>
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Your Submitted Photo</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                             <Image src={analysis.image} alt="Skin condition" width={400} height={400} className="rounded-lg w-full aspect-square object-cover" data-ai-hint="skin condition" />
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <div className="space-y-6">
@@ -340,13 +429,13 @@ export default function AnalysisDetailPage() {
                                         <TooltipTrigger asChild>
                                             {/* This div is needed for the tooltip to work on a disabled button */}
                                             <div className="w-full">
-                                                <Button onClick={handleGenerateVideo} disabled={!progressImage || isGeneratingVideo || isComparing} className="w-full" variant="secondary">
+                                                <Button disabled={true} className="w-full" variant="secondary">
                                                     <Video className="mr-2 h-4 w-4" />Generate Healing Video
                                                 </Button>
                                             </div>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                            <p>This premium feature may require GCP billing to be enabled.</p>
+                                            <p>This premium feature requires GCP billing to be enabled.</p>
                                         </TooltipContent>
                                     </Tooltip>
                                 </TooltipProvider>
@@ -372,3 +461,5 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
+
+    

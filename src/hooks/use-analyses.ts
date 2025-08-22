@@ -9,6 +9,8 @@ import { collection, doc, addDoc, getDoc, getDocs, deleteDoc, query, orderBy, on
 // Define the structure of a single analysis report
 export interface AnalysisReport {
     id: string;
+    userId: string;
+    userName: string;
     condition: string;
     date: string;
     severity: string;
@@ -54,11 +56,13 @@ export function useAnalyses() {
         return () => unsubscribe();
     }, [user]);
 
-    const addAnalysis = useCallback(async (userId: string, newAnalysis: Omit<AnalysisReport, 'id' | 'date' | 'severity'>) => {
+    const addAnalysis = useCallback(async (userId: string, userName: string, newAnalysis: Omit<AnalysisReport, 'id' | 'date' | 'severity' | 'userId' | 'userName'>) => {
         if (!userId) throw new Error("User not authenticated.");
 
         const report: Omit<AnalysisReport, 'id'> = {
             ...newAnalysis,
+            userId,
+            userName,
             date: new Date().toISOString(),
             severity: 'Mild', // AI doesn't provide severity, so mocking it.
         };
@@ -97,3 +101,5 @@ export function useAnalyses() {
 
     return { analyses, addAnalysis, getAnalysisById, deleteAnalysis, isLoading };
 }
+
+    
