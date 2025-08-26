@@ -63,8 +63,10 @@ export default function AnalysisDetailPage() {
             }
         };
         
-        if (!isAuthLoading) {
+        if (!isAuthLoading && user) {
             fetchAnalysis();
+        } else if (!isAuthLoading && !user) {
+            router.push('/login');
         }
     }, [id, user, isAuthLoading, getAnalysisById, router]);
 
@@ -376,7 +378,7 @@ export default function AnalysisDetailPage() {
                             <CardTitle>Your Submitted Photo</CardTitle>
                         </CardHeader>
                         <CardContent>
-                             <Image src={analysis.image} alt="Skin condition" width={400} height={400} className="rounded-lg w-full aspect-square object-cover" data-ai-hint="skin condition" />
+                             <Image src={analysis.image} alt="Skin condition" width={400} height={400} className="rounded-lg max-w-sm mx-auto aspect-square object-cover" data-ai-hint="skin condition" />
                         </CardContent>
                     </Card>
                 </div>
