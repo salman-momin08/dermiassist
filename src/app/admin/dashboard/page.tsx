@@ -395,7 +395,7 @@ export default function AdminDashboardPage() {
                                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                         <AlertDialogDescription>
                                             This will reject the verification request for {doctor.name}. They will be removed from the list.
-                                        </Description>
+                                        </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>

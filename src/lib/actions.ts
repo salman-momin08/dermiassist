@@ -61,5 +61,3 @@ export async function deleteFile(publicId: string) {
         return { success: false, message: `Deletion failed: ${errorMessage}` };
     }
 }
-
-    

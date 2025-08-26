@@ -455,7 +455,7 @@ export default function AnalysisDetailPage() {
                                     <TooltipTrigger asChild>
                                         {/* This div is necessary to prevent Tooltip from complaining about a disabled button */}
                                         <div className="w-full">
-                                            <Button onClick={handleGenerateVideo} disabled={true || !progressImage || isComparing || isGeneratingVideo || !progressSummary} className="w-full" variant="secondary">
+                                            <Button onClick={handleGenerateVideo} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full" variant="secondary">
                                                 {isGeneratingVideo ? (
                                                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
                                                 ) : (
