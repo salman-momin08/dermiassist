@@ -111,6 +111,13 @@ export default function MyAnalysesPage() {
             img.src = analysis.image;
             img.crossOrigin = "Anonymous"; 
             img.onload = () => {
+                const checkAndSwitchPage = (neededHeight: number) => {
+                  if (yPos + neededHeight > pageHeight - margin) {
+                    pdf.addPage();
+                    yPos = margin;
+                  }
+                };
+
                 const imgProps = pdf.getImageProperties(img);
                 const imgRatio = imgProps.width / imgProps.height;
                 const imgWidth = 60;
@@ -143,12 +150,6 @@ export default function MyAnalysesPage() {
                 pdf.text(recommendationsText, margin, yPos);
                 yPos += recommendationsText.length * 4 + 5;
 
-                const checkAndSwitchPage = (neededHeight: number) => {
-                  if (yPos + neededHeight > pageHeight - margin) {
-                    pdf.addPage();
-                    yPos = margin;
-                  }
-                };
 
                 // --- Do's and Don'ts ---
                 checkAndSwitchPage(20);
