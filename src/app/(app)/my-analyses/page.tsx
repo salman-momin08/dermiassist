@@ -93,7 +93,7 @@ export default function MyAnalysesPage() {
             
             pdf.setFont('helvetica', 'bold');
             pdf.text(`Condition Identified:`, margin, yPos);
-            yPos += 7;
+            yPos += 5;
             pdf.setFont('helvetica', 'normal');
             const conditionText = pdf.splitTextToSize(analysis.condition, pageWidth - (margin * 2) - 5);
             pdf.text(conditionText, margin + 5, yPos);
