@@ -24,7 +24,7 @@ import { generateHealingVideo } from '@/ai/flows/generate-healing-video';
 export default function AnalysisDetailPage() {
     const params = useParams();
     const id = params.id as string;
-    const { getAnalysisById, isLoading: isAnalysesHookLoading } = useAnalyses();
+    const { getAnalysisById } = useAnalyses();
     const { user, userData, loading: isAuthLoading } = useAuth();
     const router = useRouter();
 
@@ -43,11 +43,7 @@ export default function AnalysisDetailPage() {
 
     useEffect(() => {
         const fetchAnalysis = async () => {
-            if (isAuthLoading) {
-                return;
-            }
             if (!user) {
-                router.push('/login');
                 return;
             }
             
@@ -66,8 +62,10 @@ export default function AnalysisDetailPage() {
                 setIsLoading(false);
             }
         };
-
-        fetchAnalysis();
+        
+        if (!isAuthLoading) {
+            fetchAnalysis();
+        }
     }, [id, user, isAuthLoading, getAnalysisById, router]);
 
 
@@ -132,7 +130,7 @@ export default function AnalysisDetailPage() {
         } catch (err) {
             console.error("Video generation failed:", err);
             const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
-            setError(`Video generation failed. ${errorMessage}`);
+            setError(`Video generation failed. This is a premium feature that requires billing to be enabled on your Google Cloud account.`);
             toast({
                 title: "Video Generation Failed",
                 description: "Please ensure your GCP project has billing enabled for this premium feature.",
@@ -198,9 +196,11 @@ export default function AnalysisDetailPage() {
             pdf.text(`Analysis Date: ${new Date(analysis.date).toLocaleString()}`, margin, yPos);
             yPos += 7;
             pdf.text(`Condition Identified:`, margin, yPos);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text(analysis.condition, margin + 45, yPos);
-            yPos += 10;
+            yPos += 5;
+            pdf.setFont('helvetica', 'normal');
+            const conditionText = pdf.splitTextToSize(analysis.condition, pageWidth - (margin * 2) - 5);
+            pdf.text(conditionText, margin + 5, yPos);
+            yPos += conditionText.length * 5 + 5;
             
             pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
             yPos += 7;
@@ -451,6 +451,12 @@ export default function AnalysisDetailPage() {
                                         <video src={videoUri} controls className="w-full rounded-lg" />
                                     </div>
                                 )}
+                                {isComparing && !progressSummary && (
+                                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <span>Analyzing progress...</span>
+                                    </div>
+                                )}
                                 {isGeneratingVideo && (
                                     <div className="flex items-center justify-center gap-2 text-muted-foreground">
                                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -475,7 +481,6 @@ export default function AnalysisDetailPage() {
                                 <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        {/* This div is necessary to prevent Tooltip from complaining about a disabled button */}
                                         <div className="w-full">
                                             <Button onClick={handleGenerateVideo} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full" variant="secondary">
                                                 {isGeneratingVideo ? (
@@ -487,7 +492,7 @@ export default function AnalysisDetailPage() {
                                         </div>
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        <p>This is a premium feature. Please enable billing in your GCP project.</p>
+                                        <p>Premium feature. Requires GCP billing to be enabled.</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
