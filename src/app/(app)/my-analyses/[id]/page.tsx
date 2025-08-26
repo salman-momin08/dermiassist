@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, notFound } from 'next/navigation';
+import { useParams, notFound, useRouter } from 'next/navigation';
 import { useAnalyses, type AnalysisReport } from '@/hooks/use-analyses';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
@@ -24,10 +24,12 @@ import { generateHealingVideo } from '@/ai/flows/generate-healing-video';
 export default function AnalysisDetailPage() {
     const params = useParams();
     const id = params.id as string;
-    const { getAnalysisById, isLoading: isAnalysisLoading } = useAnalyses();
-    const { user, userData } = useAuth();
+    const { getAnalysisById, isLoading: isAnalysesHookLoading } = useAnalyses();
+    const { user, userData, loading: isAuthLoading } = useAuth();
+    const router = useRouter();
 
     const [analysis, setAnalysis] = useState<AnalysisReport | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
     const [progressImage, setProgressImage] = useState<string | null>(null);
     const [isComparing, setIsComparing] = useState(false);
     const [progressSummary, setProgressSummary] = useState<string | null>(null);
@@ -39,16 +41,35 @@ export default function AnalysisDetailPage() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
 
-    const fetchAnalysis = useCallback(async () => {
-        if (user && id) {
-            const foundAnalysis = await getAnalysisById(user.uid, id);
-            setAnalysis(foundAnalysis ?? null);
-        }
-    }, [user, id, getAnalysisById]);
-
     useEffect(() => {
+        const fetchAnalysis = async () => {
+            if (isAuthLoading) {
+                return;
+            }
+            if (!user) {
+                router.push('/login');
+                return;
+            }
+            
+            setIsLoading(true);
+            try {
+                const foundAnalysis = await getAnalysisById(user.uid, id);
+                if (foundAnalysis) {
+                    setAnalysis(foundAnalysis);
+                } else {
+                    notFound();
+                }
+            } catch (err) {
+                console.error("Failed to fetch analysis", err);
+                notFound();
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
         fetchAnalysis();
-    }, [fetchAnalysis]);
+    }, [id, user, isAuthLoading, getAnalysisById, router]);
+
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
@@ -283,7 +304,7 @@ export default function AnalysisDetailPage() {
         setVideoUri(null);
     };
 
-    if (isAnalysisLoading) {
+    if (isLoading) {
         return (
             <div className="container mx-auto p-4 md:p-8 flex justify-center items-center min-h-[60vh]">
                 <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -292,7 +313,8 @@ export default function AnalysisDetailPage() {
     }
     
     if (!analysis) {
-        return notFound();
+        // notFound() will be called by the useEffect hook if data is not found
+        return null;
     }
 
     return (
