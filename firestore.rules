@@ -4,31 +4,27 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    // Helper function to check if the requesting user is the owner of the data
+    // Helper functions to improve readability
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
     // Rules for the 'users' collection
     match /users/{userId} {
-      // Allow a user to read their own profile data
-      allow read: if isAuthenticated() && isOwner(userId);
-      // Allow a user to create their own profile during signup
-      allow create: if isAuthenticated() && isOwner(userId);
-      // Allow a user to update their own profile data
-      allow update: if isAuthenticated() && isOwner(userId);
-      // Disallow deleting user profiles for data integrity, can be changed based on app needs
-      allow delete: if false;
+      // Users can read and update their own profile document.
+      // Creation is handled during signup, so we don't allow it here.
+      allow read, update: if isOwner(userId);
+      
+      // Deny users from creating or deleting their own top-level user document.
+      allow create, delete: if false;
 
-      // Rules for the 'analyses' subcollection
+      // Rules for the 'analyses' subcollection within a user's document
       match /analyses/{analysisId} {
-        // Allow a user to create, read, and delete their own analysis reports
-        allow read, write, delete: if isAuthenticated() && isOwner(userId);
+        // A user can create, read, and delete their own analysis reports.
+        allow create, read, delete: if isOwner(userId);
+        
+        // Users cannot update an existing analysis report.
+        allow update: if false;
       }
     }
   }
