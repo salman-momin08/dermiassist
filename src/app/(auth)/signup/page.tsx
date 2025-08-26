@@ -129,7 +129,12 @@ export default function SignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      // 2. Prepare user data and profile update promises
+      // 2. Update the user's profile in Firebase Auth
+      await updateProfile(user, {
+        displayName: `${values.firstName} ${values.lastName}`
+      });
+
+      // 3. Prepare user data for Firestore
       const userDocRef = doc(db, "users", user.uid);
       const userData: any = {
           uid: user.uid,
@@ -150,14 +155,8 @@ export default function SignupPage() {
         userData.verified = false; // Doctors start as unverified
       }
       
-      // These promises will run in parallel
-      const profileUpdatePromise = updateProfile(user, {
-        displayName: `${values.firstName} ${values.lastName}`
-      });
-      const firestorePromise = setDoc(userDocRef, userData);
-
-      // 3. Wait for both to complete
-      await Promise.all([profileUpdatePromise, firestorePromise]);
+      // 4. Write user data to Firestore
+      await setDoc(userDocRef, userData);
 
       toast({
         title: "Account Created Successfully",
@@ -169,9 +168,14 @@ export default function SignupPage() {
 
     } catch (error: any) {
       console.error("Signup failed:", error);
-      const errorMessage = error.code === 'auth/email-already-in-use' 
-        ? "This email is already registered. Please login instead."
-        : error.message || "An unexpected error occurred. Please try again.";
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "This email is already registered. Please login instead.";
+      } else if (error.code === 'permission-denied' || error.code === 'unauthenticated') {
+        errorMessage = "There was a permission error. Please check your network and try again.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
 
       toast({
         title: "Signup Failed",
@@ -401,3 +405,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
+    

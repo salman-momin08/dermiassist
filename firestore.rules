@@ -3,29 +3,21 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions to improve readability
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // Rules for the 'users' collection
+    // Rules from previous turn
     match /users/{userId} {
-      // Users can read and update their own profile document.
-      // Creation is handled during signup, so we don't allow it here.
-      allow read, update: if isOwner(userId);
-      
-      // Deny users from creating or deleting their own top-level user document.
-      allow create, delete: if false;
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
 
-      // Rules for the 'analyses' subcollection within a user's document
       match /analyses/{analysisId} {
-        // A user can create, read, and delete their own analysis reports.
-        allow create, read, delete: if isOwner(userId);
-        
-        // Users cannot update an existing analysis report.
-        allow update: if false;
+        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
       }
+    }
+    
+    // New rule to allow user creation during signup
+    // A user can create their own user document if the document ID matches their UID.
+    match /users/{userId} {
+       allow create: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
+
+    
