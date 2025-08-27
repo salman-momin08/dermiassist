@@ -21,26 +21,30 @@ import {
   AlertTriangle,
   ArrowLeft,
   WandSparkles,
+  MessageSquareQuestion,
 } from "lucide-react";
 import Image from "next/image";
-import { skinConditionAnalysis } from "@/ai/flows/skin-condition-analysis";
+import { finalEvaluation } from "@/ai/flows/final-evaluation";
 import { detectDiseaseName } from "@/ai/flows/detect-disease-name";
+import { generateProforma } from "@/ai/flows/generate-proforma";
 import { useToast } from "@/hooks/use-toast";
 import { useAnalyses } from "@/hooks/use-analyses";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 
 type Step = 'upload' | 'proforma' | 'analyzing' | 'error';
+type Answer = { question: string; answer: string };
 
 export default function AnalyzePage() {
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [preMedication, setPreMedication] = useState("");
-  const [diseaseDuration, setDiseaseDuration] = useState("");
   const [detectedCondition, setDetectedCondition] = useState<string | null>(null);
+  const [proformaQuestions, setProformaQuestions] = useState<string[]>([]);
+  const [proformaAnswers, setProformaAnswers] = useState<Answer[]>([]);
+  
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const { toast } = useToast();
@@ -70,16 +74,33 @@ export default function AnalyzePage() {
     setError(null);
 
     try {
+      setLoadingMessage("Detecting condition...");
       const { conditionName } = await detectDiseaseName({ photoDataUri: preview });
       setDetectedCondition(conditionName);
+
+      setLoadingMessage("Generating relevant questions...");
+      const { questions } = await generateProforma({ conditionName });
+      setProformaQuestions(questions);
+      setProformaAnswers(questions.map(q => ({ question: q, answer: '' })));
+      
       setStep('proforma');
+
     } catch (err) {
-      console.error("Disease detection failed:", err);
-      setError("Failed to detect disease from the image. Please try another one.");
+      console.error("Initial analysis failed:", err);
+      setError("Failed to analyze the image. The AI may be unable to identify a condition. Please try another photo.");
       setStep('error');
     } finally {
       setIsLoading(false);
+      setLoadingMessage("");
     }
+  };
+
+  const handleAnswerChange = (index: number, answer: string) => {
+    setProformaAnswers(prev => {
+        const newAnswers = [...prev];
+        newAnswers[index].answer = answer;
+        return newAnswers;
+    });
   };
 
   const handleProformaSubmit = async () => {
@@ -87,32 +108,41 @@ export default function AnalyzePage() {
       toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
       return;
     }
-    if (!preview || !detectedCondition || !diseaseDuration) {
-      toast({ title: "Missing Information", description: "Please fill out all fields.", variant: "destructive" });
+    if (!preview || !detectedCondition) {
+      toast({ title: "Missing Information", description: "Critical analysis data is missing.", variant: "destructive" });
+      return;
+    }
+    if (proformaAnswers.some(a => !a.answer.trim())) {
+      toast({ title: "Please answer all questions", description: "Your answers are crucial for an accurate report.", variant: "destructive" });
       return;
     }
 
     setStep('analyzing');
     setIsLoading(true);
+    setLoadingMessage("Performing final evaluation...");
     setError(null);
 
     try {
-      const result = await skinConditionAnalysis({
+      const answersString = proformaAnswers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join('\n\n');
+      
+      const result = await finalEvaluation({
         photoDataUri: preview,
-        preMedication: preMedication || "None",
-        diseaseDuration,
+        initialCondition: detectedCondition,
+        userAnswers: answersString,
       });
 
       const newReport = await addAnalysis(user.uid, userData.displayName || "Anonymous", {
         condition: result.condition,
-        conditionName: result.conditionName, // Use the name from the full analysis
+        conditionName: result.conditionName,
         image: preview,
         recommendations: result.recommendations,
         dos: result.dos,
         donts: result.donts,
+        // Storing the new detailed fields for future use if needed
         submittedInfo: {
-          preMedication: preMedication || "None",
-          diseaseDuration,
+          initialCondition: detectedCondition,
+          otherConsiderations: result.otherConsiderations,
+          proformaAnswers: proformaAnswers,
         },
       });
       
@@ -120,8 +150,8 @@ export default function AnalyzePage() {
       router.push(`/my-analyses/${newReport.id}`);
 
     } catch (err) {
-      console.error("Full analysis failed:", err);
-      setError("An unexpected error occurred during the detailed analysis. Please try again.");
+      console.error("Final evaluation failed:", err);
+      setError("An unexpected error occurred during the final analysis. Please try again.");
       setStep('error');
     } finally {
       setIsLoading(false);
@@ -133,9 +163,10 @@ export default function AnalyzePage() {
     setFile(null);
     setPreview(null);
     setDetectedCondition(null);
-    setPreMedication("");
-    setDiseaseDuration("");
+    setProformaQuestions([]);
+    setProformaAnswers([]);
     setError(null);
+    setLoadingMessage("");
   };
   
   const renderBackButton = () => (
@@ -155,8 +186,8 @@ export default function AnalyzePage() {
           <CardHeader>
             <CardTitle className="font-headline text-2xl">New Skin Analysis</CardTitle>
             <CardDescription>
-              {step === 'upload' && "Upload a photo to get started. Our AI will identify the likely condition."}
-              {step === 'proforma' && "Please provide some additional details for a more accurate report."}
+              {step === 'upload' && "Upload a photo to get started. Our AI will identify the condition and ask relevant questions."}
+              {step === 'proforma' && "Please answer these questions for a more accurate report."}
               {step === 'analyzing' && "Hang tight! Our AI is preparing your detailed analysis."}
               {step === 'error' && "An error occurred. Please try again."}
             </CardDescription>
@@ -190,7 +221,7 @@ export default function AnalyzePage() {
               </CardContent>
               <CardFooter>
                 <Button onClick={handleImageSubmit} disabled={isLoading || !file} className="w-full">
-                  {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Detecting...</> : "Detect Condition"}
+                  {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{loadingMessage}</> : "Start Analysis"}
                 </Button>
               </CardFooter>
             </>
@@ -200,19 +231,26 @@ export default function AnalyzePage() {
             <>
               <CardContent className="space-y-6">
                 {detectedCondition && (
-                  <div className="p-4 bg-primary/10 rounded-lg text-center">
-                     <p className="text-sm text-muted-foreground">Likely Condition Detected:</p>
+                  <div className="p-4 bg-primary/10 rounded-lg">
+                     <p className="text-sm text-muted-foreground">Initial finding:</p>
                      <p className="text-lg font-bold text-primary">{detectedCondition}</p>
+                     <p className="text-sm text-muted-foreground mt-2">To provide a more accurate evaluation, please answer the questions below.</p>
                   </div>
                 )}
-                 <div className="space-y-2">
-                  <Label htmlFor="duration">Disease Duration</Label>
-                  <Input id="duration" placeholder="e.g., 2 weeks, 3 months" value={diseaseDuration} onChange={(e) => setDiseaseDuration(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="medication">Pre-medication (if any)</Label>
-                  <Textarea id="medication" placeholder="Describe any medications or treatments you've used." value={preMedication} onChange={(e) => setPreMedication(e.target.value)} />
-                </div>
+                 {proformaQuestions.map((question, index) => (
+                    <div key={index} className="space-y-2">
+                        <Label htmlFor={`question-${index}`} className="flex items-start gap-2">
+                          <MessageSquareQuestion className="h-4 w-4 mt-1 flex-shrink-0" />
+                          <span>{question}</span>
+                        </Label>
+                        <Textarea 
+                            id={`question-${index}`} 
+                            placeholder="Your answer..."
+                            value={proformaAnswers[index].answer}
+                            onChange={(e) => handleAnswerChange(index, e.target.value)}
+                        />
+                    </div>
+                ))}
               </CardContent>
               <CardFooter>
                 <Button onClick={handleProformaSubmit} className="w-full">
@@ -227,7 +265,7 @@ export default function AnalyzePage() {
               {step === 'analyzing' && (
                 <>
                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <p className="text-muted-foreground">Evaluating your case... Please wait.</p>
+                  <p className="text-muted-foreground">{loadingMessage}</p>
                 </>
               )}
               {step === 'error' && error && (

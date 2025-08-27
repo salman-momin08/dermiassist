@@ -20,8 +20,11 @@ export interface AnalysisReport {
     dos: string[];
     donts: string[];
     submittedInfo: {
-        preMedication: string;
-        diseaseDuration: string;
+        preMedication?: string; // Made optional as it's no longer a primary field
+        diseaseDuration?: string; // Made optional
+        initialCondition?: string;
+        otherConsiderations?: string;
+        proformaAnswers?: { question: string; answer: string }[];
     };
 }
 
