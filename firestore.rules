@@ -2,19 +2,39 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Rules for the 'users' collection
+
+    // Helper function to check if a user is an admin
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Rules for the users collection
     match /users/{userId} {
-      // Admins can list and update any user document.
-      allow list: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // CREATE: A new user can create their own user document.
+      allow create: if request.auth != null && request.auth.uid == userId;
 
-      // A user can read, create, and delete their own document.
-      // They can also update their own document.
-      allow read, create, delete: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
+      // READ: 
+      // 1. A user can read their own document.
+      // 2. An admin can read any user document.
+      allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
 
-      // Rules for a user's 'analyses' subcollection
+      // UPDATE:
+      // 1. A user can update their own document.
+      // 2. An admin can update any user document (e.g., to verify doctors).
+      allow update: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      
+      // DELETE:
+      // 1. A user can delete their own document.
+      // 2. An admin can delete any user document.
+      allow delete: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      
+      // LIST: An admin can list all users for the dashboard.
+      allow list: if isAdmin();
+
+      // Rules for the 'analyses' subcollection for each user
       match /analyses/{analysisId} {
+        // Only the user who owns the parent document can manage their analyses.
         allow read, write, delete: if request.auth != null && request.auth.uid == userId;
       }
     }
