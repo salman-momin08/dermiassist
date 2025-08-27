@@ -369,13 +369,6 @@ export default function AdminDashboardPage() {
                                 </div>
                                 </>
                             )}
-                            <Separator />
-                             <div className="space-y-3 text-sm">
-                                <h4 className="font-semibold text-base">Account & Preferences</h4>
-                                {renderDetail("Subscription", selectedUser.subscriptionPlan)}
-                                {renderDetail("Data Sharing", selectedUser.allowDataSharing ? "Allowed" : "Disallowed")}
-                                {renderDetail("Notifications", selectedUser.emailNotifications ? "Enabled" : "Disabled")}
-                            </div>
                         </div>
                         </ScrollArea>
                     )}
@@ -500,5 +493,3 @@ export default function AdminDashboardPage() {
         )
     }
 }
-
-    
