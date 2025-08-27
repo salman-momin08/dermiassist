@@ -229,10 +229,6 @@ export default function AnalysisDetailPage() {
                 
                 if (analysis.submittedInfo?.proformaAnswers && analysis.submittedInfo.proformaAnswers.length > 0) {
                     analysis.submittedInfo.proformaAnswers.forEach(qa => {
-                         if (textY > yPos + imgHeight) { // Move to left column if text overflows image height
-                            textX = margin;
-                            textY = yPos + imgHeight + 10;
-                        }
                         pdf.setFont('helvetica', 'bold');
                         const question = pdf.splitTextToSize(`Q: ${qa.question}`, textMaxWidth);
                         pdf.text(question, textX, textY);
@@ -246,9 +242,13 @@ export default function AnalysisDetailPage() {
                 } else {
                      pdf.setFont('helvetica', 'normal');
                      pdf.text("No additional information was provided for this analysis.", textX, textY);
+                     textY += 10;
                 }
-
-                yPos += imgHeight + 10; // Move yPos down past image
+                
+                // Determine the correct Y position for the next section
+                // It should be below either the image or the text block, whichever is lower.
+                let contentBottomY = Math.max(yPos + imgHeight, textY);
+                yPos = contentBottomY + 10;
 
                 const checkAndSwitchPage = (neededHeight: number) => {
                   if (yPos + neededHeight > pageHeight - margin) {
@@ -281,7 +281,7 @@ export default function AnalysisDetailPage() {
                     checkAndSwitchPage(5);
                     const itemText = pdf.splitTextToSize(`- ${item}`, pageWidth - (margin * 2) - 5);
                     pdf.text(itemText, margin + 5, yPos);
-                    yPos += itemText.length * 4;
+                    yPos += itemText.length * 4 + 2;
                 });
                 
                 yPos += 5;
@@ -296,7 +296,7 @@ export default function AnalysisDetailPage() {
                     checkAndSwitchPage(5);
                     const itemText = pdf.splitTextToSize(`- ${item}`, pageWidth - (margin * 2) - 5);
                     pdf.text(itemText, margin + 5, yPos);
-                    yPos += itemText.length * 4;
+                    yPos += itemText.length * 4 + 2;
                 });
 
                 pdf.save(`SkinWise-Report-${analysis.id}.pdf`);
@@ -539,5 +539,3 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
-
-    

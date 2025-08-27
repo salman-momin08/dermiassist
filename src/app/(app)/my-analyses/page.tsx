@@ -83,6 +83,7 @@ export default function MyAnalysesPage() {
             yPos += 7;
 
             // --- Analysis Details ---
+            pdf.setFontSize(12);
             pdf.setFont('helvetica', 'bold');
             pdf.text('Analysis Details', margin, yPos);
             yPos += 7;
@@ -131,10 +132,6 @@ export default function MyAnalysesPage() {
 
                 if (analysis.submittedInfo?.proformaAnswers && analysis.submittedInfo.proformaAnswers.length > 0) {
                     analysis.submittedInfo.proformaAnswers.forEach(qa => {
-                        if (textY > yPos + imgHeight) { // Move to left column if text overflows image height
-                            textX = margin;
-                            textY = yPos + imgHeight + 10;
-                        }
                         pdf.setFont('helvetica', 'bold');
                         const question = pdf.splitTextToSize(`Q: ${qa.question}`, textMaxWidth);
                         pdf.text(question, textX, textY);
@@ -148,10 +145,12 @@ export default function MyAnalysesPage() {
                 } else {
                      pdf.setFont('helvetica', 'normal');
                      pdf.text("No additional information was provided for this analysis.", textX, textY);
+                     textY += 10;
                 }
 
-                yPos += imgHeight + 10; // Move yPos down past image
-
+                // Determine the correct Y position for the next section
+                let contentBottomY = Math.max(yPos + imgHeight, textY);
+                yPos = contentBottomY + 10;
 
                 // --- Recommendations ---
                 checkAndSwitchPage(20);
@@ -178,7 +177,7 @@ export default function MyAnalysesPage() {
                     checkAndSwitchPage(5);
                     const itemText = pdf.splitTextToSize(`- ${item}`, pageWidth - (margin * 2) - 5);
                     pdf.text(itemText, margin + 5, yPos);
-                    yPos += itemText.length * 4;
+                    yPos += itemText.length * 4 + 2;
                 });
                 
                 yPos += 5;
@@ -193,7 +192,7 @@ export default function MyAnalysesPage() {
                     checkAndSwitchPage(5);
                     const itemText = pdf.splitTextToSize(`- ${item}`, pageWidth - (margin * 2) - 5);
                     pdf.text(itemText, margin + 5, yPos);
-                    yPos += itemText.length * 4;
+                    yPos += itemText.length * 4 + 2;
                 });
 
                 pdf.save(`SkinWise-Report-${analysis.id}.pdf`);
@@ -326,5 +325,3 @@ export default function MyAnalysesPage() {
         </div>
     )
 }
-
-    
