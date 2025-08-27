@@ -13,9 +13,6 @@ import { Separator } from '@/components/ui/separator';
 import { generateChatReply } from '@/ai/flows/generate-chat-reply';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { useChat } from '@/hooks/use-chat';
-import { collection, query, where, getDocs, onSnapshot, getDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 
@@ -26,61 +23,25 @@ type Patient = {
     online: boolean;
 };
 
+type Message = {
+    sender: 'user' | 'doctor';
+    text?: string;
+    imageUrl?: string;
+};
+
 export default function DoctorChatPage() {
   const { user } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [isLoadingPatients, setIsLoadingPatients] = useState(true);
+  const [isLoadingPatients, setIsLoadingPatients] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  const { messages, sendMessage, isLoadingMessages } = useChat(selectedPatientId, user?.uid);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [suggestedReplies, setSuggestedReplies] = useState<string[]>([]);
   const [isGeneratingReplies, setIsGeneratingReplies] = useState(false);
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const chatsRef = collection(db, 'chats');
-    const q = query(chatsRef, where('participants', 'array-contains', user.uid));
-
-    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-        const patientIds = new Set<string>();
-        querySnapshot.forEach(doc => {
-            const participants = doc.data().participants as string[];
-            const patientId = participants.find(p => p !== user.uid);
-            if (patientId) {
-                patientIds.add(patientId);
-            }
-        });
-
-        if (patientIds.size > 0) {
-            const patientPromises = Array.from(patientIds).map(id => getDoc(doc(db, 'users', id)));
-            const patientDocs = await Promise.all(patientPromises);
-            
-            const fetchedPatients: Patient[] = patientDocs
-                .filter(doc => doc.exists())
-                .map(doc => {
-                    const data = doc.data();
-                    return {
-                        id: doc.id,
-                        name: data.displayName || 'Patient',
-                        avatar: data.photoURL || `https://placehold.co/100x100.png?text=${(data.displayName || 'P').charAt(0)}`,
-                        online: data.online || false,
-                    };
-            });
-            setPatients(fetchedPatients);
-            if (fetchedPatients.length > 0 && !selectedPatientId) {
-                setSelectedPatientId(fetchedPatients[0].id);
-            }
-        }
-        setIsLoadingPatients(false);
-    });
-
-    return () => unsubscribe();
-  }, [user, selectedPatientId]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -96,7 +57,8 @@ export default function DoctorChatPage() {
 
   const handleSendMessage = () => {
     if (!inputValue.trim() || !user || !selectedPatientId) return;
-    sendMessage(inputValue);
+    const newMessage: Message = { sender: 'doctor', text: inputValue };
+    setMessages(prev => [...prev, newMessage]);
     setInputValue("");
     setSuggestedReplies([]);
   };
@@ -106,8 +68,8 @@ export default function DoctorChatPage() {
     setIsGeneratingReplies(true);
     setSuggestedReplies([]);
     
-    const conversationHistory = messages.map(m => `${m.senderId === user?.uid ? 'Doctor' : selectedPatient.name}: ${m.text}`).join('\n');
-    const lastPatientMessage = messages.filter(m => m.senderId !== user?.uid).pop()?.text;
+    const conversationHistory = messages.map(m => `${m.sender === 'doctor' ? 'Doctor' : selectedPatient.name}: ${m.text}`).join('\n');
+    const lastPatientMessage = messages.filter(m => m.sender === 'user').pop()?.text;
 
     if (!lastPatientMessage) {
         toast({
@@ -214,33 +176,27 @@ export default function DoctorChatPage() {
                         </CardHeader>
                         <Separator />
                         <ScrollArea className="h-[50vh] p-6" ref={scrollAreaRef}>
-                             {isLoadingMessages ? (
-                                <div className="flex items-center justify-center h-full">
-                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                </div>
-                            ) : (
-                                <div className="space-y-6">
-                                    {messages.map((msg, index) => (
-                                        <div key={index} className={cn("flex items-end gap-2", msg.senderId === user.uid ? 'justify-end' : 'justify-start')}>
-                                            {msg.senderId !== user.uid && (
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarImage src={selectedPatient.avatar} alt={selectedPatient.name} data-ai-hint="person portrait" />
-                                                    <AvatarFallback>{selectedPatient.name.charAt(0)}</AvatarFallback>
-                                                </Avatar>
-                                            )}
-                                            <div className={cn("max-w-[70%] rounded-xl p-3", msg.senderId === user.uid ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                                {msg.text && <p>{msg.text}</p>}
-                                                {msg.imageUrl && <Image src={msg.imageUrl} alt="attached image" width={200} height={200} className="rounded-md" />}
-                                            </div>
-                                            {msg.senderId === user.uid && (
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarFallback><User /></AvatarFallback>
-                                                </Avatar>
-                                            )}
+                            <div className="space-y-6">
+                                {messages.map((msg, index) => (
+                                    <div key={index} className={cn("flex items-end gap-2", msg.sender === 'doctor' ? 'justify-end' : 'justify-start')}>
+                                        {msg.sender === 'user' && (
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarImage src={selectedPatient.avatar} alt={selectedPatient.name} data-ai-hint="person portrait" />
+                                                <AvatarFallback>{selectedPatient.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                        )}
+                                        <div className={cn("max-w-[70%] rounded-xl p-3", msg.sender === 'doctor' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                            {msg.text && <p>{msg.text}</p>}
+                                            {msg.imageUrl && <Image src={msg.imageUrl} alt="attached image" width={200} height={200} className="rounded-md" />}
                                         </div>
-                                    ))}
-                                </div>
-                            )}
+                                        {msg.sender === 'doctor' && (
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarFallback><User /></AvatarFallback>
+                                            </Avatar>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </ScrollArea>
                         <div className="p-4 border-t space-y-2">
                              {(isGeneratingReplies || suggestedReplies.length > 0) && (
@@ -299,3 +255,5 @@ export default function DoctorChatPage() {
     </div>
   )
 }
+
+    

@@ -11,12 +11,8 @@ import { Search, Send, User, Paperclip, Image as ImageIcon, X, Loader2 } from 'l
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
-import { useChat } from '@/hooks/use-chat';
-import type { Message } from '@/hooks/use-chat';
 
 type Doctor = {
     id: string;
@@ -25,46 +21,26 @@ type Doctor = {
     online: boolean;
 };
 
+type Message = {
+    sender: 'user' | 'doctor';
+    text?: string;
+    imageUrl?: string;
+};
+
+
 export default function ChatPage() {
   const { user } = useAuth();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  const { messages, sendMessage, isLoadingMessages } = useChat(user?.uid, selectedDoctorId);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const q = query(collection(db, "users"), where("role", "==", "doctor"), where("verified", "==", true));
-    
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const fetchedDoctors: Doctor[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            fetchedDoctors.push({
-                id: doc.id,
-                name: data.displayName || "Dr. Anonymous",
-                avatar: data.photoURL || `https://placehold.co/100x100.png?text=${(data.displayName || 'D').charAt(0)}`,
-                online: data.online || false,
-            });
-        });
-        setDoctors(fetchedDoctors);
-        if (fetchedDoctors.length > 0 && !selectedDoctorId) {
-          setSelectedDoctorId(fetchedDoctors[0].id);
-        }
-        setIsLoadingDoctors(false);
-    }, (error) => {
-        console.error("Error fetching doctors:", error);
-        setIsLoadingDoctors(false);
-    });
-
-    return () => unsubscribe();
-  }, [selectedDoctorId]);
-  
   useEffect(() => {
     if (scrollAreaRef.current) {
         scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
@@ -80,7 +56,14 @@ export default function ChatPage() {
   const handleSendMessage = () => {
     if ((!inputValue.trim() && !attachedImage) || !user || !selectedDoctorId) return;
 
-    sendMessage(inputValue, attachedImage);
+    const newMessage: Message = { sender: 'user' };
+    if (inputValue.trim()) {
+        newMessage.text = inputValue.trim();
+    }
+    if (attachedImage) {
+        newMessage.imageUrl = attachedImage;
+    }
+    setMessages(prev => [...prev, newMessage]);
     setInputValue("");
     setAttachedImage(null);
   };
@@ -97,7 +80,6 @@ export default function ChatPage() {
   };
 
   const lastMessageText = (docId: string) => {
-    // This is tricky without fetching all conversations. Let's keep it simple for now.
     return 'Click to view conversation';
   }
 
@@ -177,33 +159,27 @@ export default function ChatPage() {
                         </CardHeader>
                         <Separator />
                         <ScrollArea className="h-[50vh] p-6" ref={scrollAreaRef}>
-                            {isLoadingMessages ? (
-                                <div className="flex items-center justify-center h-full">
-                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                </div>
-                            ) : (
-                                <div className="space-y-6">
-                                    {messages.map((msg, index) => (
-                                        <div key={index} className={cn("flex items-end gap-2", msg.senderId === user.uid ? 'justify-end' : 'justify-start')}>
-                                            {msg.senderId !== user.uid && (
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarImage src={selectedDoctor.avatar} alt={selectedDoctor.name} data-ai-hint="doctor portrait" />
-                                                    <AvatarFallback>{selectedDoctor.name.charAt(0)}</AvatarFallback>
-                                                </Avatar>
-                                            )}
-                                            <div className={cn("max-w-[70%] rounded-xl p-3 space-y-2", msg.senderId === user.uid ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                                {msg.text && <p>{msg.text}</p>}
-                                                {msg.imageUrl && <Image src={msg.imageUrl} alt="attached image" width={200} height={200} className="rounded-md" />}
-                                            </div>
-                                            {msg.senderId === user.uid && (
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarFallback><User /></AvatarFallback>
-                                                </Avatar>
-                                            )}
+                            <div className="space-y-6">
+                                {messages.map((msg, index) => (
+                                    <div key={index} className={cn("flex items-end gap-2", msg.sender === 'user' ? 'justify-end' : 'justify-start')}>
+                                        {msg.sender !== 'user' && (
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarImage src={selectedDoctor.avatar} alt={selectedDoctor.name} data-ai-hint="doctor portrait" />
+                                                <AvatarFallback>{selectedDoctor.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                        )}
+                                        <div className={cn("max-w-[70%] rounded-xl p-3 space-y-2", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                            {msg.text && <p>{msg.text}</p>}
+                                            {msg.imageUrl && <Image src={msg.imageUrl} alt="attached image" width={200} height={200} className="rounded-md" />}
                                         </div>
-                                    ))}
-                                </div>
-                            )}
+                                        {msg.sender === 'user' && (
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarFallback><User /></AvatarFallback>
+                                            </Avatar>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </ScrollArea>
                         <div className="p-4 border-t space-y-2">
                              {attachedImage && (
@@ -255,3 +231,5 @@ export default function ChatPage() {
     </div>
   )
 }
+
+    
