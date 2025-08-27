@@ -5,7 +5,6 @@ import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { CalendarCheck, Users, FileText, Bot, Loader2, BookUser, ShieldAlert } from "lucide-react"
 import { generateAiReportSummary } from "@/ai/flows/generate-ai-report-summary"
@@ -15,65 +14,86 @@ import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import Link from "next/link"
 import { useAuth } from "@/hooks/use-auth"
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { format } from "date-fns"
 
-// In a real app, this would be fetched from Firestore
-const initialAppointments: any[] = [
-    {
-      id: "APP001",
-      patientName: "John Smith",
-      mode: "Online",
-      requestDate: "2024-08-26",
-      status: "Pending",
-      reportId: "REP001",
-      reportCondition: "Acne Vulgaris",
-      reportFullText:
-        "The patient presents with moderate acne vulgaris on the face, primarily comedonal with some inflammatory papules. Pre-medication: None. Duration: 6 months. The analysis suggests a combination therapy of topical retinoids and benzoyl peroxide.",
-      previousNotes: "First consultation.",
-    },
-    {
-      id: "APP002",
-      patientName: "Emily White",
-      mode: "Offline",
-      requestDate: "2024-08-25",
-      status: "Pending",
-      reportId: "REP002",
-      reportCondition: "Eczema",
-      reportFullText:
-        "The patient has chronic atopic dermatitis on her hands. Pre-medication: OTC hydrocortisone. Duration: 2 years. The AI recommends a stronger topical steroid and consistent use of emollients.",
-      previousNotes:
-        "Patient has a history of seasonal flare-ups. Previous treatment with OTC creams had limited success.",
-    },
-];
-
-const mockDashboardStats = {
-    totalPatients: 124,
-    newPatientsThisMonth: 12,
-    reportsToReview: 5,
+type Appointment = {
+    id: string;
+    patientName: string;
+    mode: string;
+    requestDate: { seconds: number, nanoseconds: number };
+    status: 'Pending' | 'Confirmed' | 'Declined' | 'Completed';
+    attachedReport?: {
+        condition: string;
+        recommendations: string;
+    };
+    [key: string]: any;
 };
 
-
 export default function DoctorDashboardPage() {
-    const { userData, loading: authLoading } = useAuth();
+    const { user, userData, loading: authLoading } = useAuth();
     const [summary, setSummary] = useState('');
     const [caseFile, setCaseFile] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
-    const [appointments, setAppointments] = useState(initialAppointments);
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
     const [activeDialog, setActiveDialog] = useState<'summary' | 'caseFile' | null>(null);
     const { toast } = useToast();
 
-    const pendingRequests = useMemo(() => {
-        return appointments.filter(a => a.status === 'Pending');
+    useEffect(() => {
+        if (!user) return;
+
+        setIsLoadingAppointments(true);
+        const q = query(collection(db, "appointments"), where("doctorId", "==", user.uid));
+        
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedAppointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+            setAppointments(fetchedAppointments);
+            setIsLoadingAppointments(false);
+        }, (error) => {
+            console.error("Error fetching appointments:", error);
+            toast({ title: "Error", description: "Could not fetch appointments.", variant: "destructive" });
+            setIsLoadingAppointments(false);
+        });
+
+        return () => unsubscribe();
+
+    }, [user, toast]);
+
+    const { pendingRequests, dashboardStats } = useMemo(() => {
+        const pending = appointments.filter(a => a.status === 'Pending');
+        const patientIds = new Set(appointments.map(a => a.patientId));
+        
+        const stats = {
+            pendingCount: pending.length,
+            totalPatients: patientIds.size,
+            reportsToReview: appointments.filter(a => a.attachedReport).length,
+        };
+
+        return { pendingRequests: pending, dashboardStats: stats };
     }, [appointments]);
 
-    const handleRequest = (id: string, newStatus: 'Approved' | 'Declined') => {
-        setAppointments(prev => prev.filter(app => app.id !== id));
-        toast({
-            title: `Request ${newStatus}`,
-            description: `The appointment request has been ${newStatus.toLowerCase()}.`,
-        });
+
+    const handleRequest = async (id: string, newStatus: 'Confirmed' | 'Declined') => {
+        const appointmentRef = doc(db, 'appointments', id);
+        try {
+            await updateDoc(appointmentRef, { status: newStatus });
+            toast({
+                title: `Request ${newStatus}`,
+                description: `The appointment request has been ${newStatus.toLowerCase()}.`,
+            });
+        } catch (error) {
+            console.error(`Failed to ${newStatus.toLowerCase()} request:`, error);
+            toast({ title: "Update Failed", description: `Could not ${newStatus.toLowerCase()} the request.`, variant: "destructive" });
+        }
     };
 
-    const handleGenerateSummary = async (reportText: string) => {
+    const handleGenerateSummary = async (reportText: string | undefined) => {
+        if (!reportText) {
+            setSummary("No report was attached to this appointment request.");
+            return;
+        }
         setIsGenerating(true);
         setSummary('');
         try {
@@ -87,15 +107,15 @@ export default function DoctorDashboardPage() {
         }
     };
     
-    const handleGenerateCaseFile = async (app: typeof appointments[0]) => {
+    const handleGenerateCaseFile = async (app: Appointment) => {
         setIsGenerating(true);
         setCaseFile('');
         try {
             const result = await generateCaseFileSummary({
                 patientName: app.patientName,
-                reportCondition: app.reportCondition,
-                reportFullText: app.reportFullText,
-                previousNotes: app.previousNotes,
+                reportCondition: app.attachedReport?.condition || "N/A",
+                reportFullText: app.attachedReport?.recommendations || "No report attached.",
+                previousNotes: app.previousNotes || "No previous notes.",
             });
             setCaseFile(result.summary);
         } catch (error) {
@@ -148,7 +168,7 @@ export default function DoctorDashboardPage() {
                         <CalendarCheck className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{pendingRequests.length}</div>
+                        <div className="text-2xl font-bold">{dashboardStats.pendingCount}</div>
                         <p className="text-xs text-muted-foreground">New appointment requests await your review.</p>
                     </CardContent>
                 </Card>
@@ -158,8 +178,8 @@ export default function DoctorDashboardPage() {
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{mockDashboardStats.totalPatients}</div>
-                        <p className="text-xs text-muted-foreground">+{mockDashboardStats.newPatientsThisMonth} this month</p>
+                        <div className="text-2xl font-bold">{dashboardStats.totalPatients}</div>
+                        <p className="text-xs text-muted-foreground">Patients who have booked appointments.</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -168,7 +188,7 @@ export default function DoctorDashboardPage() {
                         <FileText className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{mockDashboardStats.reportsToReview}</div>
+                        <div className="text-2xl font-bold">{dashboardStats.reportsToReview}</div>
                         <p className="text-xs text-muted-foreground">From new and existing patients.</p>
                     </CardContent>
                 </Card>
@@ -190,18 +210,24 @@ export default function DoctorDashboardPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {pendingRequests.length > 0 ? pendingRequests.map(app => (
+                            {isLoadingAppointments ? (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center h-24">
+                                        <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                                    </TableCell>
+                                </TableRow>
+                            ) : pendingRequests.length > 0 ? pendingRequests.map(app => (
                                 <TableRow key={app.id}>
                                     <TableCell>
                                         <div className="font-medium">{app.patientName}</div>
                                         <div className="text-sm text-muted-foreground">{app.mode}</div>
                                     </TableCell>
-                                    <TableCell className="hidden sm:table-cell">{app.requestDate}</TableCell>
+                                    <TableCell className="hidden sm:table-cell">{format(new Date(app.requestDate.seconds * 1000), 'PP')}</TableCell>
                                     <TableCell>
                                         <Dialog onOpenChange={(open) => !open && closeDialog()}>
                                             <div className="flex items-center gap-2">
                                                 <DialogTrigger asChild>
-                                                    <Button variant="outline" size="sm" onClick={() => { setActiveDialog('summary'); handleGenerateSummary(app.reportFullText); }}>
+                                                    <Button variant="outline" size="sm" onClick={() => { setActiveDialog('summary'); handleGenerateSummary(app.attachedReport?.recommendations); }}>
                                                         <Bot className="mr-2 h-4 w-4" />
                                                         AI Summary
                                                     </Button>
@@ -217,7 +243,7 @@ export default function DoctorDashboardPage() {
                                                 <DialogHeader>
                                                     <DialogTitle>
                                                         {activeDialog === 'summary' 
-                                                            ? `AI Report Summary: ${app.reportCondition}`
+                                                            ? `AI Report Summary: ${app.attachedReport?.condition || 'N/A'}`
                                                             : `Case File: ${app.patientName}`
                                                         }
                                                     </DialogTitle>
@@ -244,7 +270,7 @@ export default function DoctorDashboardPage() {
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Button size="sm" variant="destructive" onClick={() => handleRequest(app.id, 'Declined')}>Decline</Button>
-                                        <Button size="sm" onClick={() => handleRequest(app.id, 'Approved')}>Approve</Button>
+                                        <Button size="sm" onClick={() => handleRequest(app.id, 'Confirmed')}>Approve</Button>
                                     </TableCell>
                                 </TableRow>
                             )) : (
