@@ -21,7 +21,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   WandSparkles,
-  MessageSquareQuestion,
+  MessageCircleQuestion,
 } from "lucide-react";
 import Image from "next/image";
 import { finalEvaluation } from "@/ai/flows/final-evaluation";
@@ -240,7 +240,7 @@ export default function AnalyzePage() {
                  {proformaQuestions.map((question, index) => (
                     <div key={index} className="space-y-2">
                         <Label htmlFor={`question-${index}`} className="flex items-start gap-2">
-                          <MessageSquareQuestion className="h-4 w-4 mt-1 flex-shrink-0" />
+                          <MessageCircleQuestion className="h-4 w-4 mt-1 flex-shrink-0" />
                           <span>{question}</span>
                         </Label>
                         <Textarea 
