@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video } from "lucide-react";
+import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -359,6 +359,25 @@ export default function AnalysisDetailPage() {
                              <p className="text-muted-foreground leading-relaxed">{analysis.recommendations}</p>
                         </CardContent>
                     </Card>
+
+                    {analysis.submittedInfo?.otherConsiderations && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <BrainCircuit className="h-6 w-6 text-primary" />
+                                    Deeper Analysis & Other Considerations
+                                </CardTitle>
+                                <CardDescription>
+                                    Based on your answers, the AI has provided further insights.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                                    {analysis.submittedInfo.otherConsiderations}
+                                </p>
+                            </CardContent>
+                        </Card>
+                    )}
 
                      <div className="grid md:grid-cols-2 gap-6">
                         <Card className="border-green-500/50 dark:border-green-500/50">
