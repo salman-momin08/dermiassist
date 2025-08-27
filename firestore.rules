@@ -1,23 +1,18 @@
-
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Rules from previous turn
+    // Grant admin users read access to the entire users collection
     match /users/{userId} {
+      allow list: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      
+      // Allow users to read/write their own data
       allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
 
+      // Allow users to manage their own analyses subcollection
       match /analyses/{analysisId} {
         allow read, write, delete: if request.auth != null && request.auth.uid == userId;
       }
     }
-    
-    // New rule to allow user creation during signup
-    // A user can create their own user document if the document ID matches their UID.
-    match /users/{userId} {
-       allow create: if request.auth != null && request.auth.uid == userId;
-    }
   }
 }
-
-    
