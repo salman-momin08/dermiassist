@@ -7,12 +7,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Send, User, Paperclip, Image as ImageIcon, X } from 'lucide-react';
+import { Search, Send, User, Paperclip, Image as ImageIcon, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const mockDoctors: any[] = [];
+type Doctor = {
+    id: string;
+    name: string;
+    avatar: string;
+    online: boolean;
+};
 
 type Message = {
     sender: 'patient' | 'doctor';
@@ -24,6 +32,8 @@ const mockMessages: Record<string, Message[]> = {};
 
 
 export default function ChatPage() {
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState(mockMessages);
@@ -32,15 +42,36 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (mockDoctors.length > 0) {
-      setSelectedDoctorId(mockDoctors[0].id);
-    }
-  }, []);
+    const q = query(collection(db, "users"), where("role", "==", "doctor"), where("verified", "==", true));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedDoctors: Doctor[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            fetchedDoctors.push({
+                id: doc.id,
+                name: data.displayName || "Dr. Anonymous",
+                avatar: data.photoURL || `https://placehold.co/100x100.png?text=${(data.displayName || 'D').charAt(0)}`,
+                online: data.online || false, // Assuming an 'online' field
+            });
+        });
+        setDoctors(fetchedDoctors);
+        if (fetchedDoctors.length > 0 && !selectedDoctorId) {
+          setSelectedDoctorId(fetchedDoctors[0].id);
+        }
+        setIsLoadingDoctors(false);
+    }, (error) => {
+        console.error("Error fetching doctors:", error);
+        setIsLoadingDoctors(false);
+    });
 
-  const selectedDoctor = mockDoctors.find(p => p.id === selectedDoctorId);
+    return () => unsubscribe();
+  }, [selectedDoctorId]);
+
+  const selectedDoctor = doctors.find(p => p.id === selectedDoctorId);
   const currentMessages = selectedDoctorId ? messages[selectedDoctorId as keyof typeof messages] || [] : [];
 
-  const filteredDoctors = mockDoctors.filter(p =>
+  const filteredDoctors = doctors.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -106,7 +137,19 @@ export default function ChatPage() {
                 </CardHeader>
                 <ScrollArea className="h-[50vh]">
                     <CardContent className="p-0">
-                        {filteredDoctors.length > 0 ? (
+                        {isLoadingDoctors ? (
+                             <div className="p-4 space-y-4">
+                                {Array.from({ length: 3 }).map((_, i) => (
+                                    <div key={i} className="flex items-center gap-4">
+                                        <Skeleton className="h-10 w-10 rounded-full" />
+                                        <div className="space-y-2 flex-grow">
+                                            <Skeleton className="h-4 w-3/4" />
+                                            <Skeleton className="h-3 w-1/2" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : filteredDoctors.length > 0 ? (
                             <div className="space-y-2">
                                 {filteredDoctors.map(doctor => (
                                     <button key={doctor.id} onClick={() => setSelectedDoctorId(doctor.id)} className={cn("w-full text-left p-4 hover:bg-muted/50", selectedDoctorId === doctor.id && "bg-muted")}>
@@ -204,8 +247,15 @@ export default function ChatPage() {
                         </div>
                     </>
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-12">
-                        <p>Select a doctor to start a conversation</p>
+                    <div className="flex flex-col items-center justify-center h-[calc(50vh+144px)] text-muted-foreground p-12 text-center">
+                        {isLoadingDoctors ? (
+                            <>
+                                <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                                <p>Loading doctors...</p>
+                            </>
+                        ) : (
+                           <p>Select a doctor to start a conversation</p>
+                        )}
                     </div>
                 )}
             </Card>
