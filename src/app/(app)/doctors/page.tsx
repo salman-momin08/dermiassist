@@ -225,7 +225,7 @@ export default function DoctorsPage() {
                                                         ) : (
                                                           analyses.map(a => (
                                                               <SelectItem key={a.id} value={a.id}>
-                                                                  {a.condition} - {new Date(a.date).toLocaleDateString()}
+                                                                  {a.condition} - {new Date(a.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                                                               </SelectItem>
                                                           ))
                                                         )}
