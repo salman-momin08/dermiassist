@@ -165,7 +165,7 @@ export default function DoctorsPage() {
                 requestDate: serverTimestamp(),
                 ...formState,
                 preferredDate: formState.preferredDate ? formState.preferredDate.toISOString() : null,
-                attachedReport: attachedReport ? { condition: attachedReport.condition, recommendations: attachedReport.recommendations } : null,
+                attachedReport: attachedReport ? { condition: attachedReport.condition, recommendations: attachedReport.recommendations, conditionName: attachedReport.conditionName } : null,
             });
 
             toast({
@@ -363,7 +363,7 @@ export default function DoctorsPage() {
                                                     <SelectContent>
                                                         {analyses.map(analysis => (
                                                             <SelectItem key={analysis.id} value={analysis.id}>
-                                                                {`${analysis.condition} - ${format(new Date(analysis.date), "MMM d, yyyy")}`}
+                                                                {`${analysis.conditionName} - ${format(new Date(analysis.date), "MMM d, yyyy")}`}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>

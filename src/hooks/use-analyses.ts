@@ -11,6 +11,7 @@ export interface AnalysisReport {
     id: string;
     userId: string;
     userName: string;
+    conditionName: string;
     condition: string;
     date: string;
     severity: string;

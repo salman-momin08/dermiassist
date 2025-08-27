@@ -88,6 +88,7 @@ export default function AnalyzePage() {
 
       const newReport = await addAnalysis(user.uid, userData.displayName || "Anonymous", {
         condition: result.condition,
+        conditionName: result.conditionName,
         image: preview,
         recommendations: result.recommendations,
         dos: result.dos,

@@ -11,6 +11,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
 
 const chartData: any[] = [];
 
@@ -181,12 +182,12 @@ export default function DashboardPage() {
                     dashboardStats.recentAnalyses.map(analysis => (
                        <TableRow key={analysis.id}>
                           <TableCell>
-                              <div className="font-medium">{analysis.condition}</div>
+                              <div className="font-medium">{analysis.conditionName}</div>
                               <div className="hidden text-sm text-muted-foreground md:inline">
                                   {analysis.severity}
                               </div>
                           </TableCell>
-                          <TableCell className="text-right">{analysis.date}</TableCell>
+                          <TableCell className="text-right">{format(new Date(analysis.date), "MMM d, yyyy")}</TableCell>
                       </TableRow>
                     ))
                   ) : (

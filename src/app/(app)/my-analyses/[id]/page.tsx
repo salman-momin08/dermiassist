@@ -97,7 +97,7 @@ export default function AnalysisDetailPage() {
             const result = await visualProgressAnalysis({
                 originalPhotoDataUri: analysis.image,
                 newPhotoDataUri: progressImage,
-                condition: analysis.condition,
+                condition: analysis.conditionName,
             });
             setProgressSummary(result.progressSummary);
         } catch (err) {
@@ -199,10 +199,10 @@ export default function AnalysisDetailPage() {
             yPos += 7;
             pdf.text(`Condition Identified:`, margin, yPos);
             yPos += 5;
-            pdf.setFont('helvetica', 'normal');
-            const conditionText = pdf.splitTextToSize(analysis.condition, pageWidth - (margin * 2) - 5);
-            pdf.text(conditionText, margin + 5, yPos);
-            yPos += conditionText.length * 5 + 5;
+            pdf.setFont('helvetica', 'bold');
+            const conditionNameText = pdf.splitTextToSize(analysis.conditionName, pageWidth - (margin * 2) - 5);
+            pdf.text(conditionNameText, margin + 5, yPos);
+            yPos += conditionNameText.length * 5 + 5;
             
             pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
             yPos += 7;
@@ -334,10 +334,12 @@ export default function AnalysisDetailPage() {
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-3xl font-headline">Analysis Report: {analysis.condition}</CardTitle>
+                            <CardTitle className="text-3xl font-headline">Analysis Report: {analysis.conditionName}</CardTitle>
                             <CardDescription>Generated on {new Date(analysis.date).toLocaleDateString()}</CardDescription>
                         </CardHeader>
                         <CardContent>
+                             <h3 className="font-semibold text-lg mb-2">About {analysis.conditionName}</h3>
+                             <p className="text-muted-foreground leading-relaxed mb-4">{analysis.condition}</p>
                              <h3 className="font-semibold text-xl mb-4 text-primary">Expert Recommendations</h3>
                              <p className="text-muted-foreground leading-relaxed">{analysis.recommendations}</p>
                         </CardContent>

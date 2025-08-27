@@ -94,10 +94,10 @@ export default function MyAnalysesPage() {
             pdf.setFont('helvetica', 'bold');
             pdf.text(`Condition Identified:`, margin, yPos);
             yPos += 5;
-            pdf.setFont('helvetica', 'normal');
-            const conditionText = pdf.splitTextToSize(analysis.condition, pageWidth - (margin * 2) - 5);
-            pdf.text(conditionText, margin + 5, yPos);
-            yPos += conditionText.length * 5 + 5;
+            pdf.setFont('helvetica', 'bold');
+            const conditionNameText = pdf.splitTextToSize(analysis.conditionName, pageWidth - (margin * 2) - 5);
+            pdf.text(conditionNameText, margin + 5, yPos);
+            yPos += conditionNameText.length * 5 + 5;
             
             pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
             yPos += 7;
@@ -251,7 +251,7 @@ export default function MyAnalysesPage() {
                                                 data-ai-hint="skin condition"
                                             />
                                         </TableCell>
-                                        <TableCell className="font-medium">{analysis.condition}</TableCell>
+                                        <TableCell className="font-medium">{analysis.conditionName}</TableCell>
                                         <TableCell>{new Date(analysis.date).toLocaleDateString()}</TableCell>
                                         <TableCell className="hidden md:table-cell">{analysis.severity}</TableCell>
                                         <TableCell className="text-right">
