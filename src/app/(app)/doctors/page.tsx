@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, ShieldCheck, Star, Loader2, CalendarIcon, Upload } from "lucide-react";
+import { MapPin, ShieldCheck, Star, Loader2, CalendarIcon, Upload, User, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -17,13 +17,14 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'f
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 
 type Doctor = {
     id: string;
@@ -34,6 +35,7 @@ type Doctor = {
     location: string;
     rating: number;
     reviews: number;
+    bio?: string;
     [key: string]: any;
 };
 
@@ -50,6 +52,7 @@ type AppointmentFormState = {
     isEmergency: boolean;
     consentData: boolean;
     agreeTerms: boolean;
+    attachedReportId: string;
 };
 
 const initialFormState: AppointmentFormState = {
@@ -65,12 +68,19 @@ const initialFormState: AppointmentFormState = {
     isEmergency: false,
     consentData: false,
     agreeTerms: false,
+    attachedReportId: '',
 };
+
+const timeSlots = [
+    '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+    '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'
+];
 
 
 export default function DoctorsPage() {
     const { user, userData } = useAuth();
     const { toast } = useToast();
+    const { analyses } = useAnalyses();
     const [openDialog, setOpenDialog] = useState<string | null>(null);
     const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
@@ -98,6 +108,7 @@ export default function DoctorsPage() {
                     verified: data.verified,
                     specialization: data.specialization || "Dermatology",
                     location: data.location || "Not specified",
+                    bio: data.bio,
                     // Mocking rating and reviews as they are not in the DB
                     rating: 4.9, 
                     reviews: 120,
@@ -135,11 +146,11 @@ export default function DoctorsPage() {
         }
         setIsRequesting(true);
 
+        const attachedReport = formState.attachedReportId 
+            ? analyses.find(a => a.id === formState.attachedReportId) 
+            : null;
+
         try {
-            // Note: In a real app, file uploads would be handled here, uploading to a service like Cloudinary or Firebase Storage
-            // and getting back URLs to store in the appointment document.
-            // For this prototype, we are just capturing the form data.
-            
             await addDoc(collection(db, "appointments"), {
                 patientId: user.uid,
                 patientName: userData.displayName,
@@ -152,6 +163,7 @@ export default function DoctorsPage() {
                 requestDate: serverTimestamp(),
                 ...formState,
                 preferredDate: formState.preferredDate ? formState.preferredDate.toISOString() : null,
+                attachedReport: attachedReport ? { condition: attachedReport.condition, recommendations: attachedReport.recommendations } : null,
             });
 
             toast({
@@ -226,7 +238,44 @@ export default function DoctorsPage() {
                                     </div>
                                 </div>
                             </CardContent>
-                            <CardFooter>
+                            <CardFooter className="flex flex-col gap-2">
+                                 <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button className="w-full" variant="outline">
+                                            <User className="mr-2" /> View Profile
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-lg">
+                                        <DialogHeader className="items-center text-center">
+                                            <Avatar className="w-24 h-24 mb-4">
+                                                <AvatarImage src={doctor.avatar} alt={doctor.name} data-ai-hint="doctor portrait" />
+                                                <AvatarFallback>{doctor.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            <DialogTitle className="flex items-center gap-2 text-2xl">
+                                                {doctor.name}
+                                                {doctor.verified && <ShieldCheck className="h-6 w-6 text-primary" />}
+                                            </DialogTitle>
+                                            <DialogDescription>{doctor.specialization}</DialogDescription>
+                                        </DialogHeader>
+                                        <div className="py-4 space-y-4">
+                                            <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                                                <div className="flex items-center gap-1">
+                                                    <MapPin className="h-4 w-4" />
+                                                    {doctor.location}
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                                                    {doctor.rating} ({doctor.reviews} reviews)
+                                                </div>
+                                            </div>
+                                            <Separator />
+                                            <div>
+                                                <h4 className="font-semibold mb-2">Professional Bio</h4>
+                                                <p className="text-sm text-muted-foreground">{doctor.bio || "No biography provided."}</p>
+                                            </div>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
                                 <Dialog open={openDialog === doctor.id} onOpenChange={(isOpen) => {setOpenDialog(isOpen ? doctor.id : null); if (!isOpen) resetForm(); }}>
                                     <DialogTrigger asChild>
                                         <Button className="w-full">Request Appointment</Button>
@@ -256,8 +305,13 @@ export default function DoctorsPage() {
                                                     </Popover>
                                                 </div>
                                                 <div className="space-y-2">
-                                                     <Label>Preferred Time</Label>
-                                                     <Input type="time" value={formState.preferredTime} onChange={(e) => handleFormChange('preferredTime', e.target.value)} />
+                                                    <Label>Preferred Time</Label>
+                                                    <Select value={formState.preferredTime} onValueChange={(v) => handleFormChange('preferredTime', v)}>
+                                                        <SelectTrigger><SelectValue placeholder="Select a time" /></SelectTrigger>
+                                                        <SelectContent>
+                                                            {timeSlots.map(time => <SelectItem key={time} value={time}>{time}</SelectItem>)}
+                                                        </SelectContent>
+                                                    </Select>
                                                 </div>
                                             </div>
 
@@ -289,6 +343,20 @@ export default function DoctorsPage() {
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
+                                            </div>
+                                            
+                                            <div className="space-y-2">
+                                                <Label>Attach AI Report (optional)</Label>
+                                                <Select value={formState.attachedReportId} onValueChange={(v) => handleFormChange('attachedReportId', v)}>
+                                                    <SelectTrigger><SelectValue placeholder="Select a past analysis report" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {analyses.map(analysis => (
+                                                            <SelectItem key={analysis.id} value={analysis.id}>
+                                                                {analysis.condition} - {format(new Date(analysis.date), "MMM d, yyyy")}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
 
                                              <div className="space-y-2">
