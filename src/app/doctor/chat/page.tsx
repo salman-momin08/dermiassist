@@ -1,10 +1,10 @@
 
 "use client"
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, Send, User, Sparkles, Loader2 } from 'lucide-react';
@@ -12,43 +12,91 @@ import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { generateChatReply } from '@/ai/flows/generate-chat-reply';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { useChat } from '@/hooks/use-chat';
+import { collection, query, where, getDocs, onSnapshot, getDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
+import Image from 'next/image';
 
-const mockPatients: any[] = [];
-
-const mockMessages: Record<string, { sender: 'patient' | 'doctor'; text: string }[]> = {};
-
+type Patient = {
+    id: string;
+    name: string;
+    avatar: string;
+    online: boolean;
+};
 
 export default function DoctorChatPage() {
+  const { user } = useAuth();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [isLoadingPatients, setIsLoadingPatients] = useState(true);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [messages, setMessages] = useState(mockMessages);
+  
+  const { messages, sendMessage, isLoadingMessages } = useChat(selectedPatientId, user?.uid);
   const [inputValue, setInputValue] = useState("");
   const [suggestedReplies, setSuggestedReplies] = useState<string[]>([]);
   const [isGeneratingReplies, setIsGeneratingReplies] = useState(false);
   const { toast } = useToast();
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (mockPatients.length > 0) {
-      setSelectedPatientId(mockPatients[0].id);
+    if (!user) return;
+
+    const chatsRef = collection(db, 'chats');
+    const q = query(chatsRef, where('participants', 'array-contains', user.uid));
+
+    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+        const patientIds = new Set<string>();
+        querySnapshot.forEach(doc => {
+            const participants = doc.data().participants as string[];
+            const patientId = participants.find(p => p !== user.uid);
+            if (patientId) {
+                patientIds.add(patientId);
+            }
+        });
+
+        if (patientIds.size > 0) {
+            const patientPromises = Array.from(patientIds).map(id => getDoc(doc(db, 'users', id)));
+            const patientDocs = await Promise.all(patientPromises);
+            
+            const fetchedPatients: Patient[] = patientDocs
+                .filter(doc => doc.exists())
+                .map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        name: data.displayName || 'Patient',
+                        avatar: data.photoURL || `https://placehold.co/100x100.png?text=${(data.displayName || 'P').charAt(0)}`,
+                        online: data.online || false,
+                    };
+            });
+            setPatients(fetchedPatients);
+            if (fetchedPatients.length > 0 && !selectedPatientId) {
+                setSelectedPatientId(fetchedPatients[0].id);
+            }
+        }
+        setIsLoadingPatients(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, selectedPatientId]);
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+        scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, []);
+  }, [messages]);
 
-  const selectedPatient = mockPatients.find(p => p.id === selectedPatientId);
-  const currentMessages = selectedPatientId ? messages[selectedPatientId as keyof typeof messages] || [] : [];
+  const selectedPatient = patients.find(p => p.id === selectedPatientId);
 
-  const filteredPatients = mockPatients.filter(p =>
+  const filteredPatients = patients.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSendMessage = () => {
-    if (!inputValue.trim() || !selectedPatientId) return;
-
-    const newMessage = { sender: 'doctor' as const, text: inputValue };
-    const updatedMessages = {
-      ...messages,
-      [selectedPatientId]: [...currentMessages, newMessage],
-    };
-    setMessages(updatedMessages);
+    if (!inputValue.trim() || !user || !selectedPatientId) return;
+    sendMessage(inputValue);
     setInputValue("");
     setSuggestedReplies([]);
   };
@@ -58,8 +106,8 @@ export default function DoctorChatPage() {
     setIsGeneratingReplies(true);
     setSuggestedReplies([]);
     
-    const conversationHistory = currentMessages.map(m => `${m.sender === 'doctor' ? 'Doctor' : selectedPatient.name}: ${m.text}`).join('\n');
-    const lastPatientMessage = currentMessages.filter(m => m.sender === 'patient').pop()?.text;
+    const conversationHistory = messages.map(m => `${m.senderId === user?.uid ? 'Doctor' : selectedPatient.name}: ${m.text}`).join('\n');
+    const lastPatientMessage = messages.filter(m => m.senderId !== user?.uid).pop()?.text;
 
     if (!lastPatientMessage) {
         toast({
@@ -110,9 +158,21 @@ export default function DoctorChatPage() {
                         />
                     </div>
                 </CardHeader>
-                <ScrollArea className="h-[50vh]">
+                <ScrollArea className="h-[60vh]">
                     <CardContent className="p-0">
-                        {filteredPatients.length > 0 ? (
+                        {isLoadingPatients ? (
+                             <div className="p-4 space-y-4">
+                                {Array.from({ length: 3 }).map((_, i) => (
+                                    <div key={i} className="flex items-center gap-4">
+                                        <Skeleton className="h-10 w-10 rounded-full" />
+                                        <div className="space-y-2 flex-grow">
+                                            <Skeleton className="h-4 w-3/4" />
+                                            <Skeleton className="h-3 w-1/2" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : filteredPatients.length > 0 ? (
                             <div className="space-y-2">
                                 {filteredPatients.map(patient => (
                                     <button key={patient.id} onClick={() => { setSelectedPatientId(patient.id); setSuggestedReplies([]); }} className={cn("w-full text-left p-4 hover:bg-muted/50", selectedPatientId === patient.id && "bg-muted")}>
@@ -124,7 +184,7 @@ export default function DoctorChatPage() {
                                             </Avatar>
                                             <div className="flex-grow">
                                                 <p className="font-semibold">{patient.name}</p>
-                                                <p className="text-sm text-muted-foreground truncate">{messages[patient.id]?.slice(-1)[0]?.text || 'No messages yet'}</p>
+                                                <p className="text-sm text-muted-foreground truncate">Click to view conversation</p>
                                             </div>
                                         </div>
                                     </button>
@@ -132,7 +192,7 @@ export default function DoctorChatPage() {
                             </div>
                         ) : (
                             <div className="text-center p-8 text-muted-foreground">
-                                No patients found.
+                                No patient chats found.
                            </div>
                         )}
                     </CardContent>
@@ -140,7 +200,7 @@ export default function DoctorChatPage() {
             </Card>
 
             <Card className="lg:col-span-2">
-                {selectedPatient ? (
+                {selectedPatient && user ? (
                     <>
                         <CardHeader className="flex-row items-center gap-4 space-y-0">
                              <Avatar className="h-12 w-12">
@@ -153,27 +213,34 @@ export default function DoctorChatPage() {
                             </div>
                         </CardHeader>
                         <Separator />
-                        <ScrollArea className="h-[50vh] p-6">
-                            <div className="space-y-6">
-                                {currentMessages.map((msg, index) => (
-                                    <div key={index} className={cn("flex items-end gap-2", msg.sender === 'doctor' ? 'justify-end' : 'justify-start')}>
-                                        {msg.sender === 'patient' && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarImage src={selectedPatient.avatar} alt={selectedPatient.name} data-ai-hint="person portrait" />
-                                                <AvatarFallback>{selectedPatient.name.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                        <div className={cn("max-w-[70%] rounded-xl p-3", msg.sender === 'doctor' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                            <p>{msg.text}</p>
+                        <ScrollArea className="h-[50vh] p-6" ref={scrollAreaRef}>
+                             {isLoadingMessages ? (
+                                <div className="flex items-center justify-center h-full">
+                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {messages.map((msg, index) => (
+                                        <div key={index} className={cn("flex items-end gap-2", msg.senderId === user.uid ? 'justify-end' : 'justify-start')}>
+                                            {msg.senderId !== user.uid && (
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarImage src={selectedPatient.avatar} alt={selectedPatient.name} data-ai-hint="person portrait" />
+                                                    <AvatarFallback>{selectedPatient.name.charAt(0)}</AvatarFallback>
+                                                </Avatar>
+                                            )}
+                                            <div className={cn("max-w-[70%] rounded-xl p-3", msg.senderId === user.uid ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                                {msg.text && <p>{msg.text}</p>}
+                                                {msg.imageUrl && <Image src={msg.imageUrl} alt="attached image" width={200} height={200} className="rounded-md" />}
+                                            </div>
+                                            {msg.senderId === user.uid && (
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarFallback><User /></AvatarFallback>
+                                                </Avatar>
+                                            )}
                                         </div>
-                                        {msg.sender === 'doctor' && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback><User /></AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </ScrollArea>
                         <div className="p-4 border-t space-y-2">
                              {(isGeneratingReplies || suggestedReplies.length > 0) && (
@@ -216,8 +283,15 @@ export default function DoctorChatPage() {
                         </div>
                     </>
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-[calc(50vh+120px)] text-muted-foreground p-12">
-                        <p>Select a patient to start a conversation</p>
+                    <div className="flex flex-col items-center justify-center h-[calc(60vh + 120px)] text-muted-foreground p-12 text-center">
+                         {isLoadingPatients ? (
+                            <>
+                                <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                                <p>Loading patient chats...</p>
+                            </>
+                        ) : (
+                           <p>Select a patient to start a conversation</p>
+                        )}
                     </div>
                 )}
             </Card>

@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, Send, User, Paperclip, Image as ImageIcon, X, Loader2 } from 'lucide-react';
@@ -14,6 +14,9 @@ import Image from 'next/image';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/use-auth';
+import { useChat } from '@/hooks/use-chat';
+import type { Message } from '@/hooks/use-chat';
 
 type Doctor = {
     id: string;
@@ -22,24 +25,18 @@ type Doctor = {
     online: boolean;
 };
 
-type Message = {
-    sender: 'patient' | 'doctor';
-    text?: string;
-    image?: string;
-};
-
-const mockMessages: Record<string, Message[]> = {};
-
-
 export default function ChatPage() {
+  const { user } = useAuth();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [messages, setMessages] = useState(mockMessages);
+  
+  const { messages, sendMessage, isLoadingMessages } = useChat(user?.uid, selectedDoctorId);
   const [inputValue, setInputValue] = useState("");
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const q = query(collection(db, "users"), where("role", "==", "doctor"), where("verified", "==", true));
@@ -52,7 +49,7 @@ export default function ChatPage() {
                 id: doc.id,
                 name: data.displayName || "Dr. Anonymous",
                 avatar: data.photoURL || `https://placehold.co/100x100.png?text=${(data.displayName || 'D').charAt(0)}`,
-                online: data.online || false, // Assuming an 'online' field
+                online: data.online || false,
             });
         });
         setDoctors(fetchedDoctors);
@@ -67,31 +64,23 @@ export default function ChatPage() {
 
     return () => unsubscribe();
   }, [selectedDoctorId]);
+  
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+        scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  }, [messages]);
 
   const selectedDoctor = doctors.find(p => p.id === selectedDoctorId);
-  const currentMessages = selectedDoctorId ? messages[selectedDoctorId as keyof typeof messages] || [] : [];
 
   const filteredDoctors = doctors.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSendMessage = () => {
-    if (!inputValue.trim() && !attachedImage) return;
-    if (!selectedDoctorId) return;
+    if ((!inputValue.trim() && !attachedImage) || !user || !selectedDoctorId) return;
 
-    const newMessage: Message = { sender: 'patient' as const };
-    if (inputValue.trim()) {
-        newMessage.text = inputValue;
-    }
-    if (attachedImage) {
-        newMessage.image = attachedImage;
-    }
-    
-    const updatedMessages = {
-      ...messages,
-      [selectedDoctorId]: [...currentMessages, newMessage],
-    };
-    setMessages(updatedMessages);
+    sendMessage(inputValue, attachedImage);
     setInputValue("");
     setAttachedImage(null);
   };
@@ -108,11 +97,8 @@ export default function ChatPage() {
   };
 
   const lastMessageText = (docId: string) => {
-    const lastMsg = messages[docId]?.slice(-1)[0];
-    if (!lastMsg) return 'No messages yet';
-    if (lastMsg.text) return lastMsg.text;
-    if (lastMsg.image) return 'Sent an image';
-    return '...';
+    // This is tricky without fetching all conversations. Let's keep it simple for now.
+    return 'Click to view conversation';
   }
 
   return (
@@ -135,7 +121,7 @@ export default function ChatPage() {
                         />
                     </div>
                 </CardHeader>
-                <ScrollArea className="h-[50vh]">
+                <ScrollArea className="h-[60vh]">
                     <CardContent className="p-0">
                         {isLoadingDoctors ? (
                              <div className="p-4 space-y-4">
@@ -177,7 +163,7 @@ export default function ChatPage() {
             </Card>
 
             <Card className="lg:col-span-2">
-                {selectedDoctor ? (
+                {selectedDoctor && user ? (
                     <>
                         <CardHeader className="flex-row items-center gap-4 space-y-0">
                              <Avatar className="h-12 w-12">
@@ -190,28 +176,34 @@ export default function ChatPage() {
                             </div>
                         </CardHeader>
                         <Separator />
-                        <ScrollArea className="h-[50vh] p-6">
-                            <div className="space-y-6">
-                                {currentMessages.map((msg, index) => (
-                                    <div key={index} className={cn("flex items-end gap-2", msg.sender === 'patient' ? 'justify-end' : 'justify-start')}>
-                                        {msg.sender === 'doctor' && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarImage src={selectedDoctor.avatar} alt={selectedDoctor.name} data-ai-hint="doctor portrait" />
-                                                <AvatarFallback>{selectedDoctor.name.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                        <div className={cn("max-w-[70%] rounded-xl p-3 space-y-2", msg.sender === 'patient' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                            {msg.text && <p>{msg.text}</p>}
-                                            {msg.image && <Image src={msg.image} alt="attached image" width={200} height={200} className="rounded-md" />}
+                        <ScrollArea className="h-[50vh] p-6" ref={scrollAreaRef}>
+                            {isLoadingMessages ? (
+                                <div className="flex items-center justify-center h-full">
+                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {messages.map((msg, index) => (
+                                        <div key={index} className={cn("flex items-end gap-2", msg.senderId === user.uid ? 'justify-end' : 'justify-start')}>
+                                            {msg.senderId !== user.uid && (
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarImage src={selectedDoctor.avatar} alt={selectedDoctor.name} data-ai-hint="doctor portrait" />
+                                                    <AvatarFallback>{selectedDoctor.name.charAt(0)}</AvatarFallback>
+                                                </Avatar>
+                                            )}
+                                            <div className={cn("max-w-[70%] rounded-xl p-3 space-y-2", msg.senderId === user.uid ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                                {msg.text && <p>{msg.text}</p>}
+                                                {msg.imageUrl && <Image src={msg.imageUrl} alt="attached image" width={200} height={200} className="rounded-md" />}
+                                            </div>
+                                            {msg.senderId === user.uid && (
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarFallback><User /></AvatarFallback>
+                                                </Avatar>
+                                            )}
                                         </div>
-                                        {msg.sender === 'patient' && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback><User /></AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </ScrollArea>
                         <div className="p-4 border-t space-y-2">
                              {attachedImage && (
@@ -240,14 +232,14 @@ export default function ChatPage() {
                                     onChange={(e) => setInputValue(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                                 />
-                                <Button size="icon" onClick={handleSendMessage} disabled={!inputValue.trim() && !attachedImage}>
+                                <Button size="icon" onClick={handleSendMessage} disabled={(!inputValue.trim() && !attachedImage)}>
                                     <Send className="h-4 w-4" />
                                 </Button>
                             </div>
                         </div>
                     </>
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-[calc(50vh+144px)] text-muted-foreground p-12 text-center">
+                    <div className="flex flex-col items-center justify-center h-[calc(60vh + 80px)] text-muted-foreground p-12 text-center">
                         {isLoadingDoctors ? (
                             <>
                                 <Loader2 className="h-8 w-8 animate-spin mb-4" />
