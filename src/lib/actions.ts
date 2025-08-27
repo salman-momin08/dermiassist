@@ -23,13 +23,10 @@ export async function uploadFile(formData: FormData) {
     const buffer = Buffer.from(arrayBuffer);
     const dataUri = `data:${file.type};base64,${buffer.toString('base64')}`;
 
-    // Upload the data URI to Cloudinary with AI cropping
+    // Upload the data URI to Cloudinary
+    // We remove the AI cropping for certificates and signatures to preserve their content.
     const result = await cloudinary.uploader.upload(dataUri, {
-      gravity: "face",
-      crop: "thumb",
-      width: 400,
-      height: 400,
-      zoom: "0.8"
+      resource_type: "auto", // Automatically detect if it's an image or other file type like PDF
     });
     
     // Return both the URL for display and the public_id for future deletion
@@ -61,3 +58,5 @@ export async function deleteFile(publicId: string) {
         return { success: false, message: `Deletion failed: ${errorMessage}` };
     }
 }
+
+    
