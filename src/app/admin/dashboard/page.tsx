@@ -30,6 +30,7 @@ import { collection, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/fire
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const analyticsData: any[] = [];
 
@@ -152,6 +153,16 @@ export default function AdminDashboardPage() {
             </div>
         );
     }
+
+    const renderDetail = (label: string, value: any) => {
+        if (!value) return null;
+        return (
+            <div className="grid grid-cols-3 gap-2">
+                <span className="font-medium text-muted-foreground col-span-1">{label}:</span>
+                <span className="col-span-2">{value}</span>
+            </div>
+        );
+    };
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -310,46 +321,63 @@ export default function AdminDashboardPage() {
                         </CardContent>
                     </Card>
                 </div>
-                 <DialogContent className="sm:max-w-md">
+                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>User Profile</DialogTitle>
+                        <DialogTitle>User Profile Details</DialogTitle>
                         <DialogDescription>
-                            Details for {selectedUser?.name}.
+                            A complete overview of {selectedUser?.name}.
                         </DialogDescription>
                     </DialogHeader>
                     {selectedUser && (
-                        <div className="space-y-4 pt-4">
+                        <ScrollArea className="max-h-[70vh] pr-4">
+                        <div className="space-y-6 pt-4">
                              <div className="flex items-center space-x-4">
-                                <Avatar className="h-16 w-16">
+                                <Avatar className="h-20 w-20">
                                     <AvatarImage src={selectedUser.photoURL || `https://placehold.co/100x100.png?text=${selectedUser.name.charAt(0)}`} data-ai-hint="user portrait" />
                                     <AvatarFallback>{selectedUser.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                                 <div className="space-y-1">
-                                    <h3 className="font-semibold text-lg">{selectedUser.name}</h3>
+                                    <h3 className="font-bold text-xl">{selectedUser.name}</h3>
                                     <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                                     <Badge variant={selectedUser.role === 'doctor' ? 'secondary' : 'outline'}>{selectedUser.role}</Badge>
                                 </div>
                             </div>
                             <Separator />
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                <span className="font-medium text-muted-foreground">User ID:</span>
-                                <span>{selectedUser.id}</span>
 
-                                <span className="font-medium text-muted-foreground">Joined:</span>
-                                <span>{selectedUser.joined}</span>
-
-                                <span className="font-medium text-muted-foreground">Role:</span>
-                                <span><Badge variant={selectedUser.role === 'doctor' ? 'secondary' : 'outline'}>{selectedUser.role}</Badge></span>
-
-                                {selectedUser.role === 'doctor' && (
-                                    <>
-                                        <span className="font-medium text-muted-foreground">Specialization:</span>
-                                        <span>{selectedUser.specialization}</span>
-                                        <span className="font-medium text-muted-foreground">Verification:</span>
-                                        <span><Badge variant={selectedUser.verified ? 'default' : selectedUser.verificationPending ? 'secondary' : 'destructive'}>{selectedUser.verified ? 'Verified' : selectedUser.verificationPending ? 'Pending' : 'Not Verified'}</Badge></span>
-                                    </>
-                                )}
+                            <div className="space-y-3 text-sm">
+                                <h4 className="font-semibold text-base">Personal Information</h4>
+                                {renderDetail("User ID", selectedUser.id)}
+                                {renderDetail("Joined", selectedUser.joined)}
+                                {renderDetail("Phone", selectedUser.phone || selectedUser.mobile)}
+                                {renderDetail("Date of Birth", selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : null)}
+                                {renderDetail("Gender", selectedUser.gender)}
+                                {renderDetail("Blood Group", selectedUser.bloodGroup)}
+                                {renderDetail("Address", selectedUser.address)}
+                                {renderDetail("City", selectedUser.city)}
+                                {renderDetail("State", selectedUser.state)}
+                            </div>
+                           
+                            {selectedUser.role === 'doctor' && (
+                                <>
+                                <Separator />
+                                <div className="space-y-3 text-sm">
+                                    <h4 className="font-semibold text-base">Professional Details</h4>
+                                    {renderDetail("Specialization", selectedUser.specialization)}
+                                    {renderDetail("Medical ID", selectedUser.medicalId)}
+                                    {renderDetail("Verification",  <Badge variant={selectedUser.verified ? 'default' : selectedUser.verificationPending ? 'secondary' : 'destructive'}>{selectedUser.verified ? 'Verified' : selectedUser.verificationPending ? 'Pending' : 'Not Verified'}</Badge>)}
+                                    {selectedUser.certificateUrl && renderDetail("Certificate", <Link href={selectedUser.certificateUrl} target="_blank" className="text-primary hover:underline">View Document</Link>)}
+                                </div>
+                                </>
+                            )}
+                            <Separator />
+                             <div className="space-y-3 text-sm">
+                                <h4 className="font-semibold text-base">Account & Preferences</h4>
+                                {renderDetail("Subscription", selectedUser.subscriptionPlan)}
+                                {renderDetail("Data Sharing", selectedUser.allowDataSharing ? "Allowed" : "Disallowed")}
+                                {renderDetail("Notifications", selectedUser.emailNotifications ? "Enabled" : "Disabled")}
                             </div>
                         </div>
+                        </ScrollArea>
                     )}
                 </DialogContent>
             </Dialog>
