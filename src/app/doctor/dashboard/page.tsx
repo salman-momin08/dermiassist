@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -14,29 +14,55 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import Link from "next/link"
+import { useAuth } from "@/hooks/use-auth"
 
-const initialAppointments: any[] = [];
+// In a real app, this would be fetched from Firestore
+const initialAppointments: any[] = [
+    {
+      id: "APP001",
+      patientName: "John Smith",
+      mode: "Online",
+      requestDate: "2024-08-26",
+      status: "Pending",
+      reportId: "REP001",
+      reportCondition: "Acne Vulgaris",
+      reportFullText:
+        "The patient presents with moderate acne vulgaris on the face, primarily comedonal with some inflammatory papules. Pre-medication: None. Duration: 6 months. The analysis suggests a combination therapy of topical retinoids and benzoyl peroxide.",
+      previousNotes: "First consultation.",
+    },
+    {
+      id: "APP002",
+      patientName: "Emily White",
+      mode: "Offline",
+      requestDate: "2024-08-25",
+      status: "Pending",
+      reportId: "REP002",
+      reportCondition: "Eczema",
+      reportFullText:
+        "The patient has chronic atopic dermatitis on her hands. Pre-medication: OTC hydrocortisone. Duration: 2 years. The AI recommends a stronger topical steroid and consistent use of emollients.",
+      previousNotes:
+        "Patient has a history of seasonal flare-ups. Previous treatment with OTC creams had limited success.",
+    },
+];
 
-// Mock data, in a real app this would come from an API
 const mockDashboardStats = {
-    totalPatients: 0,
-    newPatientsThisMonth: 0,
-    reportsToReview: 0,
+    totalPatients: 124,
+    newPatientsThisMonth: 12,
+    reportsToReview: 5,
 };
 
-// Mock the current doctor's verification status
-const isDoctorVerified = false;
 
 export default function DoctorDashboardPage() {
+    const { userData, loading: authLoading } = useAuth();
     const [summary, setSummary] = useState('');
     const [caseFile, setCaseFile] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
     const [appointments, setAppointments] = useState(initialAppointments);
     const [activeDialog, setActiveDialog] = useState<'summary' | 'caseFile' | null>(null);
     const { toast } = useToast();
 
-    const pendingRequestsCount = useMemo(() => {
-        return appointments.filter(a => a.status === 'Pending').length;
+    const pendingRequests = useMemo(() => {
+        return appointments.filter(a => a.status === 'Pending');
     }, [appointments]);
 
     const handleRequest = (id: string, newStatus: 'Approved' | 'Declined') => {
@@ -48,7 +74,7 @@ export default function DoctorDashboardPage() {
     };
 
     const handleGenerateSummary = async (reportText: string) => {
-        setIsLoading(true);
+        setIsGenerating(true);
         setSummary('');
         try {
             const result = await generateAiReportSummary({ report: reportText });
@@ -57,12 +83,12 @@ export default function DoctorDashboardPage() {
             console.error("Failed to generate summary:", error);
             setSummary("Could not generate summary at this time. Please try again.");
         } finally {
-            setIsLoading(false);
+            setIsGenerating(false);
         }
     };
     
     const handleGenerateCaseFile = async (app: typeof appointments[0]) => {
-        setIsLoading(true);
+        setIsGenerating(true);
         setCaseFile('');
         try {
             const result = await generateCaseFileSummary({
@@ -76,7 +102,7 @@ export default function DoctorDashboardPage() {
             console.error("Failed to generate case file:", error);
             setCaseFile("Could not generate case file at this time. Please try again.");
         } finally {
-            setIsLoading(false);
+            setIsGenerating(false);
         }
     };
 
@@ -85,15 +111,24 @@ export default function DoctorDashboardPage() {
         setCaseFile('');
         setActiveDialog(null);
     }
+    
+    if (authLoading) {
+        return (
+             <div className="flex min-h-[60vh] flex-col items-center justify-center">
+                <Loader2 className="h-16 w-16 animate-spin text-primary" />
+                <p className="mt-4 text-muted-foreground">Loading Doctor Dashboard...</p>
+            </div>
+        )
+    }
 
     return (
         <div className="container mx-auto p-4 md:p-8">
             <div className="space-y-2 mb-8">
                 <h1 className="text-3xl font-bold tracking-tight font-headline">Doctor Dashboard</h1>
-                <p className="text-muted-foreground">Welcome back, Dr. Grant. Here's what's happening today.</p>
+                <p className="text-muted-foreground">Welcome back, Dr. {userData?.lastName || 'Doctor'}. Here's what's happening today.</p>
             </div>
             
-            {!isDoctorVerified && (
+            {!userData?.verified && (
                 <Alert variant="destructive" className="mb-8">
                     <ShieldAlert className="h-4 w-4" />
                     <AlertTitle>Verification Required</AlertTitle>
@@ -113,7 +148,7 @@ export default function DoctorDashboardPage() {
                         <CalendarCheck className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{pendingRequestsCount}</div>
+                        <div className="text-2xl font-bold">{pendingRequests.length}</div>
                         <p className="text-xs text-muted-foreground">New appointment requests await your review.</p>
                     </CardContent>
                 </Card>
@@ -155,7 +190,7 @@ export default function DoctorDashboardPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {pendingRequestsCount > 0 ? appointments.filter(a => a.status === 'Pending').map(app => (
+                            {pendingRequests.length > 0 ? pendingRequests.map(app => (
                                 <TableRow key={app.id}>
                                     <TableCell>
                                         <div className="font-medium">{app.patientName}</div>
@@ -194,7 +229,7 @@ export default function DoctorDashboardPage() {
                                                     </DialogDescription>
                                                 </DialogHeader>
                                                 <ScrollArea className="max-h-[400px] my-4 pr-4">
-                                                    {isLoading ? (
+                                                    {isGenerating ? (
                                                         <div className="flex items-center justify-center p-8">
                                                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                                         </div>
@@ -208,7 +243,7 @@ export default function DoctorDashboardPage() {
                                         </Dialog>
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
-                                        <Button size="sm" variant="outline" onClick={() => handleRequest(app.id, 'Declined')}>Decline</Button>
+                                        <Button size="sm" variant="destructive" onClick={() => handleRequest(app.id, 'Declined')}>Decline</Button>
                                         <Button size="sm" onClick={() => handleRequest(app.id, 'Approved')}>Approve</Button>
                                     </TableCell>
                                 </TableRow>
