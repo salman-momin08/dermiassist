@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, Users, UserCheck, FileClock, Trash2, CheckCircle, XCircle, Search, LineChart, User as UserIcon } from "lucide-react";
+import { MoreHorizontal, Users, UserCheck, FileClock, Trash2, CheckCircle, XCircle, Search, LineChart, User as UserIcon, Loader2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,10 +26,10 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-
-const mockUsersData: any[] = [];
-
-const mockDoctorsData: any[] = [];
+import { collection, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 const analyticsData: any[] = [];
 
@@ -44,58 +44,114 @@ type User = {
     id: string;
     name: string;
     email: string;
-    role: string;
+    role: 'patient' | 'doctor' | 'admin';
     joined: string;
+    [key: string]: any; // Allow other properties
 };
 
-type Doctor = {
-    id: string;
-    name: string;
+type Doctor = User & {
     specialization: string;
-    joined: string;
-    status: string;
+    status: 'Verified' | 'Pending' | 'Not Verified';
 };
 
 
 export default function AdminDashboardPage() {
-    const [users, setUsers] = useState<User[]>(mockUsersData);
-    const [doctors, setDoctors] = useState<Doctor[]>(mockDoctorsData);
+    const [allUsers, setAllUsers] = useState<User[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [userSearch, setUserSearch] = useState("");
     const [doctorSearch, setDoctorSearch] = useState("");
-    const [selectedUser, setSelectedUser] = useState<User | (Doctor & {email?: string, role?: string}) | null>(null);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const { toast } = useToast();
 
-    const handleApprove = (doctorId: string) => {
-        setDoctors(prevDoctors =>
-            prevDoctors.map(doc =>
-                doc.id === doctorId ? { ...doc, status: 'Verified' } : doc
-            )
-        );
+    useEffect(() => {
+        setIsLoading(true);
+        const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
+            const usersData = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                name: doc.data().displayName,
+                joined: doc.data().createdAt ? new Date(doc.data().createdAt).toLocaleDateString() : 'N/A',
+            })) as User[];
+            setAllUsers(usersData);
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const handleApprove = async (doctorId: string) => {
+        const userDocRef = doc(db, 'users', doctorId);
+        try {
+            await updateDoc(userDocRef, {
+                verified: true,
+                verificationPending: false
+            });
+            toast({ title: "Doctor Approved", description: "The doctor has been verified and can now access all features." });
+        } catch (error) {
+            toast({ title: "Error", description: "Could not approve the doctor.", variant: "destructive"});
+        }
     };
 
-    const handleReject = (doctorId: string) => {
-        setDoctors(prevDoctors => prevDoctors.filter(doc => doc.id !== doctorId));
+    const handleReject = async (doctorId: string) => {
+        const userDocRef = doc(db, 'users', doctorId);
+        try {
+            await updateDoc(userDocRef, {
+                verificationPending: false,
+                certificateUrl: null, // Optionally clear the certificate URL
+            });
+            toast({ title: "Doctor Rejected", description: "The verification request has been rejected." });
+        } catch(error) {
+            toast({ title: "Error", description: "Could not reject the doctor.", variant: "destructive"});
+        }
     };
 
-    const handleDeleteUser = (userId: string) => {
-        setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+    const handleDeleteUser = async (userId: string) => {
+        // Note: This only deletes the Firestore record. For a full deletion, you'd also need a backend function to delete the Firebase Auth user.
+        try {
+            await deleteDoc(doc(db, "users", userId));
+            toast({ title: "User Deleted", description: "The user's record has been removed from Firestore."});
+        } catch (error) {
+            toast({ title: "Error", description: "Could not delete the user.", variant: "destructive"});
+        }
     };
+    
+    const { patientUsers, doctorUsers, verifiedDoctorsCount, pendingVerificationsCount } = useMemo(() => {
+        const patients = allUsers.filter(user => user.role === 'patient');
+        const doctors = allUsers
+            .filter(user => user.role === 'doctor')
+            .map(docUser => ({
+                ...docUser,
+                status: docUser.verified ? 'Verified' : docUser.verificationPending ? 'Pending' : 'Not Verified'
+            })) as Doctor[];
+        
+        const verifiedCount = doctors.filter(d => d.status === 'Verified').length;
+        const pendingCount = doctors.filter(d => d.status === 'Pending').length;
 
-    const verifiedDoctorsCount = useMemo(() => doctors.filter(d => d.status === 'Verified').length, [doctors]);
-    const pendingVerificationsCount = useMemo(() => doctors.filter(d => d.status === 'Pending').length, [doctors]);
+        return { patientUsers: patients, doctorUsers: doctors, verifiedDoctorsCount: verifiedCount, pendingVerificationsCount: pendingCount };
+    }, [allUsers]);
 
     const filteredUsers = useMemo(() => {
-        return users.filter(user =>
+        return patientUsers.filter(user =>
             user.name.toLowerCase().includes(userSearch.toLowerCase()) ||
             user.email.toLowerCase().includes(userSearch.toLowerCase())
         );
-    }, [users, userSearch]);
+    }, [patientUsers, userSearch]);
     
     const filteredDoctors = useMemo(() => {
-         return doctors.filter(doctor =>
+         return doctorUsers.filter(doctor =>
             doctor.name.toLowerCase().includes(doctorSearch.toLowerCase()) ||
-            doctor.specialization.toLowerCase().includes(doctorSearch.toLowerCase())
+            (doctor.specialization && doctor.specialization.toLowerCase().includes(doctorSearch.toLowerCase()))
         );
-    }, [doctors, doctorSearch]);
+    }, [doctorUsers, doctorSearch]);
+
+     if (isLoading) {
+        return (
+            <div className="flex min-h-screen flex-col items-center justify-center">
+                <Loader2 className="h-16 w-16 animate-spin text-primary" />
+                <p className="mt-4 text-muted-foreground">Loading Admin Dashboard...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -111,7 +167,7 @@ export default function AdminDashboardPage() {
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{users.length}</div>
+                        <div className="text-2xl font-bold">{allUsers.length}</div>
                         <p className="text-xs text-muted-foreground">Total registered users on the platform.</p>
                     </CardContent>
                 </Card>
@@ -154,11 +210,11 @@ export default function AdminDashboardPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <Tabs defaultValue="all">
+                            <Tabs defaultValue="pending">
                                 <TabsList className="grid w-full grid-cols-3">
-                                    <TabsTrigger value="all">All</TabsTrigger>
-                                    <TabsTrigger value="pending">Pending</TabsTrigger>
-                                    <TabsTrigger value="verified">Verified</TabsTrigger>
+                                    <TabsTrigger value="all">All ({filteredDoctors.length})</TabsTrigger>
+                                    <TabsTrigger value="pending">Pending ({filteredDoctors.filter(d => d.status === 'Pending').length})</TabsTrigger>
+                                    <TabsTrigger value="verified">Verified ({filteredDoctors.filter(d => d.status === 'Verified').length})</TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="all">
                                     {renderDoctorTable(filteredDoctors)}
@@ -174,8 +230,8 @@ export default function AdminDashboardPage() {
                     </Card>
                      <Card>
                         <CardHeader>
-                            <CardTitle>User Management</CardTitle>
-                            <CardDescription>Oversee all registered users on the platform.</CardDescription>
+                            <CardTitle>Patient Management</CardTitle>
+                            <CardDescription>Oversee all registered patient users on the platform.</CardDescription>
                              <div className="relative pt-2">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input 
@@ -191,7 +247,7 @@ export default function AdminDashboardPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>User</TableHead>
-                                        <TableHead>Role</TableHead>
+                                        <TableHead>Joined Date</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -203,7 +259,7 @@ export default function AdminDashboardPage() {
                                             <div className="text-sm text-muted-foreground">{user.email}</div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={user.role === 'doctor' ? 'secondary' : 'outline'}>{user.role}</Badge>
+                                           {user.joined}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <AlertDialog>
@@ -231,7 +287,7 @@ export default function AdminDashboardPage() {
                                                     <AlertDialogHeader>
                                                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                                         <AlertDialogDescription>
-                                                            This action cannot be undone. This will permanently delete this user's account and remove their data from our servers.
+                                                            This action cannot be undone. This will permanently delete this user's record from Firestore.
                                                         </AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
@@ -245,7 +301,7 @@ export default function AdminDashboardPage() {
                                     )) : (
                                          <TableRow>
                                             <TableCell colSpan={3} className="h-24 text-center">
-                                                No users found.
+                                                No patients found.
                                             </TableCell>
                                         </TableRow>
                                     )}
@@ -265,7 +321,7 @@ export default function AdminDashboardPage() {
                         <div className="space-y-4 pt-4">
                              <div className="flex items-center space-x-4">
                                 <Avatar className="h-16 w-16">
-                                    <AvatarImage src={`https://placehold.co/100x100.png?text=${selectedUser.name.charAt(0)}`} data-ai-hint="user portrait" />
+                                    <AvatarImage src={selectedUser.photoURL || `https://placehold.co/100x100.png?text=${selectedUser.name.charAt(0)}`} data-ai-hint="user portrait" />
                                     <AvatarFallback>{selectedUser.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                                 <div className="space-y-1">
@@ -282,12 +338,14 @@ export default function AdminDashboardPage() {
                                 <span>{selectedUser.joined}</span>
 
                                 <span className="font-medium text-muted-foreground">Role:</span>
-                                <span><Badge variant={'role' in selectedUser && selectedUser.role === 'doctor' ? 'secondary' : 'outline'}>{selectedUser.role}</Badge></span>
+                                <span><Badge variant={selectedUser.role === 'doctor' ? 'secondary' : 'outline'}>{selectedUser.role}</Badge></span>
 
-                                {'specialization' in selectedUser && (
+                                {selectedUser.role === 'doctor' && (
                                     <>
                                         <span className="font-medium text-muted-foreground">Specialization:</span>
                                         <span>{selectedUser.specialization}</span>
+                                        <span className="font-medium text-muted-foreground">Verification:</span>
+                                        <span><Badge variant={selectedUser.verified ? 'default' : selectedUser.verificationPending ? 'secondary' : 'destructive'}>{selectedUser.verified ? 'Verified' : selectedUser.verificationPending ? 'Pending' : 'Not Verified'}</Badge></span>
                                     </>
                                 )}
                             </div>
@@ -350,7 +408,7 @@ export default function AdminDashboardPage() {
                             <div className="text-sm text-muted-foreground">{doctor.specialization}</div>
                         </TableCell>
                         <TableCell>
-                            <Badge variant={doctor.status === 'Verified' ? 'default' : 'secondary'}>{doctor.status}</Badge>
+                            <Badge variant={doctor.status === 'Verified' ? 'default' : doctor.status === 'Pending' ? 'secondary' : 'destructive'}>{doctor.status}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
                              <AlertDialog>
@@ -363,20 +421,17 @@ export default function AdminDashboardPage() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DialogTrigger asChild>
-                                            <DropdownMenuItem onSelect={() => {
-                                                const userRecord = users.find(u => u.name === doctor.name);
-                                                const doctorDetails = { 
-                                                    ...doctor,
-                                                    email: userRecord?.email,
-                                                    role: userRecord?.role,
-                                                };
-                                                setSelectedUser(doctorDetails);
-                                             }}>
+                                            <DropdownMenuItem onSelect={() => setSelectedUser(doctor)}>
                                                 <UserIcon className="mr-2 h-4 w-4" /> View Profile
                                             </DropdownMenuItem>
                                         </DialogTrigger>
                                         {doctor.status === 'Pending' && (
                                             <>
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={doctor.certificateUrl || '#'} target="_blank" className="cursor-pointer">
+                                                        View Certificate
+                                                    </Link>
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleApprove(doctor.id)}>
                                                     <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Approve
                                                 </DropdownMenuItem>
@@ -394,7 +449,7 @@ export default function AdminDashboardPage() {
                                      <AlertDialogHeader>
                                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                         <AlertDialogDescription>
-                                            This will reject the verification request for {doctor.name}. They will be removed from the list.
+                                            This will reject the verification request for Dr. {doctor.name}. They will need to re-upload their certificate to apply again.
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -417,3 +472,5 @@ export default function AdminDashboardPage() {
         )
     }
 }
+
+    
