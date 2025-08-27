@@ -352,7 +352,7 @@ export default function DoctorsPage() {
                                                     <SelectContent>
                                                         {analyses.map(analysis => (
                                                             <SelectItem key={analysis.id} value={analysis.id}>
-                                                                {analysis.condition} - {format(new Date(analysis.date), "MMM d, yyyy")}
+                                                                {`${analysis.condition} - ${format(new Date(analysis.date), "MMM d, yyyy")}`}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>
@@ -427,5 +427,7 @@ export default function DoctorsPage() {
         </div>
     );
 }
+
+    
 
     
