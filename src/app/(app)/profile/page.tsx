@@ -24,7 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { uploadFile, deleteFile } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { updateProfile } from "firebase/auth";
+import { updateProfile, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -112,6 +112,11 @@ export default function ProfilePage() {
     });
 
     const [isSaving, setIsSaving] = useState(false);
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [calendarMonth, setCalendarMonth] = useState(new Date());
 
@@ -244,12 +249,64 @@ export default function ProfilePage() {
         }
     }
     
-    const handlePasswordChange = () => {
-        toast({
-            title: "Password Change (UI Demo)",
-            description: "Password change functionality would be implemented here.",
-        });
+    const handlePasswordChange = async () => {
+        if (!user || !user.email) return;
+
+        if (newPassword !== confirmPassword) {
+            toast({ title: "Error", description: "New passwords do not match.", variant: "destructive" });
+            return;
+        }
+
+        if (newPassword.length < 8) {
+            toast({ title: "Error", description: "New password must be at least 8 characters long.", variant: "destructive" });
+            return;
+        }
+
+        setIsUpdatingPassword(true);
+
+        try {
+            const credential = EmailAuthProvider.credential(user.email, currentPassword);
+            await reauthenticateWithCredential(user, credential);
+            
+            // If re-authentication is successful, update the password
+            await updatePassword(user, newPassword);
+
+            toast({ title: "Success", description: "Your password has been updated." });
+            setCurrentPassword("");
+            setNewPassword("");
+            setConfirmPassword("");
+
+        } catch (error: any) {
+            console.error("Password update failed:", error);
+            let description = "An unexpected error occurred.";
+            if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                description = "The current password you entered is incorrect.";
+            }
+            toast({ title: "Password Change Failed", description, variant: "destructive"});
+        } finally {
+            setIsUpdatingPassword(false);
+        }
     };
+    
+    const handleForgotPassword = () => {
+        if (!user || !user.email) return;
+
+        sendPasswordResetEmail(auth, user.email)
+            .then(() => {
+                toast({
+                    title: "Password Reset Email Sent",
+                    description: `An email has been sent to ${user.email} with instructions to reset your password.`
+                });
+            })
+            .catch((error) => {
+                console.error("Forgot password error:", error);
+                toast({
+                    title: "Error",
+                    description: "Could not send password reset email. Please try again.",
+                    variant: "destructive"
+                });
+            });
+    }
 
     if (loading) {
       return (
@@ -460,19 +517,27 @@ export default function ProfilePage() {
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="current-password">Current Password</Label>
-                            <Input id="current-password" type="password" placeholder="Enter your current password" />
+                            <Input id="current-password" type="password" placeholder="Enter your current password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="new-password">New Password</Label>
-                            <Input id="new-password" type="password" placeholder="Enter a new strong password" />
+                            <Input id="new-password" type="password" placeholder="Enter a new strong password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="confirm-password">Confirm New Password</Label>
-                            <Input id="confirm-password" type="password" placeholder="Confirm your new password" />
+                            <Input id="confirm-password" type="password" placeholder="Confirm your new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                        </div>
+                        <div className="text-right">
+                            <Button variant="link" className="text-sm p-0 h-auto" onClick={handleForgotPassword}>
+                                Forgot Password?
+                            </Button>
                         </div>
                     </CardContent>
                     <CardFooter>
-                       <Button onClick={handlePasswordChange}>Update Password</Button>
+                       <Button onClick={handlePasswordChange} disabled={isUpdatingPassword}>
+                            {isUpdatingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Update Password
+                       </Button>
                     </CardFooter>
                 </Card>
 
@@ -573,5 +638,7 @@ export default function ProfilePage() {
         </div>
     );
 }
+
+    
 
     
