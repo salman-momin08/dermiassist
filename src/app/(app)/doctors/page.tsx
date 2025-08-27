@@ -1,11 +1,11 @@
 
 "use client"
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, ShieldCheck, Star, Loader2 } from "lucide-react";
+import { MapPin, ShieldCheck, Star, Loader2, CalendarIcon, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -17,6 +17,13 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'f
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type Doctor = {
     id: string;
@@ -30,9 +37,38 @@ type Doctor = {
     [key: string]: any;
 };
 
+type AppointmentFormState = {
+    preferredDate?: Date;
+    preferredTime: string;
+    appointmentType: string;
+    reasonForVisit: string;
+    symptomsDuration: string;
+    symptomsSeverity: string;
+    pastTreatments: string;
+    currentMedications: string;
+    allergies: string;
+    isEmergency: boolean;
+    consentData: boolean;
+    agreeTerms: boolean;
+};
+
+const initialFormState: AppointmentFormState = {
+    preferredDate: undefined,
+    preferredTime: '',
+    appointmentType: 'first-time',
+    reasonForVisit: '',
+    symptomsDuration: '',
+    symptomsSeverity: '',
+    pastTreatments: '',
+    currentMedications: '',
+    allergies: '',
+    isEmergency: false,
+    consentData: false,
+    agreeTerms: false,
+};
+
 
 export default function DoctorsPage() {
-    const { analyses, isLoading: isLoadingAnalyses } = useAnalyses();
     const { user, userData } = useAuth();
     const { toast } = useToast();
     const [openDialog, setOpenDialog] = useState<string | null>(null);
@@ -40,10 +76,12 @@ export default function DoctorsPage() {
     const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
     
     // State for the appointment request form
-    const [appointmentMode, setAppointmentMode] = useState("Online");
-    const [attachedReportId, setAttachedReportId] = useState<string | null>(null);
-    const [additionalNotes, setAdditionalNotes] = useState("");
+    const [formState, setFormState] = useState<AppointmentFormState>(initialFormState);
     const [isRequesting, setIsRequesting] = useState(false);
+
+    // Refs for file inputs
+    const imageUploadRef = useRef<HTMLInputElement>(null);
+    const reportUploadRef = useRef<HTMLInputElement>(null);
 
 
     useEffect(() => {
@@ -75,11 +113,15 @@ export default function DoctorsPage() {
 
         return () => unsubscribe();
     }, []);
+
+    const handleFormChange = (field: keyof AppointmentFormState, value: any) => {
+        setFormState(prev => ({...prev, [field]: value}));
+    }
     
     const resetForm = () => {
-        setAppointmentMode("Online");
-        setAttachedReportId(null);
-        setAdditionalNotes("");
+        setFormState(initialFormState);
+        if(imageUploadRef.current) imageUploadRef.current.value = "";
+        if(reportUploadRef.current) reportUploadRef.current.value = "";
     }
 
     const handleRequestAppointment = async (doctor: Doctor) => {
@@ -87,10 +129,16 @@ export default function DoctorsPage() {
             toast({ title: "Authentication Error", description: "You must be logged in to send a request.", variant: "destructive"});
             return;
         }
+        if (!formState.consentData || !formState.agreeTerms) {
+            toast({ title: "Consent Required", description: "You must agree to the terms and consent to data sharing.", variant: "destructive"});
+            return;
+        }
         setIsRequesting(true);
 
         try {
-            const selectedAnalysis = attachedReportId ? analyses.find(a => a.id === attachedReportId) : null;
+            // Note: In a real app, file uploads would be handled here, uploading to a service like Cloudinary or Firebase Storage
+            // and getting back URLs to store in the appointment document.
+            // For this prototype, we are just capturing the form data.
             
             await addDoc(collection(db, "appointments"), {
                 patientId: user.uid,
@@ -100,24 +148,15 @@ export default function DoctorsPage() {
                 doctorLocation: doctor.location,
                 doctorPhone: doctor.phone,
                 doctorSignature: doctor.signatureUrl,
-                mode: appointmentMode,
-                notes: additionalNotes,
-                attachedReportId: attachedReportId || null,
-                attachedReport: selectedAnalysis ? {
-                    condition: selectedAnalysis.condition,
-                    date: selectedAnalysis.date,
-                    recommendations: selectedAnalysis.recommendations,
-                    dos: selectedAnalysis.dos,
-                    donts: selectedAnalysis.donts,
-                    image: selectedAnalysis.image
-                } : null,
                 status: 'Pending',
                 requestDate: serverTimestamp(),
+                ...formState,
+                preferredDate: formState.preferredDate ? formState.preferredDate.toISOString() : null,
             });
 
             toast({
-                title: "Request Sent",
-                description: `Your appointment request has been sent to ${doctor.name}. You will be notified once it's confirmed.`,
+                title: "Request Submitted",
+                description: `Your request has been submitted. Our team will contact you shortly to confirm.`,
             });
             setOpenDialog(null);
             resetForm();
@@ -192,55 +231,118 @@ export default function DoctorsPage() {
                                     <DialogTrigger asChild>
                                         <Button className="w-full">Request Appointment</Button>
                                     </DialogTrigger>
-                                    <DialogContent className="sm:max-w-[480px]">
+                                    <DialogContent className="sm:max-w-2xl">
                                         <DialogHeader>
-                                            <DialogTitle>Request Appointment with {doctor.name}</DialogTitle>
+                                            <DialogTitle>Appointment with {doctor.name}</DialogTitle>
                                             <DialogDescription>
-                                                Please fill out the details below to request your appointment.
+                                               Please provide the following details for your appointment.
                                             </DialogDescription>
                                         </DialogHeader>
-                                        <div className="grid gap-4 py-4">
-                                            <div className="space-y-2">
-                                                <Label>Appointment Mode</Label>
-                                                <RadioGroup value={appointmentMode} onValueChange={setAppointmentMode} className="flex gap-4">
-                                                    <div className="flex items-center space-x-2">
-                                                        <RadioGroupItem value="Online" id={`online-${doctor.id}`} />
-                                                        <Label htmlFor={`online-${doctor.id}`}>Online</Label>
-                                                    </div>
-                                                    <div className="flex items-center space-x-2">
-                                                        <RadioGroupItem value="Offline" id={`offline-${doctor.id}`} />
-                                                        <Label htmlFor={`offline-${doctor.id}`}>Offline</Label>
-                                                    </div>
+                                        <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-6">
+                                            
+                                            <div className="grid md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label>Preferred Date</Label>
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                            <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !formState.preferredDate && "text-muted-foreground")}>
+                                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                                {formState.preferredDate ? format(formState.preferredDate, "PPP") : <span>Pick a date</span>}
+                                                            </Button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-auto p-0">
+                                                            <Calendar mode="single" selected={formState.preferredDate} onSelect={(d) => handleFormChange('preferredDate', d)} initialFocus />
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                </div>
+                                                <div className="space-y-2">
+                                                     <Label>Preferred Time</Label>
+                                                     <Input type="time" value={formState.preferredTime} onChange={(e) => handleFormChange('preferredTime', e.target.value)} />
+                                                </div>
+                                            </div>
+
+                                             <div className="space-y-2">
+                                                <Label>Type of Appointment</Label>
+                                                <RadioGroup value={formState.appointmentType} onValueChange={(v) => handleFormChange('appointmentType', v)} className="flex gap-4">
+                                                    <div className="flex items-center space-x-2"><RadioGroupItem value="first-time" id={`first-time-${doctor.id}`} /><Label htmlFor={`first-time-${doctor.id}`}>First-time consultation</Label></div>
+                                                    <div className="flex items-center space-x-2"><RadioGroupItem value="follow-up" id={`follow-up-${doctor.id}`} /><Label htmlFor={`follow-up-${doctor.id}`}>Follow-up consultation</Label></div>
                                                 </RadioGroup>
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="report">Attach AI Report (Optional)</Label>
-                                                <Select value={attachedReportId || ""} onValueChange={(value) => setAttachedReportId(value)}>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select a report to attach" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {isLoadingAnalyses ? (
-                                                            <SelectItem value="loading" disabled>Loading reports...</SelectItem>
-                                                        ) : (
-                                                          analyses.map(a => (
-                                                              <SelectItem key={a.id} value={a.id}>
-                                                                  {a.condition} - {new Date(a.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                                                              </SelectItem>
-                                                          ))
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
+
+                                            <div className="grid md:grid-cols-3 gap-4">
+                                                <div className="space-y-2 md:col-span-1">
+                                                    <Label>Reason for Visit</Label>
+                                                    <Input placeholder="e.g., Acne, rash" value={formState.reasonForVisit} onChange={(e) => handleFormChange('reasonForVisit', e.target.value)} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Duration of Symptoms</Label>
+                                                    <Input placeholder="e.g., 2 weeks" value={formState.symptomsDuration} onChange={(e) => handleFormChange('symptomsDuration', e.target.value)} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Severity of Symptoms</Label>
+                                                    <Select value={formState.symptomsSeverity} onValueChange={(v) => handleFormChange('symptomsSeverity', v)}>
+                                                        <SelectTrigger><SelectValue placeholder="Select severity" /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="Mild">Mild</SelectItem>
+                                                            <SelectItem value="Moderate">Moderate</SelectItem>
+                                                            <SelectItem value="Severe">Severe</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="notes">Additional Notes</Label>
-                                                <Textarea id="notes" placeholder="Tell the doctor anything else you'd like them to know." value={additionalNotes} onChange={(e) => setAdditionalNotes(e.target.value)} />
+
+                                             <div className="space-y-2">
+                                                <Label>Past Dermatology Treatments</Label>
+                                                <Textarea placeholder="List any past treatments you have tried." value={formState.pastTreatments} onChange={(e) => handleFormChange('pastTreatments', e.target.value)} />
                                             </div>
+
+                                             <div className="grid md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label>Current Medications</Label>
+                                                    <Textarea placeholder="List any medications you are currently taking." value={formState.currentMedications} onChange={(e) => handleFormChange('currentMedications', e.target.value)} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Allergies</Label>
+                                                    <Textarea placeholder="List any known allergies (drug, food, skin-related)." value={formState.allergies} onChange={(e) => handleFormChange('allergies', e.target.value)} />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label>Upload Skin Condition Photos</Label>
+                                                    <Input type="file" ref={imageUploadRef} accept="image/*" multiple />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Upload Previous Reports</Label>
+                                                    <Input type="file" ref={reportUploadRef} accept="image/*,application/pdf" />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                                <div className="space-y-0.5">
+                                                    <Label>Is this an Emergency?</Label>
+                                                    <p className="text-xs text-muted-foreground">Check if you believe this is an urgent case.</p>
+                                                </div>
+                                                <Switch checked={formState.isEmergency} onCheckedChange={(c) => handleFormChange('isEmergency', c)} />
+                                            </div>
+                                            
+                                            <div className="space-y-4">
+                                                <div className="flex items-start space-x-3">
+                                                    <Checkbox id={`consent-${doctor.id}`} checked={formState.consentData} onCheckedChange={(c) => handleFormChange('consentData', !!c)} />
+                                                    <Label htmlFor={`consent-${doctor.id}`} className="text-xs text-muted-foreground">I consent to share my medical data for consultation purposes.</Label>
+                                                </div>
+                                                 <div className="flex items-start space-x-3">
+                                                    <Checkbox id={`terms-${doctor.id}`} checked={formState.agreeTerms} onCheckedChange={(c) => handleFormChange('agreeTerms', !!c)} />
+                                                    <Label htmlFor={`terms-${doctor.id}`} className="text-xs text-muted-foreground">I agree to the SkinWise privacy policy and terms of service.</Label>
+                                                </div>
+                                            </div>
+
                                         </div>
-                                        <DialogFooter>
-                                            <Button type="submit" onClick={() => handleRequestAppointment(doctor)} disabled={isRequesting}>
+                                        <DialogFooter className="pt-4 border-t">
+                                             <Button variant="outline" onClick={resetForm}>Reset</Button>
+                                            <Button type="submit" onClick={() => handleRequestAppointment(doctor)} disabled={isRequesting || !formState.consentData || !formState.agreeTerms}>
                                                 {isRequesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                                Send Request
+                                                Book Appointment
                                             </Button>
                                         </DialogFooter>
                                     </DialogContent>
@@ -257,3 +359,5 @@ export default function DoctorsPage() {
         </div>
     );
 }
+
+    
