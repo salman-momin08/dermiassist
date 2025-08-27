@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, notFound, useRouter } from 'next/navigation';
 import { useAnalyses, type AnalysisReport } from '@/hooks/use-analyses';
 import { useAuth } from '@/hooks/use-auth';
@@ -17,7 +17,6 @@ import { visualProgressAnalysis } from '@/ai/flows/visual-progress-analysis';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import jsPDF from 'jspdf';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Logo } from '@/components/logo';
 import { generateHealingVideo } from '@/ai/flows/generate-healing-video';
 
 
@@ -142,6 +141,11 @@ export default function AnalysisDetailPage() {
             setIsGeneratingVideo(false);
         }
     };
+    
+    const cleanText = (text: string) => {
+        // Removes markdown-like characters for cleaner PDF output
+        return text.replace(/[\*\_#]/g, '');
+    };
 
     const handleDownloadPdf = async () => {
         if (!analysis || !userData) {
@@ -230,12 +234,12 @@ export default function AnalysisDetailPage() {
                 if (analysis.submittedInfo?.proformaAnswers && analysis.submittedInfo.proformaAnswers.length > 0) {
                     analysis.submittedInfo.proformaAnswers.forEach(qa => {
                         pdf.setFont('helvetica', 'bold');
-                        const question = pdf.splitTextToSize(`Q: ${qa.question}`, textMaxWidth);
+                        const question = pdf.splitTextToSize(`Q: ${cleanText(qa.question)}`, textMaxWidth);
                         pdf.text(question, textX, textY);
                         textY += question.length * 4 + 2;
                         
                         pdf.setFont('helvetica', 'normal');
-                        const answer = pdf.splitTextToSize(`A: ${qa.answer}`, textMaxWidth);
+                        const answer = pdf.splitTextToSize(`A: ${cleanText(qa.answer)}`, textMaxWidth);
                         pdf.text(answer, textX, textY);
                         textY += answer.length * 4 + 4;
                     });
@@ -245,8 +249,6 @@ export default function AnalysisDetailPage() {
                      textY += 10;
                 }
                 
-                // Determine the correct Y position for the next section
-                // It should be below either the image or the text block, whichever is lower.
                 let contentBottomY = Math.max(yPos + imgHeight, textY);
                 yPos = contentBottomY + 10;
 
@@ -261,11 +263,11 @@ export default function AnalysisDetailPage() {
                 checkAndSwitchPage(20);
                 pdf.setFontSize(14);
                 pdf.setFont('helvetica', 'bold');
-                pdf.text('Recommendations', margin, yPos);
+                pdf.text('Expert Recommendations', margin, yPos);
                 yPos += 7;
                 pdf.setFontSize(10);
                 pdf.setFont('helvetica', 'normal');
-                const recommendationsText = pdf.splitTextToSize(analysis.recommendations, pageWidth - (margin * 2));
+                const recommendationsText = pdf.splitTextToSize(cleanText(analysis.recommendations), pageWidth - (margin * 2));
                 pdf.text(recommendationsText, margin, yPos);
                 yPos += recommendationsText.length * 4 + 5;
 
@@ -279,7 +281,7 @@ export default function AnalysisDetailPage() {
                 pdf.setFont('helvetica', 'normal');
                 analysis.dos.forEach(item => {
                     checkAndSwitchPage(5);
-                    const itemText = pdf.splitTextToSize(`- ${item}`, pageWidth - (margin * 2) - 5);
+                    const itemText = pdf.splitTextToSize(`- ${cleanText(item)}`, pageWidth - (margin * 2) - 5);
                     pdf.text(itemText, margin + 5, yPos);
                     yPos += itemText.length * 4 + 2;
                 });
@@ -294,10 +296,25 @@ export default function AnalysisDetailPage() {
                 pdf.setFont('helvetica', 'normal');
                 analysis.donts.forEach(item => {
                     checkAndSwitchPage(5);
-                    const itemText = pdf.splitTextToSize(`- ${item}`, pageWidth - (margin * 2) - 5);
+                    const itemText = pdf.splitTextToSize(`- ${cleanText(item)}`, pageWidth - (margin * 2) - 5);
                     pdf.text(itemText, margin + 5, yPos);
                     yPos += itemText.length * 4 + 2;
                 });
+                
+                // --- Deeper Analysis ---
+                if (analysis.submittedInfo?.otherConsiderations) {
+                    yPos += 5;
+                    checkAndSwitchPage(20);
+                    pdf.setFontSize(14);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('Deeper Analysis & Other Considerations', margin, yPos);
+                    yPos += 7;
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'normal');
+                    const otherConsiderationsText = pdf.splitTextToSize(cleanText(analysis.submittedInfo.otherConsiderations), pageWidth - (margin * 2));
+                    pdf.text(otherConsiderationsText, margin, yPos);
+                    yPos += otherConsiderationsText.length * 4 + 5;
+                }
 
                 pdf.save(`SkinWise-Report-${analysis.id}.pdf`);
             };
@@ -356,7 +373,7 @@ export default function AnalysisDetailPage() {
                              <h3 className="font-semibold text-lg mb-2">About {analysis.conditionName}</h3>
                              <p className="text-muted-foreground leading-relaxed mb-4">{analysis.condition}</p>
                              <h3 className="font-semibold text-xl mb-4 text-primary">Expert Recommendations</h3>
-                             <p className="text-muted-foreground leading-relaxed">{analysis.recommendations}</p>
+                             <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{analysis.recommendations}</p>
                         </CardContent>
                     </Card>
 
