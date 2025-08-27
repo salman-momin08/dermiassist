@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Upload,
   Loader2,
@@ -21,28 +20,36 @@ import {
   AlertTriangle,
   ArrowLeft,
   WandSparkles,
-  MessageCircleQuestion,
+  Bot,
+  User,
+  Send,
 } from "lucide-react";
 import Image from "next/image";
 import { finalEvaluation } from "@/ai/flows/final-evaluation";
 import { detectDiseaseName } from "@/ai/flows/detect-disease-name";
-import { generateProforma } from "@/ai/flows/generate-proforma";
+import { proformaChat } from "@/ai/flows/proforma-chat";
 import { useToast } from "@/hooks/use-toast";
 import { useAnalyses } from "@/hooks/use-analyses";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 type Step = 'upload' | 'proforma' | 'analyzing' | 'error';
-type Answer = { question: string; answer: string };
+type ChatMessage = { sender: 'ai' | 'user'; text: string };
+
+const MAX_QUESTIONS = 5;
 
 export default function AnalyzePage() {
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [detectedCondition, setDetectedCondition] = useState<string | null>(null);
-  const [proformaQuestions, setProformaQuestions] = useState<string[]>([]);
-  const [proformaAnswers, setProformaAnswers] = useState<Answer[]>([]);
-  
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [userResponse, setUserResponse] = useState("");
+  const [questionCount, setQuestionCount] = useState(0);
+
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +58,14 @@ export default function AnalyzePage() {
   const { addAnalysis } = useAnalyses();
   const { user, userData } = useAuth();
   const router = useRouter();
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+        scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  }, [chatHistory]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -71,20 +86,15 @@ export default function AnalyzePage() {
     }
     
     setIsLoading(true);
+    setLoadingMessage("Detecting condition...");
     setError(null);
 
     try {
-      setLoadingMessage("Detecting condition...");
       const { conditionName } = await detectDiseaseName({ photoDataUri: preview });
       setDetectedCondition(conditionName);
-
-      setLoadingMessage("Generating relevant questions...");
-      const { questions } = await generateProforma({ conditionName });
-      setProformaQuestions(questions);
-      setProformaAnswers(questions.map(q => ({ question: q, answer: '' })));
-      
       setStep('proforma');
-
+      // Start the conversational proforma
+      startProforma(conditionName);
     } catch (err) {
       console.error("Initial analysis failed:", err);
       setError("Failed to analyze the image. The AI may be unable to identify a condition. Please try another photo.");
@@ -95,25 +105,56 @@ export default function AnalyzePage() {
     }
   };
 
-  const handleAnswerChange = (index: number, answer: string) => {
-    setProformaAnswers(prev => {
-        const newAnswers = [...prev];
-        newAnswers[index].answer = answer;
-        return newAnswers;
-    });
+  const startProforma = (conditionName: string) => {
+    setChatHistory([{
+      sender: 'ai',
+      text: `I've identified the condition as likely being **${conditionName}**. To give you a more detailed report, I need to ask a few questions. Let's start with this:`
+    }]);
+    // Kick off the first question
+    getNextQuestion(conditionName, 'AI: Hello!');
   };
 
-  const handleProformaSubmit = async () => {
-    if (!user || !userData) {
+  const getNextQuestion = async (conditionName: string, history: string) => {
+      setIsLoading(true);
+      try {
+        const { nextQuestion } = await proformaChat({
+            conditionName: conditionName,
+            conversationHistory: history,
+        });
+        setChatHistory(prev => [...prev, { sender: 'ai', text: nextQuestion }]);
+        setQuestionCount(prev => prev + 1);
+      } catch (err) {
+        console.error("Failed to get next question:", err);
+        setChatHistory(prev => [...prev, { sender: 'ai', text: "I'm having trouble thinking of the next question. Let's proceed with the final analysis."}]);
+        // If question generation fails, just proceed to final eval
+        handleFinalEvaluation();
+      } finally {
+        setIsLoading(false);
+      }
+  };
+
+  const handleUserResponse = () => {
+    if (!userResponse.trim() || !detectedCondition) return;
+
+    const newHistory = [...chatHistory, { sender: 'user' as const, text: userResponse }];
+    setChatHistory(newHistory);
+    setUserResponse("");
+    
+    if (questionCount >= MAX_QUESTIONS) {
+        handleFinalEvaluation();
+    } else {
+        const historyString = newHistory.map(m => `${m.sender === 'ai' ? 'AI' : 'User'}: ${m.text}`).join('\n');
+        getNextQuestion(detectedCondition, historyString);
+    }
+  };
+
+  const handleFinalEvaluation = async () => {
+     if (!user || !userData) {
       toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
       return;
     }
     if (!preview || !detectedCondition) {
       toast({ title: "Missing Information", description: "Critical analysis data is missing.", variant: "destructive" });
-      return;
-    }
-    if (proformaAnswers.some(a => !a.answer.trim())) {
-      toast({ title: "Please answer all questions", description: "Your answers are crucial for an accurate report.", variant: "destructive" });
       return;
     }
 
@@ -122,8 +163,17 @@ export default function AnalyzePage() {
     setLoadingMessage("Performing final evaluation...");
     setError(null);
 
-    try {
-      const answersString = proformaAnswers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join('\n\n');
+     try {
+      const answersString = chatHistory.map(a => `${a.sender === 'ai' ? 'Q' : 'A'}: ${a.text}`).join('\n\n');
+      const proformaAnswers = chatHistory.reduce((acc, curr, index) => {
+        if (curr.sender === 'ai' && index > 0) { // Skip the initial greeting
+          const nextMessage = chatHistory[index + 1];
+          if (nextMessage && nextMessage.sender === 'user') {
+            acc.push({ question: curr.text, answer: nextMessage.text });
+          }
+        }
+        return acc;
+      }, [] as { question: string; answer: string }[]);
       
       const result = await finalEvaluation({
         photoDataUri: preview,
@@ -138,7 +188,6 @@ export default function AnalyzePage() {
         recommendations: result.recommendations,
         dos: result.dos,
         donts: result.donts,
-        // Storing the new detailed fields for future use if needed
         submittedInfo: {
           initialCondition: detectedCondition,
           otherConsiderations: result.otherConsiderations,
@@ -156,15 +205,16 @@ export default function AnalyzePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
+
 
   const resetState = () => {
     setStep('upload');
     setFile(null);
     setPreview(null);
     setDetectedCondition(null);
-    setProformaQuestions([]);
-    setProformaAnswers([]);
+    setChatHistory([]);
+    setQuestionCount(0);
     setError(null);
     setLoadingMessage("");
   };
@@ -186,8 +236,8 @@ export default function AnalyzePage() {
           <CardHeader>
             <CardTitle className="font-headline text-2xl">New Skin Analysis</CardTitle>
             <CardDescription>
-              {step === 'upload' && "Upload a photo to get started. Our AI will identify the condition and ask relevant questions."}
-              {step === 'proforma' && "Please answer these questions for a more accurate report."}
+              {step === 'upload' && "Upload a photo to get started. Our AI will identify the condition and begin a guided consultation."}
+              {step === 'proforma' && "Please answer the AI's questions for a more accurate report."}
               {step === 'analyzing' && "Hang tight! Our AI is preparing your detailed analysis."}
               {step === 'error' && "An error occurred. Please try again."}
             </CardDescription>
@@ -229,34 +279,53 @@ export default function AnalyzePage() {
 
           {step === 'proforma' && (
             <>
-              <CardContent className="space-y-6">
-                {detectedCondition && (
-                  <div className="p-4 bg-primary/10 rounded-lg">
-                     <p className="text-sm text-muted-foreground">Initial finding:</p>
-                     <p className="text-lg font-bold text-primary">{detectedCondition}</p>
-                     <p className="text-sm text-muted-foreground mt-2">To provide a more accurate evaluation, please answer the questions below.</p>
+              <CardContent className="h-[50vh] flex flex-col p-0">
+                  <ScrollArea className="flex-grow p-6" ref={scrollAreaRef}>
+                       <div className="space-y-4">
+                        {chatHistory.map((msg, index) => (
+                           <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : 'justify-start')}>
+                                {msg.sender === 'ai' && (
+                                    <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                                        <AvatarFallback><Bot size={18} /></AvatarFallback>
+                                    </Avatar>
+                                )}
+                                <div className={cn("rounded-lg px-4 py-2 max-w-[80%]", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                    <p className="text-sm" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                </div>
+                                {msg.sender === 'user' && (
+                                     <Avatar className="h-8 w-8">
+                                        <AvatarFallback><User size={18} /></AvatarFallback>
+                                    </Avatar>
+                                )}
+                            </div>
+                        ))}
+                         {isLoading && (
+                            <div className="flex items-start gap-3">
+                                <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                                    <AvatarFallback><Bot size={18} /></AvatarFallback>
+                                </Avatar>
+                                <div className="rounded-lg px-4 py-2 bg-muted flex items-center">
+                                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                </div>
+                            </div>
+                         )}
+                       </div>
+                  </ScrollArea>
+                  <div className="p-4 border-t">
+                      <div className="relative">
+                          <Input 
+                            placeholder="Type your answer..." 
+                            value={userResponse}
+                            onChange={(e) => setUserResponse(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleUserResponse()}
+                            disabled={isLoading}
+                          />
+                          <Button size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={handleUserResponse} disabled={isLoading || !userResponse.trim()}>
+                            <Send className="h-4 w-4" />
+                          </Button>
+                      </div>
                   </div>
-                )}
-                 {proformaQuestions.map((question, index) => (
-                    <div key={index} className="space-y-2">
-                        <Label htmlFor={`question-${index}`} className="flex items-start gap-2">
-                          <MessageCircleQuestion className="h-4 w-4 mt-1 flex-shrink-0" />
-                          <span>{question}</span>
-                        </Label>
-                        <Textarea 
-                            id={`question-${index}`} 
-                            placeholder="Your answer..."
-                            value={proformaAnswers[index].answer}
-                            onChange={(e) => handleAnswerChange(index, e.target.value)}
-                        />
-                    </div>
-                ))}
               </CardContent>
-              <CardFooter>
-                <Button onClick={handleProformaSubmit} className="w-full">
-                  <WandSparkles className="mr-2 h-4 w-4" /> Get Detailed Report
-                </Button>
-              </CardFooter>
             </>
           )}
           
@@ -264,8 +333,9 @@ export default function AnalyzePage() {
             <CardContent className="flex flex-col items-center justify-center h-48 gap-4">
               {step === 'analyzing' && (
                 <>
-                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <p className="text-muted-foreground">{loadingMessage}</p>
+                  <WandSparkles className="h-12 w-12 animate-pulse text-primary" />
+                  <p className="text-muted-foreground">{loadingMessage || "Generating your final report..."}</p>
+                  <p className="text-xs text-muted-foreground">This can take up to a minute.</p>
                 </>
               )}
               {step === 'error' && error && (
