@@ -125,18 +125,33 @@ export default function MyAnalysesPage() {
 
                 pdf.addImage(img, 'JPEG', margin, yPos, imgWidth, imgHeight);
                 
-                const textX = margin + imgWidth + 10;
-                pdf.setFont('helvetica', 'bold');
-                pdf.text('Pre-medication:', textX, yPos + 5);
-                pdf.setFont('helvetica', 'normal');
-                pdf.text(analysis.submittedInfo.preMedication, textX, yPos + 10);
-                
-                pdf.setFont('helvetica', 'bold');
-                pdf.text('Disease Duration:', textX, yPos + 20);
-                pdf.setFont('helvetica', 'normal');
-                pdf.text(analysis.submittedInfo.diseaseDuration, textX, yPos + 25);
-                
-                yPos += imgHeight > 35 ? imgHeight + 10 : 45;
+                let textX = margin + imgWidth + 10;
+                let textY = yPos + 5;
+                const textMaxWidth = pageWidth - textX - margin;
+
+                if (analysis.submittedInfo?.proformaAnswers && analysis.submittedInfo.proformaAnswers.length > 0) {
+                    analysis.submittedInfo.proformaAnswers.forEach(qa => {
+                        if (textY > yPos + imgHeight) { // Move to left column if text overflows image height
+                            textX = margin;
+                            textY = yPos + imgHeight + 10;
+                        }
+                        pdf.setFont('helvetica', 'bold');
+                        const question = pdf.splitTextToSize(`Q: ${qa.question}`, textMaxWidth);
+                        pdf.text(question, textX, textY);
+                        textY += question.length * 4 + 2;
+                        
+                        pdf.setFont('helvetica', 'normal');
+                        const answer = pdf.splitTextToSize(`A: ${qa.answer}`, textMaxWidth);
+                        pdf.text(answer, textX, textY);
+                        textY += answer.length * 4 + 4;
+                    });
+                } else {
+                     pdf.setFont('helvetica', 'normal');
+                     pdf.text("No additional information was provided for this analysis.", textX, textY);
+                }
+
+                yPos += imgHeight + 10; // Move yPos down past image
+
 
                 // --- Recommendations ---
                 checkAndSwitchPage(20);
@@ -311,3 +326,5 @@ export default function MyAnalysesPage() {
         </div>
     )
 }
+
+    

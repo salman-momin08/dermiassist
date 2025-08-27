@@ -223,20 +223,42 @@ export default function AnalysisDetailPage() {
 
                 pdf.addImage(img, 'JPEG', margin, yPos, imgWidth, imgHeight);
                 
-                const textX = margin + imgWidth + 10;
-                pdf.setFont('helvetica', 'bold');
-                pdf.text('Pre-medication:', textX, yPos + 5);
-                pdf.setFont('helvetica', 'normal');
-                pdf.text(analysis.submittedInfo.preMedication, textX, yPos + 10);
+                let textX = margin + imgWidth + 10;
+                let textY = yPos + 5;
+                const textMaxWidth = pageWidth - textX - margin;
                 
-                pdf.setFont('helvetica', 'bold');
-                pdf.text('Disease Duration:', textX, yPos + 20);
-                pdf.setFont('helvetica', 'normal');
-                pdf.text(analysis.submittedInfo.diseaseDuration, textX, yPos + 25);
-                
-                yPos += imgHeight > 35 ? imgHeight + 10 : 45;
+                if (analysis.submittedInfo?.proformaAnswers && analysis.submittedInfo.proformaAnswers.length > 0) {
+                    analysis.submittedInfo.proformaAnswers.forEach(qa => {
+                         if (textY > yPos + imgHeight) { // Move to left column if text overflows image height
+                            textX = margin;
+                            textY = yPos + imgHeight + 10;
+                        }
+                        pdf.setFont('helvetica', 'bold');
+                        const question = pdf.splitTextToSize(`Q: ${qa.question}`, textMaxWidth);
+                        pdf.text(question, textX, textY);
+                        textY += question.length * 4 + 2;
+                        
+                        pdf.setFont('helvetica', 'normal');
+                        const answer = pdf.splitTextToSize(`A: ${qa.answer}`, textMaxWidth);
+                        pdf.text(answer, textX, textY);
+                        textY += answer.length * 4 + 4;
+                    });
+                } else {
+                     pdf.setFont('helvetica', 'normal');
+                     pdf.text("No additional information was provided for this analysis.", textX, textY);
+                }
+
+                yPos += imgHeight + 10; // Move yPos down past image
+
+                const checkAndSwitchPage = (neededHeight: number) => {
+                  if (yPos + neededHeight > pageHeight - margin) {
+                    pdf.addPage();
+                    yPos = margin;
+                  }
+                };
 
                 // --- Recommendations ---
+                checkAndSwitchPage(20);
                 pdf.setFontSize(14);
                 pdf.setFont('helvetica', 'bold');
                 pdf.text('Recommendations', margin, yPos);
@@ -246,13 +268,6 @@ export default function AnalysisDetailPage() {
                 const recommendationsText = pdf.splitTextToSize(analysis.recommendations, pageWidth - (margin * 2));
                 pdf.text(recommendationsText, margin, yPos);
                 yPos += recommendationsText.length * 4 + 5;
-
-                const checkAndSwitchPage = (neededHeight: number) => {
-                  if (yPos + neededHeight > pageHeight - margin) {
-                    pdf.addPage();
-                    yPos = margin;
-                  }
-                };
 
                 // --- Do's and Don'ts ---
                 checkAndSwitchPage(20);
@@ -391,15 +406,17 @@ export default function AnalysisDetailPage() {
                             <CardTitle>Information Provided</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4 text-sm">
-                            <div className="flex justify-between">
-                                <span className="font-medium text-muted-foreground">Pre-medication:</span>
-                                <span className="font-semibold">{analysis.submittedInfo.preMedication}</span>
-                            </div>
-                            <Separator/>
-                            <div className="flex justify-between">
-                                <span className="font-medium text-muted-foreground">Disease Duration:</span>
-                                <span className="font-semibold">{analysis.submittedInfo.diseaseDuration}</span>
-                            </div>
+                           {analysis.submittedInfo?.proformaAnswers && analysis.submittedInfo.proformaAnswers.length > 0 ? (
+                                analysis.submittedInfo.proformaAnswers.map((qa, index) => (
+                                    <div key={index}>
+                                        <p className="font-semibold">{qa.question}</p>
+                                        <p className="text-muted-foreground">{qa.answer}</p>
+                                        {index < analysis.submittedInfo.proformaAnswers!.length - 1 && <Separator className="my-2" />}
+                                    </div>
+                                ))
+                           ) : (
+                                <p className="text-muted-foreground">No additional information was provided.</p>
+                           )}
                         </CardContent>
                     </Card>
 
@@ -522,3 +539,5 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
+
+    
