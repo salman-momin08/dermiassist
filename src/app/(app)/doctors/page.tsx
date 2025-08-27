@@ -287,7 +287,7 @@ export default function DoctorsPage() {
                                                Please provide the following details for your appointment.
                                             </DialogDescription>
                                         </DialogHeader>
-                                        <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-6">
+                                        <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto px-1">
                                             
                                             <div className="grid md:grid-cols-2 gap-4">
                                                 <div className="space-y-2">
@@ -427,7 +427,3 @@ export default function DoctorsPage() {
         </div>
     );
 }
-
-    
-
-    
