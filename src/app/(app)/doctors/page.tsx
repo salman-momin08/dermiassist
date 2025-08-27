@@ -1,11 +1,11 @@
 
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, ShieldCheck, Star } from "lucide-react";
+import { MapPin, ShieldCheck, Star, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -13,13 +13,58 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useAnalyses } from '@/hooks/use-analyses';
 import { useToast } from '@/hooks/use-toast';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const doctors: any[] = [];
+type Doctor = {
+    id: string;
+    name: string;
+    avatar: string;
+    verified: boolean;
+    specialization: string;
+    location: string;
+    rating: number;
+    reviews: number;
+    [key: string]: any;
+};
+
 
 export default function DoctorsPage() {
-    const { analyses, isLoading } = useAnalyses();
+    const { analyses, isLoading: isLoadingAnalyses } = useAnalyses();
     const { toast } = useToast();
     const [openDialog, setOpenDialog] = useState<string | null>(null);
+    const [doctors, setDoctors] = useState<Doctor[]>([]);
+    const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
+
+    useEffect(() => {
+        const q = query(collection(db, "users"), where("role", "==", "doctor"), where("verified", "==", true));
+        
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const fetchedDoctors: Doctor[] = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                fetchedDoctors.push({
+                    id: doc.id,
+                    name: data.displayName || "Dr. Anonymous",
+                    avatar: data.photoURL || `https://placehold.co/100x100.png?text=${(data.displayName || 'D').charAt(0)}`,
+                    verified: data.verified,
+                    specialization: data.specialization || "Dermatology",
+                    location: data.location || "Not specified",
+                    // Mocking rating and reviews as they are not in the DB
+                    rating: 4.9, 
+                    reviews: 120,
+                });
+            });
+            setDoctors(fetchedDoctors);
+            setIsLoadingDoctors(false);
+        }, (error) => {
+            console.error("Error fetching doctors:", error);
+            setIsLoadingDoctors(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
 
     const handleRequestAppointment = (doctorName: string) => {
         // In a real app, this would send a request to a backend.
@@ -30,6 +75,22 @@ export default function DoctorsPage() {
         });
         setOpenDialog(null); // Close the dialog
     }
+    
+    const renderSkeleton = () => (
+        <div className="flex flex-col">
+            <CardHeader className="items-center text-center">
+                <Skeleton className="w-24 h-24 rounded-full mb-4" />
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-1/2 mt-2" />
+            </CardHeader>
+            <CardContent className="flex-grow">
+                <Skeleton className="h-10 w-full" />
+            </CardContent>
+            <CardFooter>
+                <Skeleton className="h-10 w-full" />
+            </CardFooter>
+        </div>
+    );
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -42,10 +103,14 @@ export default function DoctorsPage() {
                 </p>
             </div>
 
-            {doctors.length > 0 ? (
+            {isLoadingDoctors ? (
+                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {Array.from({ length: 4 }).map((_, i) => <Card key={i}>{renderSkeleton()}</Card>)}
+                </div>
+            ) : doctors.length > 0 ? (
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {doctors.map((doctor) => (
-                        <Card key={doctor.name} className="flex flex-col">
+                        <Card key={doctor.id} className="flex flex-col">
                             <CardHeader className="items-center text-center">
                                 <Avatar className="w-24 h-24 mb-4">
                                     <AvatarImage src={doctor.avatar} alt={doctor.name} data-ai-hint="doctor portrait" />
@@ -102,12 +167,12 @@ export default function DoctorsPage() {
                                                         <SelectValue placeholder="Select a report to attach" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {isLoading ? (
+                                                        {isLoadingAnalyses ? (
                                                             <SelectItem value="loading" disabled>Loading reports...</SelectItem>
                                                         ) : (
                                                           analyses.map(a => (
                                                               <SelectItem key={a.id} value={a.id}>
-                                                                  {a.condition} - {a.date}
+                                                                  {a.condition} - {new Date(a.date).toLocaleDateString()}
                                                               </SelectItem>
                                                           ))
                                                         )}
