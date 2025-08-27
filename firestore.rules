@@ -2,41 +2,25 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /users/{userId} {
+      // Admins can do anything to any user document
+      allow read, write, delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
 
-    // Helper function to check if a user is an admin
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Users can create their own document and read/update/delete their own document.
+      // They cannot read other user documents.
+      allow create: if request.auth.uid == userId;
+      allow read, update, delete: if request.auth.uid == userId && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'admin';
+
+      // Logged-in users can read analyses attached to their own user document.
+      match /analyses/{analysisId} {
+        allow read, write, delete: if request.auth.uid == userId;
+      }
     }
 
-    // Rules for the users collection
+    // Authenticated users (patients) can list doctors to find them.
+    // The query in the app code ensures only verified doctors are returned.
     match /users/{userId} {
-      // CREATE: A new user can create their own user document.
-      allow create: if request.auth != null && request.auth.uid == userId;
-
-      // READ: 
-      // 1. A user can read their own document.
-      // 2. An admin can read any user document.
-      allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
-
-      // UPDATE:
-      // 1. A user can update their own document.
-      // 2. An admin can update any user document (e.g., to verify doctors).
-      allow update: if (request.auth != null && request.auth.uid == userId) || isAdmin();
-      
-      // DELETE:
-      // 1. A user can delete their own document.
-      // 2. An admin can delete any user document.
-      allow delete: if (request.auth != null && request.auth.uid == userId) || isAdmin();
-      
-      // LIST: An admin can list all users for the dashboard.
-      allow list: if isAdmin();
-
-      // Rules for the 'analyses' subcollection for each user
-      match /analyses/{analysisId} {
-        // Only the user who owns the parent document can manage their analyses.
-        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
-      }
+        allow list: if request.auth != null;
     }
   }
 }
