@@ -232,6 +232,18 @@ export default function DoctorDashboardPage() {
             </>
         );
     };
+    
+    const getFormattedDate = (dateString?: string) => {
+        if (!dateString || typeof dateString !== 'string' || dateString.trim() === '') {
+            return 'Not specified';
+        }
+        try {
+            return format(new Date(dateString), 'PP');
+        } catch (e) {
+            console.error('Invalid date value for formatting:', dateString);
+            return 'Invalid Date';
+        }
+    };
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -315,7 +327,7 @@ export default function DoctorDashboardPage() {
                                         <div className="text-sm text-muted-foreground">{app.mode}</div>
                                     </TableCell>
                                     <TableCell className="hidden sm:table-cell">
-                                        {app.preferredDate ? `${format(new Date(app.preferredDate), 'PP')} at ${app.preferredTime || 'any time'}` : 'Not specified'}
+                                        {`${getFormattedDate(app.preferredDate)} at ${app.preferredTime || 'any time'}`}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
@@ -364,3 +376,5 @@ export default function DoctorDashboardPage() {
         </div>
     );
 }
+
+    
