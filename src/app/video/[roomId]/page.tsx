@@ -10,8 +10,8 @@ import {
   selectIsLocalAudioEnabled,
   selectIsLocalVideoEnabled,
   useVideo,
+  HMSRoomProvider,
 } from "@100mslive/react-sdk";
-import { HMSRoomProvider } from "@100mslive/react-sdk";
 import { generate100msToken } from "@/ai/flows/generate-100ms-token";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2, Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, User } from "lucide-react";
@@ -145,7 +145,9 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
     });
 
     return () => {
-        hmsActions.leave();
+        if(hmsActions.leave) {
+          hmsActions.leave();
+        }
     }
   }, [token, hmsActions, userData]);
 
@@ -173,5 +175,3 @@ export default function VideoCallPageWrapper({ params }: { params: { roomId: str
         </HMSRoomProvider>
     );
 };
-
-    
