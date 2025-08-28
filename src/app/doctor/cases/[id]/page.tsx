@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useParams, notFound } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { collection, query, where, onSnapshot, doc, getDoc, updateDoc } from "firebase/firestore";
+import { collection, query, where, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { format } from "date-fns";
 import { AnalysisReport } from "@/hooks/use-analyses";
@@ -67,7 +67,7 @@ export default function CaseDetailPage() {
                     return;
                 }
                 const patientData = patientDoc.data();
-                setNotes(patientData.doctorNotes?.[user.uid] || ""); // Load notes specific to this doctor
+                setNotes(patientData.doctorNotes?.[user.uid] || "");
 
                 // Fetch appointments with this patient
                 const apptQuery = query(
@@ -75,12 +75,12 @@ export default function CaseDetailPage() {
                     where("doctorId", "==", user.uid),
                     where("patientId", "==", patientId)
                 );
-                const apptSnapshot = await new Promise<any>((resolve) => onSnapshot(apptQuery, resolve));
+                const apptSnapshot = await getDocs(apptQuery);
                 const appointments = apptSnapshot.docs.map((d:any) => ({ id: d.id, ...d.data() }));
 
                 // Fetch analyses for this patient
                 const analysesQuery = query(collection(db, "users", patientId, "analyses"));
-                const analysesSnapshot = await new Promise<any>((resolve) => onSnapshot(analysesQuery, resolve));
+                const analysesSnapshot = await getDocs(analysesQuery);
                 const analyses = analysesSnapshot.docs.map((d:any) => ({ id: d.id, ...d.data() }));
 
                 // Create timeline
