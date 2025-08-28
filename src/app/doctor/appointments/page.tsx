@@ -122,8 +122,8 @@ export default function DoctorAppointmentsPage() {
         if (!currentAppointmentId) return;
         const appointmentRef = doc(db, 'appointments', currentAppointmentId);
         try {
-            await updateDoc(appointmentRef, { notes: currentNotes });
-            toast({ title: "Notes Saved", description: "The consultation notes have been saved." });
+            await updateDoc(appointmentRef, { notes: currentNotes, status: 'Completed' });
+            toast({ title: "Notes Saved", description: "The consultation notes have been saved and the appointment marked as complete." });
             setCurrentNotes('');
             setCurrentAppointmentId(null);
         } catch(error) {
@@ -344,7 +344,7 @@ export default function DoctorAppointmentsPage() {
                                             </div>
                                             <DialogFooter>
                                                 <DialogClose asChild>
-                                                    <Button onClick={handleSaveNotes}>Save Notes</Button>
+                                                    <Button onClick={handleSaveNotes}>Save Notes & Mark Complete</Button>
                                                 </DialogClose>
                                             </DialogFooter>
                                         </DialogContent>
@@ -365,6 +365,7 @@ export default function DoctorAppointmentsPage() {
     );
 
     const getAppointmentsByStatus = (status: Appointment['status']) => appointments.filter(a => a.status === status);
+    const getCompletedAppointments = () => appointments.filter(a => a.status === 'Completed');
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -383,7 +384,7 @@ export default function DoctorAppointmentsPage() {
                         <TabsList className="grid w-full grid-cols-4">
                             <TabsTrigger value="pending">Pending ({getAppointmentsByStatus('Pending').length})</TabsTrigger>
                             <TabsTrigger value="confirmed">Confirmed ({getAppointmentsByStatus('Confirmed').length})</TabsTrigger>
-                            <TabsTrigger value="completed">Completed ({getAppointmentsByStatus('Completed').length})</TabsTrigger>
+                            <TabsTrigger value="completed">Completed ({getCompletedAppointments().length})</TabsTrigger>
                             <TabsTrigger value="declined">Declined ({getAppointmentsByStatus('Declined').length})</TabsTrigger>
                         </TabsList>
                         <TabsContent value="pending">
@@ -393,7 +394,7 @@ export default function DoctorAppointmentsPage() {
                             {renderTable(getAppointmentsByStatus('Confirmed'))}
                         </TabsContent>
                         <TabsContent value="completed">
-                            {renderTable(getAppointmentsByStatus('Completed'))}
+                            {renderTable(getCompletedAppointments())}
                         </TabsContent>
                         <TabsContent value="declined">
                             {renderTable(getAppointmentsByStatus('Declined'))}
@@ -404,3 +405,5 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
+
+    

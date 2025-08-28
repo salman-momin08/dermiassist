@@ -61,7 +61,7 @@ export default function AppointmentsPage() {
             const fetchedAppointments = snapshot.docs.map(doc => ({ 
                 id: doc.id,
                 ...doc.data(),
-                date: doc.data().appointmentDate, // Use appointmentDate from Firestore
+                date: doc.data().appointmentDate, // This was the bug, appointmentDate is correct.
             } as Appointment));
             setAppointments(fetchedAppointments);
             setIsLoading(false);
@@ -111,6 +111,7 @@ export default function AppointmentsPage() {
     };
     
     const isJoinButtonEnabled = (appointmentDate: string) => {
+        if (!appointmentDate) return false;
         const appointmentTime = new Date(appointmentDate);
         const diff = differenceInMinutes(appointmentTime, now);
         // Enable from 10 mins before to 10 mins after
@@ -118,6 +119,7 @@ export default function AppointmentsPage() {
     };
 
     const getJoinTooltipContent = (appointmentDate: string) => {
+        if (!appointmentDate) return "This appointment has not been scheduled yet.";
         const appointmentTime = new Date(appointmentDate);
         const diff = differenceInMinutes(appointmentTime, now);
         if (diff > 10) {
@@ -402,3 +404,5 @@ export default function AppointmentsPage() {
         </div>
     );
 }
+
+    
