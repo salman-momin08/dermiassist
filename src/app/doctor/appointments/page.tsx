@@ -93,7 +93,7 @@ export default function DoctorAppointmentsPage() {
         }
 
         const [hours, minutes] = scheduleTime.split(':').map(Number);
-        const finalDateTime = set(scheduleDate, { hours, minutes });
+        const finalDateTime = set(scheduleDate, { hours, minutes, seconds: 0, milliseconds: 0 });
 
         const appointmentRef = doc(db, 'appointments', id);
         try {
@@ -475,5 +475,7 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
+
+    
 
     
