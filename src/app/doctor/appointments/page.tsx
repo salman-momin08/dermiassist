@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarPicker } from "@/components/ui/calendar"
-import { format, set } from "date-fns"
+import { format, set, isValid } from "date-fns"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore"
@@ -196,235 +196,254 @@ export default function DoctorAppointmentsPage() {
                             <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                         </TableCell>
                     </TableRow>
-                ) : data.length > 0 ? data.map(app => (
-                    <TableRow key={app.id}>
-                        <TableCell>
-                            <div className="font-medium">{app.patientName}</div>
-                        </TableCell>
-                        <TableCell>
-                            {app.status === 'Pending' 
-                                ? (app.requestDate?.seconds ? `Requested: ${format(new Date(app.requestDate.seconds * 1000), 'PP')}` : 'Date not set')
-                                : app.appointmentDate 
-                                    ? format(new Date(app.appointmentDate), 'PPpp') 
-                                    : 'Not Scheduled'
+                ) : data.length > 0 ? data.map(app => {
+                    let displayDate = 'Not Scheduled';
+                    try {
+                        if (app.status === 'Pending') {
+                            if (app.requestDate && typeof app.requestDate.seconds === 'number') {
+                                const dateObj = new Date(app.requestDate.seconds * 1000);
+                                if (isValid(dateObj)) {
+                                    displayDate = `Requested: ${format(dateObj, 'PP')}`;
+                                } else {
+                                    displayDate = 'Date not set';
+                                }
+                            } else {
+                                displayDate = 'Date not set';
                             }
-                        </TableCell>
-                        <TableCell>
-                           <Badge variant="outline" className="flex items-center gap-1 w-fit">
-                                {app.mode === "Online" ? <Video className="h-3 w-3" /> : <CalendarIcon className="h-3 w-3" />}
-                                {app.mode}
-                            </Badge>
-                        </TableCell>
-                         <TableCell>
-                            <Badge variant={
-                                app.status === 'Confirmed' ? 'default' :
-                                app.status === 'Completed' ? 'secondary' : 
-                                app.status === 'Declined' ? 'destructive' : 'outline'
-                            }>{app.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right space-x-2">
-                             {app.status === 'Pending' && (
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button size="sm">Confirm</Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Schedule Appointment for {app.patientName}</DialogTitle>
-                                            <DialogDescription>
-                                                Patient preferred date: {app.preferredDate ? format(new Date(app.preferredDate), 'PPP') : 'Not specified'} at {app.preferredTime || 'any time'}.
-                                                <br/>
-                                                Select a final date and time to confirm.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <div className="grid gap-4 py-4">
-                                            <div className="space-y-2">
-                                                <Label>Date</Label>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <Button
-                                                            variant={"outline"}
-                                                            className={cn(
-                                                                "w-full justify-start text-left font-normal",
-                                                                !scheduleDate && "text-muted-foreground"
-                                                            )}
-                                                        >
-                                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                                            {scheduleDate ? format(scheduleDate, "PPP") : <span>Pick a date</span>}
-                                                        </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0">
-                                                        <CalendarPicker
-                                                            mode="single"
-                                                            selected={scheduleDate}
-                                                            onSelect={setScheduleDate}
-                                                            initialFocus
-                                                        />
-                                                    </PopoverContent>
-                                                </Popover>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="time">Time</Label>
-                                                <Input id="time" type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button variant="ghost" onClick={() => handleDeclineRequest(app.id)}>Decline Request</Button>
-                                            <DialogClose asChild>
-                                                <Button onClick={() => handleConfirmRequest(app.id)}>Confirm Appointment</Button>
-                                            </DialogClose>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                             )} 
-                             {(app.status === 'Confirmed') && (
-                                <>
-                                  {app.mode === 'Online' && (
-                                    <Button asChild size="sm">
-                                      <Link href={`/video/${app.id}`}>
-                                        <Video className="mr-2 h-4 w-4" /> Join Call
-                                      </Link>
-                                    </Button>
-                                  )}
-                                  <AlertDialog>
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon">
-                                          <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent>
-                                        <AlertDialogTrigger asChild>
-                                          <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            Cancel Appointment
-                                          </DropdownMenuItem>
-                                        </AlertDialogTrigger>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          This will cancel the appointment for {app.patientName}. This action cannot be undone.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Go Back</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDelete(app.id)} className="bg-destructive hover:bg-destructive/90">
-                                          Yes, Cancel
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </>
-                             )}
-                             {app.status === 'Completed' && (
-                                <>
+                        } else if (app.appointmentDate) {
+                            const dateObj = new Date(app.appointmentDate);
+                             if (isValid(dateObj)) {
+                                displayDate = format(dateObj, 'PPpp');
+                            }
+                        }
+                    } catch (e) {
+                         // Catches any other error during date processing
+                         console.error("Error processing date for appointment", app.id, e);
+                    }
+
+                    return (
+                        <TableRow key={app.id}>
+                            <TableCell>
+                                <div className="font-medium">{app.patientName}</div>
+                            </TableCell>
+                            <TableCell>{displayDate}</TableCell>
+                            <TableCell>
+                               <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                                    {app.mode === "Online" ? <Video className="h-3 w-3" /> : <CalendarIcon className="h-3 w-3" />}
+                                    {app.mode}
+                                </Badge>
+                            </TableCell>
+                             <TableCell>
+                                <Badge variant={
+                                    app.status === 'Confirmed' ? 'default' :
+                                    app.status === 'Completed' ? 'secondary' : 
+                                    app.status === 'Declined' ? 'destructive' : 'outline'
+                                }>{app.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right space-x-2">
+                                 {app.status === 'Pending' && (
                                     <Dialog>
                                         <DialogTrigger asChild>
-                                            <Button size="sm" variant="outline" onClick={() => openPrescriptionDialog(app)}>
-                                                <Pill className="mr-2 h-4 w-4" /> E-Prescription
-                                            </Button>
+                                            <Button size="sm">Confirm</Button>
                                         </DialogTrigger>
                                         <DialogContent>
                                             <DialogHeader>
-                                                <DialogTitle>E-Prescription for {app.patientName}</DialogTitle>
-                                                <DialogDescription>Fill out the details below to generate an e-prescription.</DialogDescription>
+                                                <DialogTitle>Schedule Appointment for {app.patientName}</DialogTitle>
+                                                <DialogDescription>
+                                                    Patient preferred date: {app.preferredDate ? format(new Date(app.preferredDate), 'PPP') : 'Not specified'} at {app.preferredTime || 'any time'}.
+                                                    <br/>
+                                                    Select a final date and time to confirm.
+                                                </DialogDescription>
                                             </DialogHeader>
                                             <div className="grid gap-4 py-4">
                                                 <div className="space-y-2">
-                                                    <Label htmlFor="medication">Medication</Label>
-                                                    <Input id="medication" placeholder="e.g., Tretinoin Cream 0.05%" value={prescriptionForm.medication} onChange={(e) => setPrescriptionForm(p => ({...p, medication: e.target.value}))}/>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="type">Medicine Type</Label>
-                                                        <Select value={prescriptionForm.type} onValueChange={(v) => setPrescriptionForm(p => ({...p, type: v}))}>
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Select a type" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="cream">Cream</SelectItem>
-                                                                <SelectItem value="ointment">Ointment</SelectItem>
-                                                                <SelectItem value="gel">Gel</SelectItem>
-                                                                <SelectItem value="lotion">Lotion</SelectItem>
-                                                                <SelectItem value="foam">Foam</SelectItem>
-                                                                <SelectItem value="solution">Solution</SelectItem>
-                                                                <SelectItem value="shampoo">Shampoo</SelectItem>
-                                                                <SelectItem value="tablet">Tablet</SelectItem>
-                                                                <SelectItem value="capsule">Capsule</SelectItem>
-                                                                <SelectItem value="syrup">Syrup</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="time">Time of Day</Label>
-                                                        <Select value={prescriptionForm.time} onValueChange={(v) => setPrescriptionForm(p => ({...p, time: v}))}>
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Select time" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="morn-after">Morning (After Food)</SelectItem>
-                                                                <SelectItem value="morn-before">Morning (Before Food)</SelectItem>
-                                                                <SelectItem value="noon-after">Afternoon (After Food)</SelectItem>
-                                                                <SelectItem value="noon-before">Afternoon (Before Food)</SelectItem>
-                                                                <SelectItem value="night-after">Night (After Food)</SelectItem>
-                                                                <SelectItem value="night-before">Night (Before Food)</SelectItem>
-                                                                <SelectItem value="twice-day">Twice a day</SelectItem>
-                                                                <SelectItem value="thrice-day">Thrice a day</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
+                                                    <Label>Date</Label>
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                            <Button
+                                                                variant={"outline"}
+                                                                className={cn(
+                                                                    "w-full justify-start text-left font-normal",
+                                                                    !scheduleDate && "text-muted-foreground"
+                                                                )}
+                                                            >
+                                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                                {scheduleDate ? format(scheduleDate, "PPP") : <span>Pick a date</span>}
+                                                            </Button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-auto p-0">
+                                                            <CalendarPicker
+                                                                mode="single"
+                                                                selected={scheduleDate}
+                                                                onSelect={setScheduleDate}
+                                                                initialFocus
+                                                            />
+                                                        </PopoverContent>
+                                                    </Popover>
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label htmlFor="dosage">Dosage</Label>
-                                                    <Input id="dosage" placeholder="e.g., Apply a pea-sized amount once daily" value={prescriptionForm.dosage} onChange={(e) => setPrescriptionForm(p => ({...p, dosage: e.target.value}))}/>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="instructions">Additional Instructions</Label>
-                                                    <Textarea id="instructions" placeholder="e.g., Avoid sun exposure. Use moisturizer." value={prescriptionForm.instructions} onChange={(e) => setPrescriptionForm(p => ({...p, instructions: e.target.value}))}/>
+                                                    <Label htmlFor="time">Time</Label>
+                                                    <Input id="time" type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} />
                                                 </div>
                                             </div>
                                             <DialogFooter>
+                                                <Button variant="ghost" onClick={() => handleDeclineRequest(app.id)}>Decline Request</Button>
                                                 <DialogClose asChild>
-                                                    <Button onClick={() => handleSendPrescription(app.patientName)}>Send to Patient</Button>
+                                                    <Button onClick={() => handleConfirmRequest(app.id)}>Confirm Appointment</Button>
                                                 </DialogClose>
                                             </DialogFooter>
                                         </DialogContent>
                                     </Dialog>
-
-                                    <Dialog>
-                                        <DialogTrigger asChild>
-                                             <Button size="sm" onClick={() => openNotesDialog(app)}>
-                                                <StickyNote className="mr-2 h-4 w-4" /> Notes
+                                 )} 
+                                 {(app.status === 'Confirmed') && (
+                                    <>
+                                      {app.mode === 'Online' && (
+                                        <Button asChild size="sm">
+                                          <Link href={`/video/${app.id}`}>
+                                            <Video className="mr-2 h-4 w-4" /> Join Call
+                                          </Link>
+                                        </Button>
+                                      )}
+                                      <AlertDialog>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon">
+                                              <MoreHorizontal className="h-4 w-4" />
                                             </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>Consultation Notes for {app.patientName}</DialogTitle>
-                                                <DialogDescription>Add or edit your follow-up notes for this consultation. These notes will be visible to the patient.</DialogDescription>
-                                            </DialogHeader>
-                                            <div className="py-4">
-                                                <Textarea 
-                                                    placeholder="Type your consultation notes here..." 
-                                                    className="min-h-[200px]" 
-                                                    value={currentNotes}
-                                                    onChange={(e) => setCurrentNotes(e.target.value)}
-                                                />
-                                            </div>
-                                            <DialogFooter>
-                                                <DialogClose asChild>
-                                                    <Button onClick={handleSaveNotes}>Save Notes & Mark Complete</Button>
-                                                </DialogClose>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
-                                </>
-                             )}
-                        </TableCell>
-                    </TableRow>
-                )) : (
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent>
+                                            <AlertDialogTrigger asChild>
+                                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Cancel Appointment
+                                              </DropdownMenuItem>
+                                            </AlertDialogTrigger>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              This will cancel the appointment for {app.patientName}. This action cannot be undone.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>Go Back</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDelete(app.id)} className="bg-destructive hover:bg-destructive/90">
+                                              Yes, Cancel
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </>
+                                 )}
+                                 {app.status === 'Completed' && (
+                                    <>
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button size="sm" variant="outline" onClick={() => openPrescriptionDialog(app)}>
+                                                    <Pill className="mr-2 h-4 w-4" /> E-Prescription
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>E-Prescription for {app.patientName}</DialogTitle>
+                                                    <DialogDescription>Fill out the details below to generate an e-prescription.</DialogDescription>
+                                                </DialogHeader>
+                                                <div className="grid gap-4 py-4">
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="medication">Medication</Label>
+                                                        <Input id="medication" placeholder="e.g., Tretinoin Cream 0.05%" value={prescriptionForm.medication} onChange={(e) => setPrescriptionForm(p => ({...p, medication: e.target.value}))}/>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="type">Medicine Type</Label>
+                                                            <Select value={prescriptionForm.type} onValueChange={(v) => setPrescriptionForm(p => ({...p, type: v}))}>
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Select a type" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="cream">Cream</SelectItem>
+                                                                    <SelectItem value="ointment">Ointment</SelectItem>
+                                                                    <SelectItem value="gel">Gel</SelectItem>
+                                                                    <SelectItem value="lotion">Lotion</SelectItem>
+                                                                    <SelectItem value="foam">Foam</SelectItem>
+                                                                    <SelectItem value="solution">Solution</SelectItem>
+                                                                    <SelectItem value="shampoo">Shampoo</SelectItem>
+                                                                    <SelectItem value="tablet">Tablet</SelectItem>
+                                                                    <SelectItem value="capsule">Capsule</SelectItem>
+                                                                    <SelectItem value="syrup">Syrup</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="time">Time of Day</Label>
+                                                            <Select value={prescriptionForm.time} onValueChange={(v) => setPrescriptionForm(p => ({...p, time: v}))}>
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Select time" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="morn-after">Morning (After Food)</SelectItem>
+                                                                    <SelectItem value="morn-before">Morning (Before Food)</SelectItem>
+                                                                    <SelectItem value="noon-after">Afternoon (After Food)</SelectItem>
+                                                                    <SelectItem value="noon-before">Afternoon (Before Food)</SelectItem>
+                                                                    <SelectItem value="night-after">Night (After Food)</SelectItem>
+                                                                    <SelectItem value="night-before">Night (Before Food)</SelectItem>
+                                                                    <SelectItem value="twice-day">Twice a day</SelectItem>
+                                                                    <SelectItem value="thrice-day">Thrice a day</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="dosage">Dosage</Label>
+                                                        <Input id="dosage" placeholder="e.g., Apply a pea-sized amount once daily" value={prescriptionForm.dosage} onChange={(e) => setPrescriptionForm(p => ({...p, dosage: e.target.value}))}/>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="instructions">Additional Instructions</Label>
+                                                        <Textarea id="instructions" placeholder="e.g., Avoid sun exposure. Use moisturizer." value={prescriptionForm.instructions} onChange={(e) => setPrescriptionForm(p => ({...p, instructions: e.target.value}))}/>
+                                                    </div>
+                                                </div>
+                                                <DialogFooter>
+                                                    <DialogClose asChild>
+                                                        <Button onClick={() => handleSendPrescription(app.patientName)}>Send to Patient</Button>
+                                                    </DialogClose>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                 <Button size="sm" onClick={() => openNotesDialog(app)}>
+                                                    <StickyNote className="mr-2 h-4 w-4" /> Notes
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Consultation Notes for {app.patientName}</DialogTitle>
+                                                    <DialogDescription>Add or edit your follow-up notes for this consultation. These notes will be visible to the patient.</DialogDescription>
+                                                </DialogHeader>
+                                                <div className="py-4">
+                                                    <Textarea 
+                                                        placeholder="Type your consultation notes here..." 
+                                                        className="min-h-[200px]" 
+                                                        value={currentNotes}
+                                                        onChange={(e) => setCurrentNotes(e.target.value)}
+                                                    />
+                                                </div>
+                                                <DialogFooter>
+                                                    <DialogClose asChild>
+                                                        <Button onClick={handleSaveNotes}>Save Notes & Mark Complete</Button>
+                                                    </DialogClose>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </>
+                                 )}
+                            </TableCell>
+                        </TableRow>
+                    )
+                }) : (
                     <TableRow>
                         <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
                             No appointments in this category.
