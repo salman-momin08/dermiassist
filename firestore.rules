@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -9,15 +8,21 @@ service cloud.firestore {
     // =====================================================================
 
     function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Check for existence of the user document and the role field.
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isDoctor() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
     }
 
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Checks if the requesting doctor has a case file for the given patient.
+    function isTheirPatient(patientId) {
+        return isDoctor() && exists(/databases/$(database)/documents/doctorCases/$(request.auth.uid)/patients/$(patientId));
     }
 
     // =====================================================================
@@ -26,18 +31,18 @@ service cloud.firestore {
     match /users/{userId} {
       // GET: Allows fetching a single user document.
       // 1. A user can read their own profile.
-      // 2. Any authenticated user can read a doctor's profile.
-      // 3. An admin can read any user's profile.
+      // 2. A doctor can read the profile of their own patient.
+      // 3. Any authenticated user can read another doctor's profile.
+      // 4. An admin can read any user's profile.
       allow get: if request.auth != null && (
                     isOwner(userId) ||
+                    isTheirPatient(userId) ||
                     get(/databases/$(database)/documents/users/$(userId)).data.role == 'doctor' ||
                     isAdmin()
                   );
 
       // LIST: Allows querying the users collection.
-      // Any authenticated user can list users, but the query in the app
-      // specifically filters for doctors (role == 'doctor').
-      // This is required for the "Find a Doctor" page to function.
+      // Required for the "Find a Doctor" page to function.
       allow list: if request.auth != null;
 
       // CREATE:
@@ -55,10 +60,12 @@ service cloud.firestore {
 
       // --- Analyses Subcollection -> /users/{userId}/analyses/{analysisId} ---
       match /analyses/{analysisId} {
-        // Full access is granted only to the owner of the parent user document.
-        // A doctor can read analyses if they are linked via a case file.
-        allow read: if isOwner(userId) || 
-                       (isDoctor() && exists(/databases/$(database)/documents/doctorCases/$(request.auth.uid)/patients/$(userId)));
+        // READ:
+        // 1. A user can read their own analysis.
+        // 2. A doctor can read the analysis of their own patient.
+        allow read: if isOwner(userId) || isTheirPatient(userId);
+        
+        // WRITE, DELETE: Only the owner can modify their analyses.
         allow write, delete: if isOwner(userId);
       }
     }
