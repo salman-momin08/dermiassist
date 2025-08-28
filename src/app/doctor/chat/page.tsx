@@ -29,13 +29,6 @@ type Message = {
     imageUrl?: string;
 };
 
-// Mock data to allow UI to be functional
-const mockPatients: Patient[] = [
-    { id: 'patient1', name: 'John Doe', avatar: 'https://placehold.co/100x100.png?text=JD', online: true },
-    { id: 'patient2', name: 'Jane Smith', avatar: 'https://placehold.co/100x100.png?text=JS', online: false },
-    { id: 'patient3', name: 'Sam Wilson', avatar: 'https://placehold.co/100x100.png?text=SW', online: true },
-];
-
 export default function DoctorChatPage() {
   const { user } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -51,8 +44,8 @@ export default function DoctorChatPage() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Using mock data since appointments collection is empty
-    setPatients(mockPatients);
+    // In a real application, you would fetch the doctor's patients here.
+    // For now, we leave it empty and let the UI show the loading/empty state.
     setIsLoadingPatients(false);
   }, []);
 

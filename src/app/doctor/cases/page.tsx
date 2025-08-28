@@ -31,26 +31,53 @@ type PatientCase = {
     status: 'Active' | 'Resolved';
 };
 
-// Mock data to allow UI to be functional
-const mockPatientCases: PatientCase[] = [
-    { patientId: 'patient1', patientName: 'John Doe', patientAvatar: 'https://placehold.co/100x100.png?text=JD', lastInteraction: '2024-05-20', fileCount: 2, status: 'Active' },
-    { patientId: 'patient2', patientName: 'Jane Smith', patientAvatar: 'https://placehold.co/100x100.png?text=JS', lastInteraction: '2024-05-18', fileCount: 5, status: 'Resolved' },
-    { patientId: 'patient3', patientName: 'Sam Wilson', patientAvatar: 'https://placehold.co/100x100.png?text=SW', lastInteraction: '2024-05-21', fileCount: 0, status: 'Active' },
-];
-
 export default function DoctorCasesPage() {
     const { user } = useAuth();
-    const [patientCases, setPatientCases] = useState<PatientCase[]>([]);
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Using mock data since appointments collection is empty
-        // This makes the UI usable for demonstration and testing purposes
-        if (user) {
-            setPatientCases(mockPatientCases);
+        if (!user) {
+            setIsLoading(false);
+            return;
         }
-        setIsLoading(false);
+        const q = query(collection(db, "appointments"), where("doctorId", "==", user.uid), orderBy("requestDate", "desc"));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedAppointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+            setAppointments(fetchedAppointments);
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
     }, [user]);
+
+    const patientCases = useMemo((): PatientCase[] => {
+        const cases: Record<string, PatientCase> = {};
+        
+        appointments.forEach(app => {
+            if (!cases[app.patientId]) {
+                 cases[app.patientId] = {
+                    patientId: app.patientId,
+                    patientName: app.patientName,
+                    patientAvatar: `https://placehold.co/100x100.png?text=${app.patientName.charAt(0)}`, // Placeholder avatar
+                    lastInteraction: format(new Date(app.requestDate.seconds * 1000), 'yyyy-MM-dd'),
+                    fileCount: (app.uploadedImageUrls?.length || 0) + (app.uploadedReportUrls?.length || 0) + (app.attachedReport ? 1 : 0),
+                    status: 'Active' // Basic status logic
+                };
+            } else {
+                // Update last interaction date if this one is newer
+                const currentLastInteraction = new Date(cases[app.patientId].lastInteraction);
+                const newInteraction = new Date(app.requestDate.seconds * 1000);
+                if (newInteraction > currentLastInteraction) {
+                    cases[app.patientId].lastInteraction = format(newInteraction, 'yyyy-MM-dd');
+                }
+                 cases[app.patientId].fileCount += (app.uploadedImageUrls?.length || 0) + (app.uploadedReportUrls?.length || 0) + (app.attachedReport ? 1 : 0);
+            }
+        });
+
+        return Object.values(cases);
+    }, [appointments]);
 
     return (
         <div className="container mx-auto p-4 md:p-8">
