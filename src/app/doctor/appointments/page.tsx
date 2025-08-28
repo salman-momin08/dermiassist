@@ -255,7 +255,7 @@ export default function DoctorAppointmentsPage() {
                     } else if (app.appointmentDate) {
                         const dateObj = new Date(app.appointmentDate);
                          if (isValid(dateObj)) {
-                            displayDate = format(dateObj, 'PPpp');
+                            displayDate = format(dateObj, 'PPpp', { timeZone: 'Asia/Kolkata' });
                         } else {
                             displayDate = 'Invalid Appointment Date'
                         }
