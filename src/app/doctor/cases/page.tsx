@@ -10,9 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Eye, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 
 type Appointment = {
     id: string;
@@ -41,11 +41,17 @@ export default function DoctorCasesPage() {
             setIsLoading(false);
             return;
         }
+        
+        // This query fetches all appointments for the current doctor.
+        // This is used to derive the list of unique patients.
         const q = query(collection(db, "appointments"), where("doctorId", "==", user.uid), orderBy("requestDate", "desc"));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedAppointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
             setAppointments(fetchedAppointments);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching appointments for patient cases:", error);
             setIsLoading(false);
         });
 
@@ -53,30 +59,47 @@ export default function DoctorCasesPage() {
     }, [user]);
 
     const patientCases = useMemo((): PatientCase[] => {
+        if (appointments.length === 0) {
+            return [];
+        }
+        
         const cases: Record<string, PatientCase> = {};
         
         appointments.forEach(app => {
+            // Initialize patient case if it's the first time we see this patient
             if (!cases[app.patientId]) {
                  cases[app.patientId] = {
                     patientId: app.patientId,
                     patientName: app.patientName,
-                    patientAvatar: `https://placehold.co/100x100.png?text=${app.patientName.charAt(0)}`, // Placeholder avatar
-                    lastInteraction: format(new Date(app.requestDate.seconds * 1000), 'yyyy-MM-dd'),
-                    fileCount: (app.uploadedImageUrls?.length || 0) + (app.uploadedReportUrls?.length || 0) + (app.attachedReport ? 1 : 0),
-                    status: 'Active' // Basic status logic
+                    patientAvatar: app.patientAvatar || `https://placehold.co/100x100.png?text=${app.patientName.charAt(0)}`,
+                    lastInteraction: new Date(0).toISOString(), // Initialize with a very old date
+                    fileCount: 0,
+                    status: 'Active' // Default status
                 };
-            } else {
-                // Update last interaction date if this one is newer
-                const currentLastInteraction = new Date(cases[app.patientId].lastInteraction);
-                const newInteraction = new Date(app.requestDate.seconds * 1000);
-                if (newInteraction > currentLastInteraction) {
-                    cases[app.patientId].lastInteraction = format(newInteraction, 'yyyy-MM-dd');
-                }
-                 cases[app.patientId].fileCount += (app.uploadedImageUrls?.length || 0) + (app.uploadedReportUrls?.length || 0) + (app.attachedReport ? 1 : 0);
+            }
+            
+            // Update last interaction date if this one is newer
+            const interactionDate = new Date(app.requestDate.seconds * 1000);
+            const lastInteractionDate = new Date(cases[app.patientId].lastInteraction);
+            if (interactionDate > lastInteractionDate) {
+                cases[app.patientId].lastInteraction = interactionDate.toISOString();
+            }
+
+            // Aggregate file counts
+            const fileCount = (app.uploadedImageUrls?.length || 0) + (app.uploadedReportUrls?.length || 0) + (app.attachedReport ? 1 : 0);
+            cases[app.patientId].fileCount += fileCount;
+            
+            // Update status (example logic: if any appointment is completed, case is resolved)
+            if (app.status === 'Completed') {
+                cases[app.patientId].status = 'Resolved';
             }
         });
 
-        return Object.values(cases);
+        // Convert the record to an array and format the date for display
+        return Object.values(cases).map(c => ({
+            ...c,
+            lastInteraction: isValid(new Date(c.lastInteraction)) ? format(new Date(c.lastInteraction), 'yyyy-MM-dd') : 'N/A'
+        }));
     }, [appointments]);
 
     return (

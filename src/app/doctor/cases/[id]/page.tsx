@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft, User, Calendar, Bot, MessageSquare, Loader2, FileText, Download, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useParams, notFound } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { collection, query, where, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
+import { collection, query, where, doc, getDoc, getDocs, updateDoc, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { AnalysisReport } from "@/hooks/use-analyses";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
@@ -38,7 +38,7 @@ type TimelineItem = {
     type: 'appointment' | 'analysis';
     title: string;
     description: string;
-    date: string;
+    date: Date; // Use Date object for sorting
     data?: any;
 };
 
@@ -58,81 +58,91 @@ export default function CaseDetailPage() {
     const [caseDetails, setCaseDetails] = useState<CaseDetails | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [notes, setNotes] = useState("");
+    const [activeReport, setActiveReport] = useState<any>(null);
 
-    useEffect(() => {
+    const fetchCaseDetails = useCallback(async () => {
         if (!user || !patientId) return;
 
-        const fetchCaseDetails = async () => {
-            setIsLoading(true);
-            try {
-                // Fetch patient data
-                const patientDocRef = doc(db, "users", patientId);
-                const patientDoc = await getDoc(patientDocRef);
-                if (!patientDoc.exists()) {
-                    notFound();
-                    return;
-                }
-                const patientData = patientDoc.data();
-                setNotes(patientData.doctorNotes?.[user.uid] || "");
+        setIsLoading(true);
+        try {
+            // 1. Fetch all data in parallel
+            const patientDocRef = doc(db, "users", patientId);
+            const apptQuery = query(
+                collection(db, "appointments"),
+                where("doctorId", "==", user.uid),
+                where("patientId", "==", patientId),
+                orderBy("requestDate", "desc")
+            );
+            const analysesQuery = query(
+                collection(db, "users", patientId, "analyses"),
+                orderBy("date", "desc")
+            );
 
-                // Fetch appointments with this patient
-                const apptQuery = query(
-                    collection(db, "appointments"),
-                    where("doctorId", "==", user.uid),
-                    where("patientId", "==", patientId)
-                );
-                const apptSnapshot = await getDocs(apptQuery);
-                const appointments = apptSnapshot.docs.map((d:any) => ({ id: d.id, ...d.data() }));
+            const [patientDoc, apptSnapshot, analysesSnapshot] = await Promise.all([
+                getDoc(patientDocRef),
+                getDocs(apptQuery),
+                getDocs(analysesQuery)
+            ]);
 
-                // Fetch analyses for this patient
-                const analysesQuery = query(collection(db, "users", patientId, "analyses"));
-                const analysesSnapshot = await getDocs(analysesQuery);
-                const analyses = analysesSnapshot.docs.map((d:any) => ({ id: d.id, ...d.data() }));
-
-                // Create timeline
-                const timeline: TimelineItem[] = [];
-                appointments.forEach((app: Appointment) => {
-                    let description = `Appointment was ${app.status.toLowerCase()}`;
-                    if (app.attachedReport) {
-                        description += ` with AI report for ${app.attachedReport.conditionName}.`;
-                    }
-                    timeline.push({
-                        type: 'appointment',
-                        title: `Appointment ${app.status}`,
-                        description: description,
-                        date: app.appointmentDate ? format(new Date(app.appointmentDate), "PPp") : format(new Date(app.requestDate.seconds * 1000), "PPp"),
-                        data: app
-                    });
-                });
-                analyses.forEach((an: AnalysisReport) => {
-                    timeline.push({
-                        type: 'analysis',
-                        title: 'AI Analysis Completed',
-                        description: `Identified: ${an.conditionName}`,
-                        date: format(new Date(an.date), "PPp"),
-                        data: an
-                    });
-                });
-
-                timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-                setCaseDetails({
-                    patient: patientData,
-                    appointments,
-                    analyses,
-                    timeline
-                });
-
-            } catch (error) {
-                console.error("Error fetching case details:", error);
-                toast({ title: "Error", description: "Could not load case details.", variant: "destructive" });
-            } finally {
-                setIsLoading(false);
+            // 2. Check if patient exists
+            if (!patientDoc.exists()) {
+                notFound();
+                return;
             }
-        };
+            const patientData = patientDoc.data();
+            setNotes(patientData.doctorNotes?.[user.uid] || "");
 
-        fetchCaseDetails();
+            // 3. Process results
+            const appointments = apptSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+            const analyses = analysesSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+
+            // 4. Create timeline
+            const timeline: TimelineItem[] = [];
+            appointments.forEach((app: Appointment) => {
+                let description = `Appointment was ${app.status.toLowerCase()}`;
+                if (app.attachedReport) {
+                    description += ` with AI report for ${app.attachedReport.conditionName}.`;
+                }
+                timeline.push({
+                    type: 'appointment',
+                    title: `Appointment ${app.status}`,
+                    description: description,
+                    date: app.appointmentDate ? new Date(app.appointmentDate) : new Date(app.requestDate.seconds * 1000),
+                    data: app
+                });
+            });
+            analyses.forEach((an: AnalysisReport) => {
+                timeline.push({
+                    type: 'analysis',
+                    title: 'AI Analysis Completed',
+                    description: `Identified: ${an.conditionName}`,
+                    date: new Date(an.date),
+                    data: an
+                });
+            });
+
+            // 5. Sort timeline by date descending
+            timeline.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+            setCaseDetails({
+                patient: patientData,
+                appointments,
+                analyses,
+                timeline
+            });
+
+        } catch (error) {
+            console.error("Error fetching case details:", error);
+            toast({ title: "Error", description: "Could not load case details.", variant: "destructive" });
+        } finally {
+            setIsLoading(false);
+        }
     }, [user, patientId, toast]);
+
+    useEffect(() => {
+        fetchCaseDetails();
+    }, [fetchCaseDetails]);
+
 
     const handleSaveNotes = async () => {
         if (!user) return;
@@ -186,6 +196,10 @@ export default function CaseDetailPage() {
             </Card>
         </div>
        )
+    }
+    
+    const formatDate = (date: Date) => {
+        return isValid(date) ? format(date, "PPp") : 'Invalid Date';
     }
 
     return (
@@ -267,20 +281,20 @@ export default function CaseDetailPage() {
                                             <div className="pb-6 w-full">
                                                 <p className="font-semibold">{item.title}</p>
                                                 <p className="text-sm text-muted-foreground">{item.description}</p>
-                                                <p className="text-xs text-muted-foreground mt-1">{item.date}</p>
+                                                <p className="text-xs text-muted-foreground mt-1">{formatDate(item.date)}</p>
                                                 {item.type === 'appointment' && item.data.attachedReport && (
                                                      <DialogTrigger asChild>
-                                                        <Button variant="secondary" size="sm" className="mt-2">
+                                                        <Button variant="secondary" size="sm" className="mt-2" onClick={() => setActiveReport(item.data.attachedReport)}>
                                                             <FileText className="mr-2 h-4 w-4"/> View AI Report
                                                         </Button>
                                                     </DialogTrigger>
                                                 )}
                                                 {item.type === 'analysis' && (
-                                                    <Button variant="secondary" size="sm" className="mt-2" asChild>
-                                                        <Link href={`/my-analyses/${item.data.id}`}>
+                                                    <DialogTrigger asChild>
+                                                        <Button variant="secondary" size="sm" className="mt-2" onClick={() => setActiveReport(item.data)}>
                                                             <FileText className="mr-2 h-4 w-4"/> View Full Report
-                                                        </Link>
-                                                    </Button>
+                                                        </Button>
+                                                    </DialogTrigger>
                                                 )}
                                             </div>
                                         </div>
@@ -348,22 +362,36 @@ export default function CaseDetailPage() {
 
                 <DialogContent className="sm:max-w-xl">
                     <DialogHeader>
-                        <DialogTitle>Attached AI Report</DialogTitle>
+                        <DialogTitle>AI Analysis Report</DialogTitle>
                     </DialogHeader>
-                    {caseDetails.timeline.find(item => item.type === 'appointment' && item.data.attachedReport)?.data.attachedReport ? (
-                        <div className="space-y-4 py-4">
-                            <h3 className="font-bold text-lg">{caseDetails.timeline.find(item => item.type === 'appointment' && item.data.attachedReport)?.data.attachedReport.conditionName}</h3>
-                            <p className="text-sm text-muted-foreground">{caseDetails.timeline.find(item => item.type === 'appointment' && item.data.attachedReport)?.data.attachedReport.condition}</p>
+                    {activeReport ? (
+                        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                            <h3 className="font-bold text-lg">{activeReport.conditionName}</h3>
+                            <p className="text-sm text-muted-foreground">{activeReport.condition}</p>
                             <Separator/>
-                            <h4 className="font-semibold">Recommendations:</h4>
-                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{caseDetails.timeline.find(item => item.type === 'appointment' && item.data.attachedReport)?.data.attachedReport.recommendations}</p>
+                            <h4 className="font-semibold">Expert Recommendations:</h4>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{activeReport.recommendations}</p>
+                            <Separator/>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <h4 className="font-semibold mb-2">Do's</h4>
+                                    <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                                        {activeReport.dos?.map((item: string, i: number) => <li key={i}>{item}</li>)}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold mb-2">Don'ts</h4>
+                                    <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                                        {activeReport.donts?.map((item: string, i: number) => <li key={i}>{item}</li>)}
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     ) : (
-                        <p>No report found.</p>
+                        <p>No report details to display.</p>
                     )}
                 </DialogContent>
             </Dialog>
         </div>
     );
 }
-
