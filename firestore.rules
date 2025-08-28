@@ -43,34 +43,22 @@ service cloud.firestore {
 
     // Rules for the 'appointments' collection
     match /appointments/{appointmentId} {
-        // Allow reads (get, list) under specific conditions.
-        // A user can list their own appointments (as patient or doctor).
-        allow list: if request.auth != null &&
-                      (request.query.where.patientId == request.auth.uid ||
-                       request.query.where.doctorId == request.auth.uid ||
-                       isAdmin());
-        
-        // A user can get a specific appointment if they are the patient or doctor.
-        allow get: if request.auth != null &&
-                     (resource.data.patientId == request.auth.uid ||
-                      resource.data.doctorId == request.auth.uid ||
-                      isAdmin());
+      // Any authenticated user can create an appointment request.
+      allow create: if request.auth != null;
 
-        // Allow writes (create, update, delete) under specific conditions.
-        // Any authenticated user can create an appointment (request).
-        allow create: if request.auth != null;
-        
-        // Only the patient, doctor, or an admin can update an appointment.
-        allow update: if request.auth != null &&
-                        (request.auth.uid == resource.data.patientId ||
-                         request.auth.uid == resource.data.doctorId ||
-                         isAdmin());
-
-        // Only the patient, doctor, or an admin can delete an appointment.
-        allow delete: if request.auth != null &&
-                        (request.auth.uid == resource.data.patientId ||
-                         request.auth.uid == resource.data.doctorId ||
-                         isAdmin());
+      // Allow a user to query for appointments if they are querying by their own patientId or doctorId.
+      allow list: if request.auth != null && (
+                    (request.query.resource.data.patientId == request.auth.uid) ||
+                    (request.query.resource.data.doctorId == request.auth.uid) ||
+                    isAdmin()
+                  );
+      
+      // Only the patient who created it, the assigned doctor, or an admin can get, update, or delete an appointment.
+      allow get, update, delete: if request.auth != null && (
+                                  request.auth.uid == resource.data.patientId || 
+                                  request.auth.uid == resource.data.doctorId || 
+                                  isAdmin()
+                                );
     }
 
     // Rules for the 'chats' collection
