@@ -16,7 +16,7 @@ import Link from "next/link"
 import { useAuth } from "@/hooks/use-auth"
 import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { format, parse } from "date-fns"
+import { format, parse, isValid } from "date-fns"
 import { Separator } from "@/components/ui/separator"
 
 type Appointment = {
@@ -234,13 +234,18 @@ export default function DoctorDashboardPage() {
     };
     
     const getFormattedDate = (dateString?: string) => {
-        if (!dateString || typeof dateString !== 'string') return 'Not specified';
+        if (!dateString || typeof dateString !== 'string') {
+            return 'Not specified';
+        }
         try {
             // Robustly parse the 'YYYY-MM-DD' string to avoid timezone issues
             const parsedDate = parse(dateString, 'yyyy-MM-dd', new Date());
-            return format(parsedDate, 'PP');
+            if (isValid(parsedDate)) {
+                 return format(parsedDate, 'PP');
+            }
+            return 'Invalid Date';
         } catch (e) {
-            console.error('Invalid date value for formatting:', dateString);
+            console.error('Invalid date value for formatting:', dateString, e);
             return 'Invalid Date';
         }
     };
@@ -376,5 +381,3 @@ export default function DoctorDashboardPage() {
         </div>
     );
 }
-
-    

@@ -225,11 +225,9 @@ export default function DoctorAppointmentsPage() {
             return 'Not specified';
         }
         try {
-            // Robustly parse the 'YYYY-MM-DD' string to avoid timezone issues
-            const [year, month, day] = dateString.split('-').map(Number);
-            const parsedDate = new Date(year, month - 1, day);
+            const parsedDate = parse(dateString, 'yyyy-MM-dd', new Date());
             if (isValid(parsedDate)) {
-                return format(parsedDate, 'PPP');
+                return format(parsedDate, 'PP');
             }
             return 'Invalid Date';
         } catch (e) {
