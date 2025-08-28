@@ -28,7 +28,7 @@ type Appointment = {
     id: string;
     doctorName: string;
     appointmentDate?: string; // ISO string, optional because it doesn't exist for pending
-    mode: 'Online' | 'Offline';
+    appointmentMode: 'Online' | 'Offline';
     status: 'Confirmed' | 'Completed' | 'Pending' | 'Declined';
     notes?: string;
     patientName?: string;
@@ -196,14 +196,11 @@ export default function AppointmentsPage() {
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
                                     <TableCell>{appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PPpp', { timeZone: 'Asia/Kolkata' }) : 'Not Scheduled'}</TableCell>
                                     <TableCell className="hidden md:table-cell">
-                                        <Badge variant="outline" className="flex items-center gap-1.5 w-fit">
-                                            {appointment.mode === "Online" ? <Video className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
-                                            <span>{appointment.mode}</span>
-                                        </Badge>
+                                        <Badge variant="outline">{appointment.appointmentMode}</Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            {appointment.mode === "Online" ? (
+                                            {appointment.appointmentMode === "Online" ? (
                                                  <TooltipProvider>
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>

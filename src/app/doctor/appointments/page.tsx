@@ -34,7 +34,7 @@ type Appointment = {
     requestDate: { seconds: number, nanoseconds: number };
     preferredDate?: string; // yyyy-MM-dd
     preferredTime?: string; // HH:mm
-    mode: 'Online' | 'Offline';
+    appointmentMode: 'Online' | 'Offline';
     status: 'Pending' | 'Confirmed' | 'Declined' | 'Completed';
     appointmentDate?: string;
     notes?: string;
@@ -336,10 +336,7 @@ export default function DoctorAppointmentsPage() {
                             </TableCell>
                             <TableCell>{displayDate}</TableCell>
                             <TableCell>
-                               <Badge variant="outline" className="flex items-center gap-1.5 w-fit">
-                                    {app.mode === "Online" ? <Video className="h-3 w-3" /> : <CalendarIcon className="h-3 w-3" />}
-                                    <span>{app.mode}</span>
-                                </Badge>
+                               <Badge variant="outline">{app.appointmentMode}</Badge>
                             </TableCell>
                              <TableCell>
                                 <Badge variant={
@@ -430,7 +427,7 @@ export default function DoctorAppointmentsPage() {
                                  )} 
                                  {(app.status === 'Confirmed') && (
                                     <>
-                                      {app.mode === 'Online' && (
+                                      {app.appointmentMode === 'Online' && (
                                           <TooltipProvider>
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
@@ -576,7 +573,7 @@ export default function DoctorAppointmentsPage() {
                                                     />
                                                 </div>
                                                 <DialogFooter>
-                                                    <DialogClose as Child>
+                                                    <DialogClose asChild>
                                                         <Button onClick={handleSaveNotes}>Save Notes &amp; Mark Complete</Button>
                                                     </DialogClose>
                                                 </DialogFooter>
