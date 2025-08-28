@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"
-import { Pill, StickyNote, Loader2, Video, Calendar as CalendarIcon, Trash2, MoreHorizontal, CheckCircle } from "lucide-react"
+import { Pill, StickyNote, Loader2, Video, Calendar as CalendarIcon, Trash2, MoreHorizontal, CheckCircle, XCircle, Settings2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
@@ -262,12 +262,19 @@ export default function DoctorAppointmentsPage() {
             if (!isValid(baseDate)) return 'Invalid Date';
             
             if (timeString) {
-                const [hours, minutes] = timeString.split(':').map(Number);
-                const finalDate = set(baseDate, { hours, minutes });
-                return format(finalDate, 'PPp');
+                // Manually format time from HH:mm to am/pm
+                const [hoursStr, minutesStr] = timeString.split(':');
+                const hours = parseInt(hoursStr, 10);
+                const minutes = parseInt(minutesStr, 10);
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                const formattedHours = hours % 12 || 12; // Convert 0 to 12
+                const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+                const time = `${formattedHours}:${formattedMinutes} ${ampm}`;
+                return `${format(baseDate, 'PP')} at ${time}`;
             }
             return format(baseDate, 'PP');
         } catch (e) {
+            console.error('Error formatting date:', e);
             return 'Invalid Date Format';
         }
     };
@@ -326,11 +333,32 @@ export default function DoctorAppointmentsPage() {
                             </TableCell>
                             <TableCell className="text-right space-x-2">
                                  {app.status === 'Pending' && (
-                                    <>
+                                    <Dialog>
                                         <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <Button size="sm" variant="destructive" className="px-2">Decline</Button>
-                                            </AlertDialogTrigger>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                        <span className="sr-only">Toggle menu</span>
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onSelect={() => handleConfirmRequest(app, true)} disabled={!app.preferredDate || !app.preferredTime}>
+                                                        <CheckCircle className="mr-2 h-4 w-4" /> Quick Confirm
+                                                    </DropdownMenuItem>
+                                                    <DialogTrigger asChild>
+                                                        <DropdownMenuItem onSelect={() => openScheduleDialog(app)}>
+                                                            <Settings2 className="mr-2 h-4 w-4" /> Change & Confirm
+                                                        </DropdownMenuItem>
+                                                    </DialogTrigger>
+                                                    <AlertDialogTrigger asChild>
+                                                        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
+                                                            <XCircle className="mr-2 h-4 w-4" /> Decline
+                                                        </DropdownMenuItem>
+                                                    </AlertDialogTrigger>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+
                                             <AlertDialogContent>
                                                 <AlertDialogHeader>
                                                     <AlertDialogTitle>Decline this request?</AlertDialogTitle>
@@ -345,62 +373,43 @@ export default function DoctorAppointmentsPage() {
                                             </AlertDialogContent>
                                         </AlertDialog>
 
-                                        <Dialog>
-                                            <DialogTrigger asChild>
-                                                <Button size="sm" variant="secondary" onClick={() => openScheduleDialog(app)}>Change & Confirm</Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Schedule Appointment for {app.patientName}</DialogTitle>
-                                                    <DialogDescription>
-                                                        Patient preferred: {getFormattedPreferredDate(app.preferredDate, app.preferredTime)}.
-                                                        <br/>
-                                                        Select a final date and time to confirm.
-                                                    </DialogDescription>
-                                                </DialogHeader>
-                                                <div className="grid gap-4 py-4">
-                                                    <div className="space-y-2">
-                                                        <Label>Date</Label>
-                                                        <Popover>
-                                                            <PopoverTrigger asChild>
-                                                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal",!scheduleDate && "text-muted-foreground")}>
-                                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                                    {scheduleDate ? format(scheduleDate, "PPP") : <span>Pick a date</span>}
-                                                                </Button>
-                                                            </PopoverTrigger>
-                                                            <PopoverContent className="w-auto p-0">
-                                                                <CalendarPicker mode="single" selected={scheduleDate} onSelect={setScheduleDate} disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))} initialFocus />
-                                                            </PopoverContent>
-                                                        </Popover>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="time">Time</Label>
-                                                        <Input id="time" type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} />
-                                                    </div>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Schedule Appointment for {app.patientName}</DialogTitle>
+                                                <DialogDescription>
+                                                    Patient preferred: {getFormattedPreferredDate(app.preferredDate, app.preferredTime)}.
+                                                    <br/>
+                                                    Select a final date and time to confirm.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="grid gap-4 py-4">
+                                                <div className="space-y-2">
+                                                    <Label>Date</Label>
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                            <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal",!scheduleDate && "text-muted-foreground")}>
+                                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                                {scheduleDate ? format(scheduleDate, "PPP") : <span>Pick a date</span>}
+                                                            </Button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-auto p-0">
+                                                            <CalendarPicker mode="single" selected={scheduleDate} onSelect={setScheduleDate} disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))} initialFocus />
+                                                        </PopoverContent>
+                                                    </Popover>
                                                 </div>
-                                                <DialogFooter>
-                                                    <DialogClose asChild>
-                                                        <Button onClick={() => handleConfirmRequest(app, false)}>Confirm Appointment</Button>
-                                                    </DialogClose>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="time">Time</Label>
+                                                    <Input id="time" type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} />
+                                                </div>
+                                            </div>
+                                            <DialogFooter>
+                                                <DialogClose asChild>
+                                                    <Button onClick={() => handleConfirmRequest(app, false)}>Confirm Appointment</Button>
+                                                </DialogClose>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
 
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button size="sm" onClick={() => handleConfirmRequest(app, true)} disabled={!app.preferredDate || !app.preferredTime}>
-                                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                                        Quick Confirm
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Confirm for the patient's requested date and time.</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-
-                                    </>
                                  )} 
                                  {(app.status === 'Confirmed') && (
                                     <>
