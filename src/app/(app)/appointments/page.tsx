@@ -194,7 +194,7 @@ export default function AppointmentsPage() {
                             ) : upcomingAppointments.length > 0 ? upcomingAppointments.map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
-                                    <TableCell>{appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PPpp') : 'Not Scheduled'}</TableCell>
+                                    <TableCell>{appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PPpp', { timeZone: 'Asia/Kolkata' }) : 'Not Scheduled'}</TableCell>
                                     <TableCell className="hidden md:table-cell">
                                         <Badge variant="outline" className="flex items-center gap-1 w-fit">
                                             {appointment.mode === "Online" ? <Video className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
@@ -243,8 +243,8 @@ export default function AppointmentsPage() {
                                                                             <p>Dear {appointment.patientName},</p>
                                                                             <p>This letter confirms your appointment with <strong>{appointment.doctorName}</strong>. Please find the details below:</p>
                                                                             <div className="border p-4 rounded-lg space-y-2 bg-slate-50">
-                                                                                <p><strong>Date:</strong> {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'EEEE, MMMM d, yyyy') : 'N/A'}</p>
-                                                                                <p><strong>Time:</strong> {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'p') : 'N/A'}</p>
+                                                                                <p><strong>Date:</strong> {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'EEEE, MMMM d, yyyy', { timeZone: 'Asia/Kolkata' }) : 'N/A'}</p>
+                                                                                <p><strong>Time:</strong> {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'p', { timeZone: 'Asia/Kolkata' }) : 'N/A'}</p>
                                                                                 <p><strong>Location:</strong> {appointment.doctorLocation}</p>
                                                                                 <p><strong>Contact:</strong> {appointment.doctorPhone}</p>
                                                                             </div>
@@ -335,7 +335,7 @@ export default function AppointmentsPage() {
                             ) : [...pastAppointments, ...pendingAppointments].length > 0 ? [...pastAppointments, ...pendingAppointments].map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
-                                    <TableCell>{appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PP') : 'N/A'}</TableCell>
+                                    <TableCell>{appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PP', { timeZone: 'Asia/Kolkata' }) : 'N/A'}</TableCell>
                                     <TableCell>
                                         <Badge variant={
                                             appointment.status === 'Completed' ? 'secondary' :
@@ -355,7 +355,7 @@ export default function AppointmentsPage() {
                                                     <DialogHeader>
                                                         <DialogTitle>Follow-up notes from Dr. {appointment.doctorName}</DialogTitle>
                                                         <DialogDescription>
-                                                            Notes from your appointment on {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PP') : ''}.
+                                                            Notes from your appointment on {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PP', { timeZone: 'Asia/Kolkata' }) : ''}.
                                                         </DialogDescription>
                                                     </DialogHeader>
                                                     <div className="py-4 text-sm text-muted-foreground">
@@ -392,7 +392,7 @@ export default function AppointmentsPage() {
                                                                 <div>
                                                                     <p className="font-semibold">Patient Details</p>
                                                                     <p>{appointment.patientName}</p>
-                                                                    <p>Appointment: {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PP') : ''}</p>
+                                                                    <p>Appointment: {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PP', { timeZone: 'Asia/Kolkata' }) : ''}</p>
                                                                 </div>
                                                                  <div className="text-right">
                                                                     <p className="font-semibold">Prescribing Doctor</p>
@@ -419,7 +419,7 @@ export default function AppointmentsPage() {
                                                             </div>
                                                             <Separator />
                                                             <div className="text-xs text-muted-foreground text-center">
-                                                                <p>Date Issued: {appointment.prescription.dateIssued ? format(new Date(appointment.prescription.dateIssued), 'PP') : ''}</p>
+                                                                <p>Date Issued: {appointment.prescription.dateIssued ? format(new Date(appointment.prescription.dateIssued), 'PP', { timeZone: 'Asia/Kolkata' }) : ''}</p>
                                                                 <p>This is a digitally generated prescription and does not require a physical signature for verification.</p>
                                                             </div>
                                                         </CardContent>
@@ -452,3 +452,5 @@ export default function AppointmentsPage() {
         </div>
     );
 }
+
+    
