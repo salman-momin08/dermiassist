@@ -22,6 +22,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 
 
@@ -474,3 +475,5 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
+
+    
