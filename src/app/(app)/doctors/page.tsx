@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+import { uploadFile } from '@/lib/actions';
 
 type Doctor = {
     id: string;
@@ -148,11 +149,44 @@ export default function DoctorsPage() {
         }
         setIsRequesting(true);
 
-        const attachedReport = formState.attachedReportId 
-            ? analyses.find(a => a.id === formState.attachedReportId) 
-            : null;
-
         try {
+            let uploadedImageUrls: string[] = [];
+            let uploadedReportUrls: string[] = [];
+
+            // Upload skin condition photos
+            if (imageUploadRef.current?.files && imageUploadRef.current.files.length > 0) {
+                const imageFiles = Array.from(imageUploadRef.current.files);
+                const uploadPromises = imageFiles.map(async file => {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const result = await uploadFile(formData);
+                    if (result.success && result.url) {
+                        return result.url;
+                    }
+                    throw new Error(result.message || 'Image upload failed.');
+                });
+                uploadedImageUrls = await Promise.all(uploadPromises);
+            }
+
+            // Upload previous reports
+            if (reportUploadRef.current?.files && reportUploadRef.current.files.length > 0) {
+                 const reportFiles = Array.from(reportUploadRef.current.files);
+                 const uploadPromises = reportFiles.map(async file => {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const result = await uploadFile(formData);
+                    if (result.success && result.url) {
+                        return result.url;
+                    }
+                    throw new Error(result.message || 'Report upload failed.');
+                });
+                uploadedReportUrls = await Promise.all(uploadPromises);
+            }
+
+            const attachedReport = formState.attachedReportId 
+                ? analyses.find(a => a.id === formState.attachedReportId) 
+                : null;
+
             await addDoc(collection(db, "appointments"), {
                 patientId: user.uid,
                 patientName: userData.displayName,
@@ -166,6 +200,8 @@ export default function DoctorsPage() {
                 ...formState,
                 preferredDate: formState.preferredDate ? formState.preferredDate.toISOString() : null,
                 attachedReport: attachedReport ? { condition: attachedReport.condition, recommendations: attachedReport.recommendations, conditionName: attachedReport.conditionName } : null,
+                uploadedImageUrls,
+                uploadedReportUrls,
             });
 
             toast({
@@ -176,7 +212,8 @@ export default function DoctorsPage() {
             resetForm();
         } catch (error) {
             console.error("Failed to send appointment request:", error);
-            toast({ title: "Request Failed", description: "Could not send your appointment request. Please try again.", variant: "destructive" });
+            const errorMessage = error instanceof Error ? error.message : "Could not send your appointment request. Please try again.";
+            toast({ title: "Request Failed", description: errorMessage, variant: "destructive" });
         } finally {
             setIsRequesting(false);
         }
@@ -393,7 +430,7 @@ export default function DoctorsPage() {
                                                 </div>
                                                 <div className="space-y-2">
                                                     <Label>Upload Previous Reports</Label>
-                                                    <Input type="file" ref={reportUploadRef} accept="image/*,application/pdf" />
+                                                    <Input type="file" ref={reportUploadRef} accept="image/*,application/pdf" multiple />
                                                 </div>
                                             </div>
 

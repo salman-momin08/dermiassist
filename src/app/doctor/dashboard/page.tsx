@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { CalendarCheck, Users, FileText, Bot, Loader2, BookUser, ShieldAlert } from "lucide-react"
+import { CalendarCheck, Users, FileText, Bot, Loader2, BookUser, ShieldAlert, Paperclip } from "lucide-react"
 import { generateAiReportSummary } from "@/ai/flows/generate-ai-report-summary"
 import { generateCaseFileSummary } from "@/ai/flows/generate-case-file-summary"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { format } from "date-fns"
+import { Separator } from "@/components/ui/separator"
 
 type Appointment = {
     id: string;
@@ -28,6 +29,9 @@ type Appointment = {
         condition: string;
         recommendations: string;
     };
+    uploadedImageUrls?: string[];
+    uploadedReportUrls?: string[];
+    reasonForVisit?: string;
     [key: string]: any;
 };
 
@@ -38,7 +42,8 @@ export default function DoctorDashboardPage() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
-    const [activeDialog, setActiveDialog] = useState<'summary' | 'caseFile' | null>(null);
+    const [activeDialog, setActiveDialog] = useState<'summary' | 'caseFile' | 'attachments' | null>(null);
+    const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -68,7 +73,7 @@ export default function DoctorDashboardPage() {
         const stats = {
             pendingCount: pending.length,
             totalPatients: patientIds.size,
-            reportsToReview: appointments.filter(a => a.attachedReport).length,
+            reportsToReview: appointments.filter(a => a.attachedReport || (a.uploadedImageUrls && a.uploadedImageUrls.length > 0) || (a.uploadedReportUrls && a.uploadedReportUrls.length > 0)).length,
         };
 
         return { pendingRequests: pending, dashboardStats: stats };
@@ -91,7 +96,7 @@ export default function DoctorDashboardPage() {
 
     const handleGenerateSummary = async (reportText: string | undefined) => {
         if (!reportText) {
-            setSummary("No report was attached to this appointment request.");
+            setSummary("No AI report was attached to this appointment request.");
             return;
         }
         setIsGenerating(true);
@@ -126,10 +131,16 @@ export default function DoctorDashboardPage() {
         }
     };
 
+    const openAttachmentsDialog = (app: Appointment) => {
+        setSelectedAppointment(app);
+        setActiveDialog('attachments');
+    };
+
     const closeDialog = () => {
         setSummary('');
         setCaseFile('');
         setActiveDialog(null);
+        setSelectedAppointment(null);
     }
     
     if (authLoading) {
@@ -140,6 +151,85 @@ export default function DoctorDashboardPage() {
             </div>
         )
     }
+
+    const renderDialogContent = () => {
+        if (activeDialog === 'attachments' && selectedAppointment) {
+            const hasImages = selectedAppointment.uploadedImageUrls && selectedAppointment.uploadedImageUrls.length > 0;
+            const hasReports = selectedAppointment.uploadedReportUrls && selectedAppointment.uploadedReportUrls.length > 0;
+            return (
+                 <>
+                    <DialogHeader>
+                        <DialogTitle>Patient Attachments: {selectedAppointment.patientName}</DialogTitle>
+                        <DialogDescription>Reason for visit: {selectedAppointment.reasonForVisit || "Not provided"}</DialogDescription>
+                    </DialogHeader>
+                    <ScrollArea className="max-h-[60vh] my-4 pr-4">
+                        <div className="space-y-4">
+                            {hasImages && (
+                                <div>
+                                    <h4 className="font-semibold mb-2">Skin Condition Photos</h4>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {selectedAppointment.uploadedImageUrls!.map((url, index) => (
+                                            <Link key={index} href={url} target="_blank" rel="noopener noreferrer">
+                                                <img src={url} alt={`Condition photo ${index + 1}`} className="rounded-md object-cover aspect-square" />
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                             {hasReports && (
+                                <div>
+                                    <h4 className="font-semibold mb-2">Previous Reports</h4>
+                                     <ul className="space-y-2">
+                                        {selectedAppointment.uploadedReportUrls!.map((url, index) => (
+                                            <li key={index}>
+                                                <Link href={url} target="_blank" rel="noopener noreferrer">
+                                                    <Button variant="outline" className="w-full justify-start">
+                                                        <FileText className="mr-2" /> Report {index + 1}
+                                                    </Button>
+                                                </Link>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            {(!hasImages && !hasReports) && (
+                                <p className="text-muted-foreground text-center py-8">No files were uploaded with this request.</p>
+                            )}
+                        </div>
+                    </ScrollArea>
+                 </>
+            );
+        }
+
+        const isSummary = activeDialog === 'summary';
+        const title = isSummary 
+            ? `AI Report Summary: ${selectedAppointment?.attachedReport?.condition || 'N/A'}`
+            : `Case File: ${selectedAppointment?.patientName}`;
+        const description = isSummary
+            ? `A concise summary generated by AI for a quick overview.`
+            : `A comprehensive overview of the patient's case.`;
+        const content = isSummary ? summary : caseFile;
+        
+        return (
+             <>
+                <DialogHeader>
+                    <DialogTitle>{title}</DialogTitle>
+                    <DialogDescription>{description}</DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="max-h-[400px] my-4 pr-4">
+                    {isGenerating ? (
+                        <div className="flex items-center justify-center p-8">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                            {content}
+                        </p>
+                    )}
+                </ScrollArea>
+            </>
+        );
+    };
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -184,7 +274,7 @@ export default function DoctorDashboardPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Reports to Review</CardTitle>
+                        <CardTitle className="text-sm font-medium">Files for Review</CardTitle>
                         <FileText className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -193,7 +283,7 @@ export default function DoctorDashboardPage() {
                     </CardContent>
                 </Card>
             </div>
-
+            <Dialog onOpenChange={(open) => !open && closeDialog()}>
             <Card>
                 <CardHeader>
                     <CardTitle>Appointment Requests</CardTitle>
@@ -205,7 +295,7 @@ export default function DoctorDashboardPage() {
                             <TableRow>
                                 <TableHead>Patient</TableHead>
                                 <TableHead className="hidden sm:table-cell">Requested On</TableHead>
-                                <TableHead>AI Tools</TableHead>
+                                <TableHead>Tools</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -224,49 +314,28 @@ export default function DoctorDashboardPage() {
                                     </TableCell>
                                     <TableCell className="hidden sm:table-cell">{format(new Date(app.requestDate.seconds * 1000), 'PP')}</TableCell>
                                     <TableCell>
-                                        <Dialog onOpenChange={(open) => !open && closeDialog()}>
-                                            <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" size="sm" onClick={() => { setSelectedAppointment(app); setActiveDialog('summary'); handleGenerateSummary(app.attachedReport?.recommendations); }}>
+                                                    <Bot className="mr-2 h-4 w-4" />
+                                                    AI Summary
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" size="sm" onClick={() => { setSelectedAppointment(app); setActiveDialog('caseFile'); handleGenerateCaseFile(app); }}>
+                                                    <BookUser className="mr-2 h-4 w-4" />
+                                                    Case File
+                                                </Button>
+                                            </DialogTrigger>
+                                             {(app.uploadedImageUrls?.length || app.uploadedReportUrls?.length) ? (
                                                 <DialogTrigger asChild>
-                                                    <Button variant="outline" size="sm" onClick={() => { setActiveDialog('summary'); handleGenerateSummary(app.attachedReport?.recommendations); }}>
-                                                        <Bot className="mr-2 h-4 w-4" />
-                                                        AI Summary
+                                                    <Button variant="secondary" size="sm" onClick={() => openAttachmentsDialog(app)}>
+                                                        <Paperclip className="mr-2 h-4 w-4" />
+                                                        View Attachments
                                                     </Button>
                                                 </DialogTrigger>
-                                                <DialogTrigger asChild>
-                                                    <Button variant="outline" size="sm" onClick={() => { setActiveDialog('caseFile'); handleGenerateCaseFile(app); }}>
-                                                        <BookUser className="mr-2 h-4 w-4" />
-                                                        Case File
-                                                    </Button>
-                                                </DialogTrigger>
-                                            </div>
-                                            <DialogContent className="sm:max-w-md">
-                                                <DialogHeader>
-                                                    <DialogTitle>
-                                                        {activeDialog === 'summary' 
-                                                            ? `AI Report Summary: ${app.attachedReport?.condition || 'N/A'}`
-                                                            : `Case File: ${app.patientName}`
-                                                        }
-                                                    </DialogTitle>
-                                                    <DialogDescription>
-                                                         {activeDialog === 'summary' 
-                                                            ? `A concise summary generated by AI for a quick overview.`
-                                                            : `A comprehensive overview of the patient's case.`
-                                                        }
-                                                    </DialogDescription>
-                                                </DialogHeader>
-                                                <ScrollArea className="max-h-[400px] my-4 pr-4">
-                                                    {isGenerating ? (
-                                                        <div className="flex items-center justify-center p-8">
-                                                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                                                            {activeDialog === 'summary' ? summary : caseFile}
-                                                        </p>
-                                                    )}
-                                                </ScrollArea>
-                                            </DialogContent>
-                                        </Dialog>
+                                             ) : null}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Button size="sm" variant="destructive" onClick={() => handleRequest(app.id, 'Declined')}>Decline</Button>
@@ -284,6 +353,10 @@ export default function DoctorDashboardPage() {
                     </Table>
                 </CardContent>
             </Card>
+            <DialogContent className="sm:max-w-md">
+                {renderDialogContent()}
+            </DialogContent>
+        </Dialog>
         </div>
     );
 }
