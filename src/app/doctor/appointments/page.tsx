@@ -1,13 +1,13 @@
 
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"
-import { Pill, StickyNote, Calendar, Clock } from "lucide-react"
+import { Pill, StickyNote, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
@@ -19,31 +19,72 @@ import { Calendar as CalendarIcon } from "lucide-react"
 import { Calendar as CalendarPicker } from "@/components/ui/calendar"
 import { format, set } from "date-fns"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/hooks/use-auth"
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
-const initialAppointments: any[] = [];
 
 type Appointment = {
     id: string;
     patientName: string;
-    requestDate: string;
+    requestDate: { seconds: number, nanoseconds: number };
     mode: string;
-    status: string;
-    reportId: string;
-    reportCondition: string;
-    reportFullText: string;
-    previousNotes?: string;
-    notes: string;
+    status: 'Pending' | 'Confirmed' | 'Declined' | 'Completed';
     appointmentDate?: string;
+    notes?: string;
+    prescription?: {
+        medication: string;
+        type: string;
+        time: string;
+        dosage: string;
+        instructions: string;
+        dateIssued: string;
+    };
+    [key: string]: any;
 };
 
 export default function DoctorAppointmentsPage() {
-    const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
+    const { user } = useAuth();
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [currentNotes, setCurrentNotes] = useState("");
+    const [currentAppointmentId, setCurrentAppointmentId] = useState<string | null>(null);
     const { toast } = useToast();
+    
+    // State for scheduling modal
     const [scheduleDate, setScheduleDate] = useState<Date | undefined>(new Date());
     const [scheduleTime, setScheduleTime] = useState("09:00");
+    
+    // State for prescription modal
+    const [prescriptionForm, setPrescriptionForm] = useState({
+        medication: '',
+        type: '',
+        time: '',
+        dosage: '',
+        instructions: ''
+    });
 
-    const handleConfirmRequest = (id: string) => {
+    useEffect(() => {
+        if (!user) return;
+
+        setIsLoading(true);
+        const q = query(collection(db, "appointments"), where("doctorId", "==", user.uid));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedAppointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+            setAppointments(fetchedAppointments);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching appointments:", error);
+            toast({ title: "Error", description: "Could not fetch appointments.", variant: "destructive" });
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [user, toast]);
+    
+
+    const handleConfirmRequest = async (id: string) => {
         if (!scheduleDate) {
             toast({ title: "Please select a date.", variant: "destructive" });
             return;
@@ -52,38 +93,70 @@ export default function DoctorAppointmentsPage() {
         const [hours, minutes] = scheduleTime.split(':').map(Number);
         const finalDateTime = set(scheduleDate, { hours, minutes });
 
-        setAppointments(prev =>
-            prev.map(app =>
-                app.id === id ? { 
-                    ...app, 
-                    status: 'Confirmed',
-                    appointmentDate: finalDateTime.toISOString(),
-                } : app
-            )
-        );
-        toast({
-            title: `Request Confirmed`,
-            description: `The appointment has been scheduled.`,
-        });
+        const appointmentRef = doc(db, 'appointments', id);
+        try {
+            await updateDoc(appointmentRef, { 
+                status: 'Confirmed',
+                appointmentDate: finalDateTime.toISOString(),
+            });
+             toast({
+                title: `Request Confirmed`,
+                description: `The appointment has been scheduled.`,
+            });
+        } catch(error) {
+            toast({ title: "Error confirming request", variant: "destructive" });
+        }
     };
     
-    const handleDeclineRequest = (id: string) => {
-        setAppointments(prev => prev.map(app => app.id === id ? {...app, status: 'Declined' } : app));
-        toast({ title: "Request Declined", variant: "destructive" });
+    const handleDeclineRequest = async (id: string) => {
+        const appointmentRef = doc(db, 'appointments', id);
+        try {
+            await updateDoc(appointmentRef, { status: 'Declined' });
+            toast({ title: "Request Declined", variant: "destructive" });
+        } catch(error) {
+            toast({ title: "Error declining request", variant: "destructive" });
+        }
     }
     
-    const handleSaveNotes = (id: string) => {
-        setAppointments(prev =>
-            prev.map(app =>
-                app.id === id ? { ...app, notes: currentNotes } : app
-            )
-        );
-        toast({ title: "Notes Saved", description: "The consultation notes have been saved." });
-        setCurrentNotes('');
+    const handleSaveNotes = async () => {
+        if (!currentAppointmentId) return;
+        const appointmentRef = doc(db, 'appointments', currentAppointmentId);
+        try {
+            await updateDoc(appointmentRef, { notes: currentNotes });
+            toast({ title: "Notes Saved", description: "The consultation notes have been saved." });
+            setCurrentNotes('');
+            setCurrentAppointmentId(null);
+        } catch(error) {
+            toast({ title: "Error saving notes", variant: "destructive" });
+        }
     }
 
-    const handleSendPrescription = (patientName: string) => {
-        toast({ title: "E-Prescription Sent", description: `The prescription has been sent to ${patientName}.` });
+    const handleSendPrescription = async (patientName: string) => {
+         if (!currentAppointmentId) return;
+         const appointmentRef = doc(db, 'appointments', currentAppointmentId);
+         try {
+            await updateDoc(appointmentRef, {
+                prescription: {
+                    ...prescriptionForm,
+                    dateIssued: new Date().toISOString(),
+                }
+            });
+            toast({ title: "E-Prescription Sent", description: `The prescription has been sent to ${patientName}.` });
+            setPrescriptionForm({ medication: '', type: '', time: '', dosage: '', instructions: '' }); // Reset form
+            setCurrentAppointmentId(null);
+         } catch(error) {
+            toast({ title: "Error sending prescription", variant: "destructive" });
+         }
+    }
+    
+    const openNotesDialog = (app: Appointment) => {
+        setCurrentAppointmentId(app.id);
+        setCurrentNotes(app.notes || "");
+    }
+    
+    const openPrescriptionDialog = (app: Appointment) => {
+        setCurrentAppointmentId(app.id);
+        setPrescriptionForm(app.prescription || { medication: '', type: '', time: '', dosage: '', instructions: '' });
     }
 
     const renderTable = (data: Appointment[]) => (
@@ -97,14 +170,25 @@ export default function DoctorAppointmentsPage() {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {data.length > 0 ? data.map(app => (
+                {isLoading ? (
+                    <TableRow>
+                        <TableCell colSpan={4} className="h-24 text-center">
+                            <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                        </TableCell>
+                    </TableRow>
+                ) : data.length > 0 ? data.map(app => (
                     <TableRow key={app.id}>
                         <TableCell>
                             <div className="font-medium">{app.patientName}</div>
                             <div className="text-sm text-muted-foreground">{app.mode}</div>
                         </TableCell>
                         <TableCell>
-                            {app.status === 'Pending' ? `Requested: ${app.requestDate}` : app.appointmentDate ? format(new Date(app.appointmentDate), 'PPpp') : 'Not Scheduled'}
+                           {app.status === 'Pending' 
+                                ? `Requested: ${format(new Date(app.requestDate.seconds * 1000), 'PP')}` 
+                                : app.appointmentDate 
+                                    ? format(new Date(app.appointmentDate), 'PPpp') 
+                                    : 'Not Scheduled'
+                            }
                         </TableCell>
                          <TableCell>
                             <Badge variant={
@@ -168,7 +252,7 @@ export default function DoctorAppointmentsPage() {
                                 <>
                                     <Dialog>
                                         <DialogTrigger asChild>
-                                            <Button size="sm" variant="outline">
+                                            <Button size="sm" variant="outline" onClick={() => openPrescriptionDialog(app)}>
                                                 <Pill className="mr-2 h-4 w-4" /> E-Prescription
                                             </Button>
                                         </DialogTrigger>
@@ -180,12 +264,12 @@ export default function DoctorAppointmentsPage() {
                                             <div className="grid gap-4 py-4">
                                                 <div className="space-y-2">
                                                     <Label htmlFor="medication">Medication</Label>
-                                                    <Input id="medication" placeholder="e.g., Tretinoin Cream 0.05%" />
+                                                    <Input id="medication" placeholder="e.g., Tretinoin Cream 0.05%" value={prescriptionForm.medication} onChange={(e) => setPrescriptionForm(p => ({...p, medication: e.target.value}))}/>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div className="space-y-2">
                                                         <Label htmlFor="type">Medicine Type</Label>
-                                                        <Select>
+                                                        <Select value={prescriptionForm.type} onValueChange={(v) => setPrescriptionForm(p => ({...p, type: v}))}>
                                                             <SelectTrigger>
                                                                 <SelectValue placeholder="Select a type" />
                                                             </SelectTrigger>
@@ -205,7 +289,7 @@ export default function DoctorAppointmentsPage() {
                                                     </div>
                                                     <div className="space-y-2">
                                                         <Label htmlFor="time">Time of Day</Label>
-                                                        <Select>
+                                                        <Select value={prescriptionForm.time} onValueChange={(v) => setPrescriptionForm(p => ({...p, time: v}))}>
                                                             <SelectTrigger>
                                                                 <SelectValue placeholder="Select time" />
                                                             </SelectTrigger>
@@ -224,11 +308,11 @@ export default function DoctorAppointmentsPage() {
                                                 </div>
                                                 <div className="space-y-2">
                                                     <Label htmlFor="dosage">Dosage</Label>
-                                                    <Input id="dosage" placeholder="e.g., Apply a pea-sized amount once daily" />
+                                                    <Input id="dosage" placeholder="e.g., Apply a pea-sized amount once daily" value={prescriptionForm.dosage} onChange={(e) => setPrescriptionForm(p => ({...p, dosage: e.target.value}))}/>
                                                 </div>
                                                 <div className="space-y-2">
                                                     <Label htmlFor="instructions">Additional Instructions</Label>
-                                                    <Textarea id="instructions" placeholder="e.g., Avoid sun exposure. Use moisturizer." />
+                                                    <Textarea id="instructions" placeholder="e.g., Avoid sun exposure. Use moisturizer." value={prescriptionForm.instructions} onChange={(e) => setPrescriptionForm(p => ({...p, instructions: e.target.value}))}/>
                                                 </div>
                                             </div>
                                             <DialogFooter>
@@ -241,7 +325,7 @@ export default function DoctorAppointmentsPage() {
 
                                     <Dialog>
                                         <DialogTrigger asChild>
-                                             <Button size="sm" onClick={() => setCurrentNotes(app.notes || "")}>
+                                             <Button size="sm" onClick={() => openNotesDialog(app)}>
                                                 <StickyNote className="mr-2 h-4 w-4" /> Notes
                                             </Button>
                                         </DialogTrigger>
@@ -260,7 +344,7 @@ export default function DoctorAppointmentsPage() {
                                             </div>
                                             <DialogFooter>
                                                 <DialogClose asChild>
-                                                    <Button onClick={() => handleSaveNotes(app.id)}>Save Notes</Button>
+                                                    <Button onClick={handleSaveNotes}>Save Notes</Button>
                                                 </DialogClose>
                                             </DialogFooter>
                                         </DialogContent>
@@ -280,6 +364,8 @@ export default function DoctorAppointmentsPage() {
         </Table>
     );
 
+    const getAppointmentsByStatus = (status: Appointment['status']) => appointments.filter(a => a.status === status);
+
     return (
         <div className="container mx-auto p-4 md:p-8">
             <div className="space-y-2 mb-8">
@@ -295,22 +381,22 @@ export default function DoctorAppointmentsPage() {
                 <CardContent>
                     <Tabs defaultValue="pending">
                         <TabsList className="grid w-full grid-cols-4">
-                            <TabsTrigger value="pending">Pending</TabsTrigger>
-                            <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
-                            <TabsTrigger value="completed">Completed</TabsTrigger>
-                            <TabsTrigger value="declined">Declined</TabsTrigger>
+                            <TabsTrigger value="pending">Pending ({getAppointmentsByStatus('Pending').length})</TabsTrigger>
+                            <TabsTrigger value="confirmed">Confirmed ({getAppointmentsByStatus('Confirmed').length})</TabsTrigger>
+                            <TabsTrigger value="completed">Completed ({getAppointmentsByStatus('Completed').length})</TabsTrigger>
+                            <TabsTrigger value="declined">Declined ({getAppointmentsByStatus('Declined').length})</TabsTrigger>
                         </TabsList>
                         <TabsContent value="pending">
-                            {renderTable(appointments.filter(a => a.status === 'Pending'))}
+                            {renderTable(getAppointmentsByStatus('Pending'))}
                         </TabsContent>
                         <TabsContent value="confirmed">
-                            {renderTable(appointments.filter(a => a.status === 'Confirmed'))}
+                            {renderTable(getAppointmentsByStatus('Confirmed'))}
                         </TabsContent>
                         <TabsContent value="completed">
-                            {renderTable(appointments.filter(a => a.status === 'Completed'))}
+                            {renderTable(getAppointmentsByStatus('Completed'))}
                         </TabsContent>
                         <TabsContent value="declined">
-                            {renderTable(appointments.filter(a => a.status === 'Declined'))}
+                            {renderTable(getAppointmentsByStatus('Declined'))}
                         </TabsContent>
                     </Tabs>
                 </CardContent>

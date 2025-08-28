@@ -6,28 +6,74 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Video, Clock, Download, FileText, MoreHorizontal, Printer, Phone, MapPin } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Calendar, Video, Clock, Download, FileText, Printer, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Logo } from "@/components/logo";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { addMinutes, differenceInMinutes, format } from 'date-fns';
+import { addMinutes, differenceInMinutes, format, isFuture, isPast } from 'date-fns';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Image from "next/image";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/hooks/use-auth";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-const appointments: any[] = [];
+type Appointment = {
+    id: string;
+    doctorName: string;
+    date: string; // ISO string
+    mode: 'Online' | 'Offline';
+    status: 'Confirmed' | 'Completed' | 'Pending' | 'Declined';
+    notes?: string;
+    patientName?: string;
+    doctorLocation?: string;
+    doctorPhone?: string;
+    doctorSignature?: string;
+    prescription?: {
+        medication: string;
+        dosage: string;
+        instructions: string;
+        dateIssued: string;
+    };
+    [key: string]: any;
+};
 
 export default function AppointmentsPage() {
+    const { user } = useAuth();
     const { toast } = useToast();
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [now, setNow] = useState(new Date());
     const letterRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
 
+    useEffect(() => {
+        if (!user) return;
+
+        setIsLoading(true);
+        const q = query(collection(db, "appointments"), where("patientId", "==", user.uid));
+        
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedAppointments = snapshot.docs.map(doc => ({ 
+                id: doc.id,
+                ...doc.data(),
+                date: doc.data().appointmentDate, // Use appointmentDate from Firestore
+            } as Appointment));
+            setAppointments(fetchedAppointments);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching appointments:", error);
+            toast({ title: "Error", description: "Could not fetch appointments.", variant: "destructive" });
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [user, toast]);
+    
     useEffect(() => {
         const timer = setInterval(() => setNow(new Date()), 60000); // Update every minute
         return () => clearInterval(timer);
@@ -83,6 +129,9 @@ export default function AppointmentsPage() {
         return "Join your video consultation now.";
     }
 
+    const upcomingAppointments = appointments.filter(a => a.status === 'Confirmed' && a.date && isFuture(new Date(a.date)));
+    const pastAppointments = appointments.filter(a => a.status === 'Completed' || (a.status === 'Confirmed' && a.date && isPast(new Date(a.date))));
+
     return (
         <div className="container mx-auto p-4 md:p-8">
             <div className="flex items-center justify-between space-y-2 mb-8">
@@ -121,7 +170,9 @@ export default function AppointmentsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {appointments.filter(a => a.status === 'Confirmed').map(appointment => (
+                            {isLoading ? (
+                                <TableRow><TableCell colSpan={5} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                            ) : upcomingAppointments.length > 0 ? upcomingAppointments.map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
                                     <TableCell>{format(new Date(appointment.date), 'PPpp')}</TableCell>
@@ -161,8 +212,7 @@ export default function AppointmentsPage() {
                                         )}
                                     </TableCell>
                                 </TableRow>
-                            ))}
-                             {appointments.filter(a => a.status === 'Confirmed').length === 0 && (
+                            )) : (
                                 <TableRow>
                                     <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
                                         You have no upcoming appointments.
@@ -191,7 +241,9 @@ export default function AppointmentsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {appointments.filter(a => a.status === 'Completed').map(appointment => (
+                            {isLoading ? (
+                                <TableRow><TableCell colSpan={3} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                            ) : pastAppointments.length > 0 ? pastAppointments.map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
                                     <TableCell>{format(new Date(appointment.date), 'PP')}</TableCell>
@@ -320,7 +372,7 @@ export default function AppointmentsPage() {
                                                             </div>
                                                             <Separator />
                                                             <div className="text-xs text-muted-foreground text-center">
-                                                                <p>Date Issued: {appointment.prescription.dateIssued}</p>
+                                                                <p>Date Issued: {format(new Date(appointment.prescription.dateIssued), 'PP')}</p>
                                                                 <p>This is a digitally generated prescription and does not require a physical signature for verification.</p>
                                                             </div>
                                                         </CardContent>
@@ -336,8 +388,7 @@ export default function AppointmentsPage() {
                                         )}
                                     </TableCell>
                                 </TableRow>
-                            ))}
-                             {appointments.filter(a => a.status === 'Completed').length === 0 && (
+                            )) : (
                                 <TableRow>
                                     <TableCell colSpan={3} className="text-center h-24 text-muted-foreground">
                                         You have no past appointments.
