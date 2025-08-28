@@ -19,7 +19,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { generate100msToken } from "@/ai/flows/generate-100ms-token";
 
 const Conference = () => {
   const isConnected = useHMSStore(selectIsConnectedToRoom);
@@ -107,28 +106,14 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    const getToken = async () => {
-      if (!user || !role) return;
-
-      try {
-        const { token: authToken } = await generate100msToken({
-          userId: user.uid,
-          role: role,
-        });
-        setToken(authToken);
-      } catch (e) {
-        console.error("Token generation failed", e);
-        toast({
-          title: "Error joining call",
-          description: "Could not get authentication to join the video call.",
-          variant: "destructive"
-        })
-      }
-    };
-    if (!authLoading && user && role) {
-      getToken();
-    }
-  }, [user, role, authLoading, toast]);
+    // Temporarily disabled token generation due to dependency issues.
+    // In a real scenario, you would fetch a token from your backend here.
+    toast({
+        title: "Video Service Unavailable",
+        description: "The video call feature is temporarily disabled due to a configuration issue.",
+        variant: "destructive"
+    });
+  }, [toast]);
 
 
   useEffect(() => {
@@ -151,11 +136,11 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
     }
   }, [token, hmsActions, userData]);
 
-  if (authLoading || !token) {
+  if (authLoading) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Joining secure call...</p>
+        <p className="mt-4 text-muted-foreground">Loading...</p>
       </div>
     );
   }
