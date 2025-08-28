@@ -243,8 +243,8 @@ export default function AppointmentsPage() {
                                                                             <p>Dear {appointment.patientName},</p>
                                                                             <p>This letter confirms your appointment with <strong>{appointment.doctorName}</strong>. Please find the details below:</p>
                                                                             <div className="border p-4 rounded-lg space-y-2 bg-slate-50">
-                                                                                <p><strong>Date:</strong> {format(new Date(appointment.appointmentDate!), 'EEEE, MMMM d, yyyy')}</p>
-                                                                                <p><strong>Time:</strong> {format(new Date(appointment.appointmentDate!), 'p')}</p>
+                                                                                <p><strong>Date:</strong> {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'EEEE, MMMM d, yyyy') : 'N/A'}</p>
+                                                                                <p><strong>Time:</strong> {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'p') : 'N/A'}</p>
                                                                                 <p><strong>Location:</strong> {appointment.doctorLocation}</p>
                                                                                 <p><strong>Contact:</strong> {appointment.doctorPhone}</p>
                                                                             </div>
@@ -419,7 +419,7 @@ export default function AppointmentsPage() {
                                                             </div>
                                                             <Separator />
                                                             <div className="text-xs text-muted-foreground text-center">
-                                                                <p>Date Issued: {format(new Date(appointment.prescription.dateIssued), 'PP')}</p>
+                                                                <p>Date Issued: {appointment.prescription.dateIssued ? format(new Date(appointment.prescription.dateIssued), 'PP') : ''}</p>
                                                                 <p>This is a digitally generated prescription and does not require a physical signature for verification.</p>
                                                             </div>
                                                         </CardContent>
@@ -452,5 +452,3 @@ export default function AppointmentsPage() {
         </div>
     );
 }
-
-    

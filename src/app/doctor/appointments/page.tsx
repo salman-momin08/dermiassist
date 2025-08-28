@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarPicker } from "@/components/ui/calendar"
-import { format, set, isValid } from "date-fns"
+import { format, set, isValid, differenceInMinutes, isFuture, isPast } from "date-fns"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from "firebase/firestore"
@@ -24,6 +24,7 @@ import { db } from "@/lib/firebase"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 
 type Appointment = {
@@ -58,6 +59,8 @@ export default function DoctorAppointmentsPage() {
     
     const [scheduleDate, setScheduleDate] = useState<Date | undefined>(new Date());
     const [scheduleTime, setScheduleTime] = useState("09:00");
+    const [now, setNow] = useState(new Date());
+
     
     const [prescriptionForm, setPrescriptionForm] = useState({
         medication: '',
@@ -85,6 +88,11 @@ export default function DoctorAppointmentsPage() {
 
         return () => unsubscribe();
     }, [user, toast]);
+
+     useEffect(() => {
+        const timer = setInterval(() => setNow(new Date()), 60000); // Update every minute
+        return () => clearInterval(timer);
+    }, []);
     
 
     const handleConfirmRequest = async (app: Appointment) => {
@@ -190,6 +198,26 @@ export default function DoctorAppointmentsPage() {
     const openPrescriptionDialog = (app: Appointment) => {
         setCurrentAppointmentId(app.id);
         setPrescriptionForm(app.prescription || { medication: '', type: '', time: '', dosage: '', instructions: '' });
+    }
+
+    const isJoinButtonEnabled = (appointmentDate?: string) => {
+        if (!appointmentDate) return false;
+        const appointmentTime = new Date(appointmentDate);
+        const diff = differenceInMinutes(appointmentTime, now);
+        // Enable from 10 mins before to 10 mins after
+        return diff <= 10 && diff > -10;
+    };
+
+    const getJoinTooltipContent = (appointmentDate?: string) => {
+        if (!appointmentDate) return "This appointment has not been scheduled yet.";
+        const appointmentTime = new Date(appointmentDate);
+        if (isPast(appointmentTime) && differenceInMinutes(now, appointmentTime) > 10) {
+             return "The window to join this call has passed.";
+        }
+        if (isFuture(appointmentTime) && differenceInMinutes(appointmentTime, now) > 10) {
+             return `You can join the call 10 minutes before the start time.`;
+        }
+        return "Join your video consultation now.";
     }
 
     const renderTable = (data: Appointment[]) => (
@@ -310,11 +338,22 @@ export default function DoctorAppointmentsPage() {
                                  {(app.status === 'Confirmed') && (
                                     <>
                                       {app.mode === 'Online' && (
-                                        <Button asChild size="sm">
-                                          <Link href={`/video/${app.id}`}>
-                                            <Video className="mr-2 h-4 w-4" /> Join Call
-                                          </Link>
-                                        </Button>
+                                          <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                         <div style={{ display: 'inline-block' }}> 
+                                                            <Button asChild size="sm" disabled={!isJoinButtonEnabled(app.appointmentDate)}>
+                                                            <Link href={`/video/${app.id}`}>
+                                                                <Video className="mr-2 h-4 w-4" /> Join Call
+                                                            </Link>
+                                                            </Button>
+                                                         </div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>{getJoinTooltipContent(app.appointmentDate)}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
                                       )}
                                       <AlertDialog>
                                         <DropdownMenu>
