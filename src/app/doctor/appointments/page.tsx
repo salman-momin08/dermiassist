@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarPicker } from "@/components/ui/calendar"
-import { format, set, isValid, differenceInMinutes, isFuture, isPast } from "date-fns"
+import { format, set, isValid, differenceInMinutes, isFuture, isPast, parse } from "date-fns"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from "firebase/firestore"
@@ -220,6 +220,20 @@ export default function DoctorAppointmentsPage() {
         return "Join your video consultation now.";
     }
 
+    const getFormattedPreferredDate = (dateString?: string) => {
+        if (!dateString) return 'Not specified';
+        try {
+            // The date is stored as 'yyyy-MM-dd', parse it as such
+            const parsedDate = parse(dateString, 'yyyy-MM-dd', new Date());
+            if (isValid(parsedDate)) {
+                return format(parsedDate, 'PPP');
+            }
+            return 'Invalid Date';
+        } catch (e) {
+            return 'Invalid Date';
+        }
+    };
+
     const renderTable = (data: Appointment[]) => (
         <Table>
             <TableHeader>
@@ -290,7 +304,7 @@ export default function DoctorAppointmentsPage() {
                                             <DialogHeader>
                                                 <DialogTitle>Schedule Appointment for {app.patientName}</DialogTitle>
                                                 <DialogDescription>
-                                                    Patient preferred date: {app.preferredDate && isValid(new Date(app.preferredDate)) ? format(new Date(app.preferredDate), 'PPP') : 'Not specified'} at {app.preferredTime || 'any time'}.
+                                                    Patient preferred date: {getFormattedPreferredDate(app.preferredDate)} at {app.preferredTime || 'any time'}.
                                                     <br/>
                                                     Select a final date and time to confirm.
                                                 </DialogDescription>

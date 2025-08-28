@@ -187,6 +187,10 @@ export default function DoctorsPage() {
             const attachedReport = formState.attachedReportId 
                 ? analyses.find(a => a.id === formState.attachedReportId) 
                 : null;
+                
+            const onlyDate = formState.preferredDate 
+                ? new Date(formState.preferredDate.getFullYear(), formState.preferredDate.getMonth(), formState.preferredDate.getDate())
+                : null;
 
             await addDoc(collection(db, "appointments"), {
                 patientId: user.uid,
@@ -198,7 +202,7 @@ export default function DoctorsPage() {
                 doctorSignature: doctor.signatureUrl,
                 status: 'Pending',
                 requestDate: serverTimestamp(),
-                preferredDate: formState.preferredDate ? formState.preferredDate.toISOString() : null,
+                preferredDate: onlyDate ? format(onlyDate, 'yyyy-MM-dd') : null,
                 preferredTime: formState.preferredTime,
                 ...formState,
                 appointmentDate: null, // This will be set upon confirmation
