@@ -24,6 +24,8 @@ type Appointment = {
     patientName: string;
     mode: string;
     requestDate: { seconds: number, nanoseconds: number };
+    preferredDate?: string;
+    preferredTime?: string;
     status: 'Pending' | 'Confirmed' | 'Declined' | 'Completed';
     attachedReport?: {
         condition: string;
@@ -294,7 +296,7 @@ export default function DoctorDashboardPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Patient</TableHead>
-                                <TableHead className="hidden sm:table-cell">Requested On</TableHead>
+                                <TableHead className="hidden sm:table-cell">Requested Date/Time</TableHead>
                                 <TableHead>Tools</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -312,7 +314,9 @@ export default function DoctorDashboardPage() {
                                         <div className="font-medium">{app.patientName}</div>
                                         <div className="text-sm text-muted-foreground">{app.mode}</div>
                                     </TableCell>
-                                    <TableCell className="hidden sm:table-cell">{format(new Date(app.requestDate.seconds * 1000), 'PP')}</TableCell>
+                                    <TableCell className="hidden sm:table-cell">
+                                        {app.preferredDate ? `${format(new Date(app.preferredDate), 'PP')} at ${app.preferredTime || 'any time'}` : 'Not specified'}
+                                    </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             <DialogTrigger asChild>

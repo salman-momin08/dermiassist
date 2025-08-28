@@ -8,19 +8,14 @@ service cloud.firestore {
     // Helper Functions
     // =====================================================================
 
-    // Checks if the requesting user has the 'admin' role.
     function isAdmin() {
-      let userRole = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-      return request.auth != null && userRole == 'admin';
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Checks if the requesting user has the 'doctor' role.
     function isDoctor() {
-      let userRole = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-      return request.auth != null && userRole == 'doctor';
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
     }
 
-    // Checks if the requesting user is the owner of the document.
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
@@ -29,15 +24,21 @@ service cloud.firestore {
     // User Profiles -> /users/{userId}
     // =====================================================================
     match /users/{userId} {
-      // READ:
+      // GET: Allows fetching a single user document.
       // 1. A user can read their own profile.
-      // 2. Any authenticated user can read a doctor's profile (for 'Find a Doctor' page).
+      // 2. Any authenticated user can read a doctor's profile.
       // 3. An admin can read any user's profile.
-      allow read: if request.auth != null && (
+      allow get: if request.auth != null && (
                     isOwner(userId) ||
                     get(/databases/$(database)/documents/users/$(userId)).data.role == 'doctor' ||
                     isAdmin()
                   );
+
+      // LIST: Allows querying the users collection.
+      // Any authenticated user can list users, but the query in the app
+      // specifically filters for doctors (role == 'doctor').
+      // This is required for the "Find a Doctor" page to function.
+      allow list: if request.auth != null;
 
       // CREATE:
       // A user can create their own document upon signup.
@@ -55,7 +56,6 @@ service cloud.firestore {
       // --- Analyses Subcollection -> /users/{userId}/analyses/{analysisId} ---
       match /analyses/{analysisId} {
         // Full access is granted only to the owner of the parent user document.
-        // This ensures a user's analysis data is completely private.
         allow read, write, delete: if isOwner(userId);
       }
     }
@@ -64,19 +64,18 @@ service cloud.firestore {
     // Appointments -> /appointments/{appointmentId}
     // =====================================================================
     match /appointments/{appointmentId} {
-        // READ, UPDATE, DELETE:
-        // Access is granted if the user is the patient, the doctor, or an admin.
-        allow read, update, delete: if request.auth != null && (
-                                request.auth.uid == resource.data.patientId ||
-                                request.auth.uid == resource.data.doctorId ||
-                                isAdmin()
-                              );
+      // READ, UPDATE, DELETE:
+      // Access is granted if the user is the patient, the doctor, or an admin.
+      allow read, update, delete: if request.auth != null && (
+        request.auth.uid == resource.data.patientId ||
+        request.auth.uid == resource.data.doctorId ||
+        isAdmin()
+      );
 
-        // CREATE:
-        // Any authenticated user can create an appointment request.
-        allow create: if request.auth != null;
+      // CREATE:
+      // Any authenticated user can create an appointment request.
+      allow create: if request.auth != null;
     }
-
 
     // =====================================================================
     // Chats -> /chats/{chatId}
@@ -89,7 +88,6 @@ service cloud.firestore {
       // --- Messages Subcollection -> /chats/{chatId}/messages/{messageId} ---
       match /messages/{messageId} {
         // Permissions are inherited from the parent chat document.
-        // A user can read/write messages in a chat if their UID is in the chatId.
         allow read, write: if request.auth != null && request.auth.uid in chatId.split('_');
       }
     }

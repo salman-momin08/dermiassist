@@ -122,11 +122,12 @@ export default function DoctorsPage() {
             setIsLoadingDoctors(false);
         }, (error) => {
             console.error("Error fetching doctors:", error);
+            toast({ title: "Error", description: "Could not fetch doctors. Please check permissions.", variant: "destructive" });
             setIsLoadingDoctors(false);
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [toast]);
 
     const handleFormChange = (field: keyof AppointmentFormState, value: any) => {
         setFormState(prev => ({...prev, [field]: value}));
@@ -197,8 +198,11 @@ export default function DoctorsPage() {
                 doctorSignature: doctor.signatureUrl,
                 status: 'Pending',
                 requestDate: serverTimestamp(),
+                // Saving the requested date and time
+                preferredDate: formState.preferredDate ? format(formState.preferredDate, "yyyy-MM-dd") : null,
+                preferredTime: formState.preferredTime,
                 ...formState,
-                preferredDate: formState.preferredDate ? formState.preferredDate.toISOString() : null,
+                appointmentDate: null, // This will be set upon confirmation
                 attachedReport: attachedReport ? { condition: attachedReport.condition, recommendations: attachedReport.recommendations, conditionName: attachedReport.conditionName } : null,
                 uploadedImageUrls,
                 uploadedReportUrls,
