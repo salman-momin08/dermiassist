@@ -13,12 +13,13 @@ import {
   HMSRoomProvider,
 } from "@100mslive/react-sdk";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, User } from "lucide-react";
+import { Loader2, Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, User, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Conference = () => {
   const isConnected = useHMSStore(selectIsConnectedToRoom);
@@ -37,7 +38,9 @@ const Conference = () => {
   };
   
   const handleLeave = () => {
-    hmsActions.leave();
+    if(hmsActions.leave) {
+        hmsActions.leave();
+    }
     router.back(); // Go back to the previous page (appointments)
   }
 
@@ -102,24 +105,57 @@ const Peer = ({ peer }: { peer: any }) => {
 function VideoCallPage({ params }: { params: { roomId: string } }) {
   const { user, role, userData, loading: authLoading } = useAuth();
   const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const hmsActions = useHMSActions();
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     if (authLoading || !user || !role || !userData) return;
 
-    // We can't generate a token without the server-sdk, so we'll show an error.
-    // In a real app, this would be an API call to a backend.
-    toast({
-        title: "Video Service Unavailable",
-        description: "Could not generate an authentication token to join the call.",
-        variant: "destructive",
-    });
+    const getToken = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await fetch('/api/generate-token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    roomId: params.roomId,
+                    role: role,
+                    userId: user.uid,
+                })
+            });
+
+            const body = await response.json();
+            if (!response.ok) {
+                throw new Error(body.error || "Failed to fetch token");
+            }
+            
+            setToken(body.token);
+
+        } catch (error) {
+             const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+             toast({
+                title: "Video Service Error",
+                description: errorMessage,
+                variant: "destructive",
+            });
+            setError(errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    getToken();
 
   }, [authLoading, user, role, userData, params.roomId, toast]);
 
   useEffect(() => {
-    if (!token || !userData) return;
+    if (!token || !userData || !hmsActions) return;
 
     hmsActions.join({
       userName: userData.displayName || "User",
@@ -129,6 +165,14 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
         isVideoEnabled: true,
       },
        metaData: JSON.stringify({ image: userData.photoURL })
+    }).catch(err => {
+      console.error("Error joining HMS room:", err);
+      toast({
+        title: "Connection Failed",
+        description: "Could not connect to the video call room.",
+        variant: "destructive",
+      });
+      setError("Failed to connect to the room.");
     });
 
     return () => {
@@ -136,13 +180,32 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
           hmsActions.leave();
         }
     }
-  }, [token, hmsActions, userData]);
+  }, [token, hmsActions, userData, toast]);
 
-  if (authLoading || !token) {
+  if (isLoading || authLoading) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Authenticating for video call...</p>
+        <p className="mt-4 text-muted-foreground">Connecting to video call...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+     return (
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4">
+        <Alert variant="destructive" className="max-w-md">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Connection Error</AlertTitle>
+            <AlertDescription>
+                {error}
+                <br />
+                Please try again later.
+            </AlertDescription>
+        </Alert>
+         <Button onClick={() => router.back()} variant="outline" className="mt-4">
+            Go Back
+        </Button>
       </div>
     );
   }
