@@ -198,19 +198,24 @@ export default function DoctorAppointmentsPage() {
                     </TableRow>
                 ) : data.length > 0 ? data.map(app => {
                     let displayDate = 'Not Scheduled';
-                    let dateObj: Date | null = null;
                     
-                    if (app.status === 'Pending' && app.requestDate?.seconds) {
-                        dateObj = new Date(app.requestDate.seconds * 1000);
-                        if (isValid(dateObj)) {
-                            displayDate = `Requested: ${format(dateObj, 'PP')}`;
+                    if (app.status === 'Pending') {
+                        if (app.requestDate && app.requestDate.seconds) {
+                            const dateObj = new Date(app.requestDate.seconds * 1000);
+                            if (isValid(dateObj)) {
+                                displayDate = `Requested: ${format(dateObj, 'PP')}`;
+                            } else {
+                                displayDate = 'Invalid Request Date';
+                            }
                         } else {
-                            displayDate = 'Date not set';
+                             displayDate = 'Date not set';
                         }
                     } else if (app.appointmentDate) {
-                        dateObj = new Date(app.appointmentDate);
-                        if (isValid(dateObj)) {
+                        const dateObj = new Date(app.appointmentDate);
+                         if (isValid(dateObj)) {
                             displayDate = format(dateObj, 'PPpp');
+                        } else {
+                            displayDate = 'Invalid Appointment Date'
                         }
                     }
                     
