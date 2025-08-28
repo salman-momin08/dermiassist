@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -42,8 +43,9 @@ service cloud.firestore {
                   );
 
       // LIST: Allows querying the users collection.
-      // Required for the "Find a Doctor" page to function.
-      allow list: if request.auth != null;
+      // Only doctors and admins can list users.
+      // This is required for the "Find a Doctor" page and admin dashboards.
+      allow list: if request.auth != null && (isDoctor() || isAdmin());
 
       // CREATE:
       // A user can create their own document upon signup.
@@ -90,15 +92,9 @@ service cloud.firestore {
     // =====================================================================
     // Doctor Cases -> /doctorCases/{doctorId}/patients/{patientId}
     // =====================================================================
-    match /doctorCases/{doctorId} {
+    match /doctorCases/{doctorId}/{path=**} {
         // A doctor can only access their own case files.
         allow read, write, delete: if isOwner(doctorId);
-
-        match /patients/{patientId} {
-            // A doctor can read/write their own patient case entries.
-            // An admin can also manage these for administrative purposes.
-            allow read, write, delete: if isOwner(doctorId) || isAdmin();
-        }
     }
 
 

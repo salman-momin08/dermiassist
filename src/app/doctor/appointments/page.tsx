@@ -19,7 +19,7 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar"
 import { format, set, isValid } from "date-fns"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
-import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore"
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -28,6 +28,7 @@ import Link from "next/link"
 
 type Appointment = {
     id: string;
+    patientId: string;
     patientName: string;
     requestDate: { seconds: number, nanoseconds: number };
     preferredDate?: string;
@@ -86,8 +87,8 @@ export default function DoctorAppointmentsPage() {
     }, [user, toast]);
     
 
-    const handleConfirmRequest = async (id: string) => {
-        if (!scheduleDate) {
+    const handleConfirmRequest = async (app: Appointment) => {
+        if (!scheduleDate || !user) {
             toast({ title: "Please select a date.", variant: "destructive" });
             return;
         }
@@ -95,17 +96,30 @@ export default function DoctorAppointmentsPage() {
         const [hours, minutes] = scheduleTime.split(':').map(Number);
         const finalDateTime = set(scheduleDate, { hours, minutes, seconds: 0, milliseconds: 0 });
 
-        const appointmentRef = doc(db, 'appointments', id);
+        const appointmentRef = doc(db, 'appointments', app.id);
+        const doctorCaseRef = doc(db, 'doctorCases', user.uid, 'patients', app.patientId);
+
         try {
+            // Update appointment status
             await updateDoc(appointmentRef, { 
                 status: 'Confirmed',
                 appointmentDate: finalDateTime.toISOString(),
             });
+
+            // Create a record in doctorCases to link patient to doctor
+            await setDoc(doctorCaseRef, {
+                patientId: app.patientId,
+                patientName: app.patientName,
+                lastAppointmentDate: finalDateTime.toISOString(),
+                linkedAt: serverTimestamp()
+            }, { merge: true }); // Use merge to avoid overwriting existing case data if any
+
              toast({
                 title: `Request Confirmed`,
                 description: `The appointment has been scheduled.`,
             });
         } catch(error) {
+            console.error("Error confirming appointment:", error);
             toast({ title: "Error confirming request", variant: "destructive" });
         }
     };
@@ -287,7 +301,7 @@ export default function DoctorAppointmentsPage() {
                                             <DialogFooter>
                                                 <Button variant="ghost" onClick={() => handleDeclineRequest(app.id)}>Decline Request</Button>
                                                 <DialogClose asChild>
-                                                    <Button onClick={() => handleConfirmRequest(app.id)}>Confirm Appointment</Button>
+                                                    <Button onClick={() => handleConfirmRequest(app)}>Confirm Appointment</Button>
                                                 </DialogClose>
                                             </DialogFooter>
                                         </DialogContent>
@@ -492,5 +506,3 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
-
-    
