@@ -248,7 +248,7 @@ export default function DoctorAppointmentsPage() {
                                             <DialogHeader>
                                                 <DialogTitle>Schedule Appointment for {app.patientName}</DialogTitle>
                                                 <DialogDescription>
-                                                    Patient preferred date: {app.preferredDate ? format(new Date(app.preferredDate), 'PPP') : 'Not specified'} at {app.preferredTime || 'any time'}.
+                                                    Patient preferred date: {app.preferredDate && isValid(new Date(app.preferredDate)) ? format(new Date(app.preferredDate), 'PPP') : 'Not specified'} at {app.preferredTime || 'any time'}.
                                                     <br/>
                                                     Select a final date and time to confirm.
                                                 </DialogDescription>
@@ -492,3 +492,5 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
+
+    
