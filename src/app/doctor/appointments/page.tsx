@@ -219,6 +219,12 @@ export default function DoctorAppointmentsPage() {
         }
         return "Join your video consultation now.";
     }
+    
+    const parseDateString = (dateString: string) => {
+        // The date string is in "yyyy-MM-dd" format and represents a date in the user's timezone.
+        // To avoid timezone shift issues, we parse it as UTC.
+        return new Date(`${dateString}T00:00:00Z`);
+    };
 
     const renderTable = (data: Appointment[]) => (
         <Table>
@@ -245,7 +251,7 @@ export default function DoctorAppointmentsPage() {
                         if (app.requestDate && app.requestDate.seconds) {
                             const dateObj = new Date(app.requestDate.seconds * 1000);
                             if (isValid(dateObj)) {
-                                displayDate = `Requested: ${format(dateObj, 'PP')}`;
+                                displayDate = `Requested: ${format(dateObj, 'PP', { timeZone: 'Asia/Kolkata' })}`;
                             } else {
                                 displayDate = 'Invalid Request Date';
                             }
@@ -290,7 +296,7 @@ export default function DoctorAppointmentsPage() {
                                             <DialogHeader>
                                                 <DialogTitle>Schedule Appointment for {app.patientName}</DialogTitle>
                                                 <DialogDescription>
-                                                    Patient preferred date: {app.preferredDate && isValid(new Date(app.preferredDate)) ? format(new Date(app.preferredDate), 'PPP') : 'Not specified'} at {app.preferredTime || 'any time'}.
+                                                    Patient preferred date: {app.preferredDate && isValid(parseDateString(app.preferredDate)) ? format(parseDateString(app.preferredDate), 'PPP') : 'Not specified'} at {app.preferredTime || 'any time'}.
                                                     <br/>
                                                     Select a final date and time to confirm.
                                                 </DialogDescription>

@@ -199,7 +199,7 @@ export default function DoctorsPage() {
                 status: 'Pending',
                 requestDate: serverTimestamp(),
                 // Saving the requested date and time
-                preferredDate: formState.preferredDate ? format(formState.preferredDate, "yyyy-MM-dd") : null,
+                preferredDate: formState.preferredDate ? formState.preferredDate.toISOString().split('T')[0] : null,
                 preferredTime: formState.preferredTime,
                 ...formState,
                 appointmentDate: null, // This will be set upon confirmation
@@ -343,7 +343,13 @@ export default function DoctorsPage() {
                                                             </Button>
                                                         </PopoverTrigger>
                                                         <PopoverContent className="w-auto p-0">
-                                                            <Calendar mode="single" selected={formState.preferredDate} onSelect={(d) => handleFormChange('preferredDate', d)} initialFocus />
+                                                            <Calendar
+                                                                mode="single"
+                                                                selected={formState.preferredDate}
+                                                                onSelect={(d) => handleFormChange('preferredDate', d)}
+                                                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                                                initialFocus
+                                                            />
                                                         </PopoverContent>
                                                     </Popover>
                                                 </div>
