@@ -199,7 +199,7 @@ export default function DoctorsPage() {
                 status: 'Pending',
                 requestDate: serverTimestamp(),
                 // Saving the requested date and time
-                preferredDate: formState.preferredDate ? formState.preferredDate.toISOString().split('T')[0] : null,
+                preferredDate: formState.preferredDate ? formState.preferredDate.toISOString() : null,
                 preferredTime: formState.preferredTime,
                 ...formState,
                 appointmentDate: null, // This will be set upon confirmation
@@ -361,23 +361,6 @@ export default function DoctorsPage() {
                                                             {timeSlots.map(time => <SelectItem key={time} value={time}>{time}</SelectItem>)}
                                                         </SelectContent>
                                                     </Select>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid md:grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label>Type of Appointment</Label>
-                                                    <RadioGroup value={formState.appointmentType} onValueChange={(v) => handleFormChange('appointmentType', v)} className="flex gap-4 pt-2">
-                                                        <div className="flex items-center space-x-2"><RadioGroupItem value="first-time" id={`first-time-${doctor.id}`} /><Label htmlFor={`first-time-${doctor.id}`}>First-time</Label></div>
-                                                        <div className="flex items-center space-x-2"><RadioGroupItem value="follow-up" id={`follow-up-${doctor.id}`} /><Label htmlFor={`follow-up-${doctor.id}`}>Follow-up</Label></div>
-                                                    </RadioGroup>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Mode of Appointment</Label>
-                                                    <RadioGroup value={formState.appointmentMode} onValueChange={(v) => handleFormChange('appointmentMode', v)} className="flex gap-4 pt-2">
-                                                        <div className="flex items-center space-x-2"><RadioGroupItem value="Online" id={`online-${doctor.id}`} /><Label htmlFor={`online-${doctor.id}`}>Online</Label></div>
-                                                        <div className="flex items-center space-x-2"><RadioGroupItem value="Offline" id={`offline-${doctor.id}`} /><Label htmlFor={`offline-${doctor.id}`}>Offline</Label></div>
-                                                    </RadioGroup>
                                                 </div>
                                             </div>
 
