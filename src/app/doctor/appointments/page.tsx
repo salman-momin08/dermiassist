@@ -322,6 +322,7 @@ export default function DoctorAppointmentsPage() {
                                                                 mode="single"
                                                                 selected={scheduleDate}
                                                                 onSelect={setScheduleDate}
+                                                                disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
                                                                 initialFocus
                                                             />
                                                         </PopoverContent>
@@ -551,5 +552,3 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
-
-    
