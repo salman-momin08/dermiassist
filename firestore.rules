@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -44,14 +43,20 @@ service cloud.firestore {
 
     // Rules for the 'appointments' collection
     match /appointments/{appointmentId} {
-      // Any authenticated user can create an appointment request.
-      allow create: if request.auth != null;
-      
-      // Only the patient who created it, the assigned doctor, or an admin can read/update an appointment.
-      allow read, update: if request.auth != null && (request.auth.uid == resource.data.patientId || request.auth.uid == resource.data.doctorId || isAdmin());
+      // Allow querying the collection if the user is asking for their own appointments (as a patient or doctor).
+      allow list: if request.auth != null && 
+                    (request.query.limit <= 100) && // Add a reasonable limit
+                    ((isDoctor() && request.query.filters[0].value == request.auth.uid) || 
+                     (request.query.filters[0].value == request.auth.uid));
 
-      // Only the patient or doctor involved, or an admin can delete.
-      allow delete: if request.auth != null && (request.auth.uid == resource.data.patientId || request.auth.uid == resource.data.doctorId || isAdmin());
+      // Allow getting a single document if the user is the patient or the doctor involved.
+      allow get: if request.auth != null && (isOwner(resource.data.patientId) || isOwner(resource.data.doctorId) || isAdmin());
+
+      // Any authenticated user can create an appointment.
+      // The patient or doctor can update it.
+      // Only the patient, doctor, or an admin can delete.
+      allow write: if request.auth != null && 
+                     (request.auth.uid == resource.data.patientId || request.auth.uid == resource.data.doctorId || isAdmin() || request.resource.data.patientId == request.auth.uid);
     }
 
     // Rules for the 'chats' collection
