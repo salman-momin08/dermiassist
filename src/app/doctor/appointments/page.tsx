@@ -97,7 +97,7 @@ export default function DoctorAppointmentsPage() {
 
     const handleConfirmRequest = async (app: Appointment) => {
         if (!scheduleDate || !user) {
-            toast({ title: "Please select a date.", variant = "destructive" });
+            toast({ title: "Please select a date.", variant: "destructive" });
             return;
         }
 
@@ -225,7 +225,9 @@ export default function DoctorAppointmentsPage() {
             return 'Not specified';
         }
         try {
-            const parsedDate = parse(dateString, 'yyyy-MM-dd', new Date());
+            // Robustly parse the 'YYYY-MM-DD' string to avoid timezone issues
+            const [year, month, day] = dateString.split('-').map(Number);
+            const parsedDate = new Date(year, month - 1, day);
             if (isValid(parsedDate)) {
                 return format(parsedDate, 'PPP');
             }
@@ -270,7 +272,7 @@ export default function DoctorAppointmentsPage() {
                     } else if (app.appointmentDate) {
                         const dateObj = new Date(app.appointmentDate);
                          if (isValid(dateObj)) {
-                            displayDate = format(dateObj, 'PPpp', { timeZone: 'Asia/Kolkata' });
+                            displayDate = format(dateObj, 'PPpp');
                         } else {
                             displayDate = 'Invalid Appointment Date'
                         }
@@ -561,5 +563,3 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
-
-    
