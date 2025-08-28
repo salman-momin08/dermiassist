@@ -150,6 +150,7 @@ export default function AppointmentsPage() {
 
     const upcomingAppointments = appointments.filter(a => a.status === 'Confirmed' && a.appointmentDate && isFuture(new Date(a.appointmentDate)));
     const pastAppointments = appointments.filter(a => a.status === 'Completed' || (a.status === 'Confirmed' && a.appointmentDate && isPast(new Date(a.appointmentDate))));
+    const pendingAppointments = appointments.filter(a => a.status === 'Pending' || a.status === 'Declined');
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -184,27 +185,20 @@ export default function AppointmentsPage() {
                                 <TableHead>Doctor</TableHead>
                                 <TableHead>Date &amp; Time</TableHead>
                                 <TableHead className="hidden md:table-cell">Mode</TableHead>
-                                <TableHead className="hidden md:table-cell">Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow><TableCell colSpan={5} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                                <TableRow><TableCell colSpan={4} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                             ) : upcomingAppointments.length > 0 ? upcomingAppointments.map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
                                     <TableCell>{appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PPpp') : 'Not Scheduled'}</TableCell>
                                     <TableCell className="hidden md:table-cell">
-                                        <Badge variant="outline">
-                                            {appointment.mode === "Online" ? <Video className="mr-1 h-3 w-3" /> : <Calendar className="mr-1 h-3 w-3" />}
+                                        <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                                            {appointment.mode === "Online" ? <Video className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
                                             {appointment.mode}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="hidden md:table-cell">
-                                        <Badge>
-                                             <Clock className="mr-1 h-3 w-3" />
-                                            {appointment.status}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -227,7 +221,50 @@ export default function AppointmentsPage() {
                                                     </Tooltip>
                                                 </TooltipProvider>
                                             ) : (
-                                                <Button size="sm" variant="outline" disabled>In-Person</Button>
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Letter</Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="max-w-3xl">
+                                                        <DialogHeader>
+                                                            <DialogTitle>Appointment Confirmation Letter</DialogTitle>
+                                                            <DialogDescription>A downloadable copy of your appointment confirmation.</DialogDescription>
+                                                        </DialogHeader>
+                                                        <ScrollArea className="max-h-[60vh] pr-6">
+                                                            <div ref={letterRef} className="p-8 bg-white text-black">
+                                                                <div className="p-8 bg-white text-black">
+                                                                    <Card className="shadow-none border-0 text-black">
+                                                                        <CardHeader className="text-center space-y-4">
+                                                                            <div className="flex justify-center"><Logo /></div>
+                                                                            <CardTitle className="font-normal text-2xl">Appointment Confirmation</CardTitle>
+                                                                            <Separator />
+                                                                        </CardHeader>
+                                                                        <CardContent className="space-y-6 text-sm">
+                                                                            <p>Dear {appointment.patientName},</p>
+                                                                            <p>This letter confirms your appointment with <strong>{appointment.doctorName}</strong>. Please find the details below:</p>
+                                                                            <div className="border p-4 rounded-lg space-y-2 bg-slate-50">
+                                                                                <p><strong>Date:</strong> {format(new Date(appointment.appointmentDate!), 'EEEE, MMMM d, yyyy')}</p>
+                                                                                <p><strong>Time:</strong> {format(new Date(appointment.appointmentDate!), 'p')}</p>
+                                                                                <p><strong>Location:</strong> {appointment.doctorLocation}</p>
+                                                                                <p><strong>Contact:</strong> {appointment.doctorPhone}</p>
+                                                                            </div>
+                                                                            <p>Please arrive 15 minutes early and bring a valid ID. If you need to reschedule, please contact us at least 24 hours in advance.</p>
+                                                                            <div className="pt-8">
+                                                                                <p>Sincerely,</p>
+                                                                                {appointment.doctorSignature && <Image src={appointment.doctorSignature} alt="Doctor's Signature" width={150} height={50} data-ai-hint="signature" />}
+                                                                                <p><strong>{appointment.doctorName}</strong></p>
+                                                                                <p>SkinWise Dermatology</p>
+                                                                            </div>
+                                                                        </CardContent>
+                                                                    </Card>
+                                                                </div>
+                                                            </div>
+                                                        </ScrollArea>
+                                                        <Button className="w-full mt-4" onClick={() => handleDownloadLetter(appointment)} disabled={isDownloading}>
+                                                            {isDownloading ? <><Download className="mr-2 h-4 w-4" />Downloading...</> : <><Download className="mr-2 h-4 w-4" />Download PDF</>}
+                                                        </Button>
+                                                    </DialogContent>
+                                                </Dialog>
                                             )}
                                             <AlertDialog>
                                                 <DropdownMenu>
@@ -265,7 +302,7 @@ export default function AppointmentsPage() {
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
+                                    <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
                                         You have no upcoming appointments.
                                     </TableCell>
                                 </TableRow>
@@ -277,9 +314,9 @@ export default function AppointmentsPage() {
 
             <Card className="mt-8">
                  <CardHeader>
-                    <CardTitle>Past Appointments</CardTitle>
+                    <CardTitle>History &amp; Pending Requests</CardTitle>
                     <CardDescription>
-                        Review your consultation history, notes, and prescriptions.
+                        Review your consultation history, notes, and pending appointment requests.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -288,66 +325,25 @@ export default function AppointmentsPage() {
                             <TableRow>
                                 <TableHead>Doctor</TableHead>
                                 <TableHead>Date</TableHead>
+                                <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow><TableCell colSpan={3} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
-                            ) : pastAppointments.length > 0 ? pastAppointments.map(appointment => (
+                                <TableRow><TableCell colSpan={4} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                            ) : [...pastAppointments, ...pendingAppointments].length > 0 ? [...pastAppointments, ...pendingAppointments].map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
                                     <TableCell>{appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PP') : 'N/A'}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={
+                                            appointment.status === 'Completed' ? 'secondary' :
+                                            appointment.status === 'Declined' ? 'destructive' : 'outline'
+                                        }>{appointment.status}</Badge>
+                                    </TableCell>
                                     <TableCell className="text-right space-x-2">
-                                         {appointment.mode === 'Offline' && appointment.appointmentDate && (
-                                            <Dialog>
-                                                <DialogTrigger asChild>
-                                                    <Button size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Appointment Letter</Button>
-                                                </DialogTrigger>
-                                                <DialogContent className="max-w-3xl">
-                                                    <DialogHeader>
-                                                        <DialogTitle>Appointment Confirmation Letter</DialogTitle>
-                                                        <DialogDescription>
-                                                            A downloadable copy of your appointment confirmation.
-                                                        </DialogDescription>
-                                                    </DialogHeader>
-                                                    <ScrollArea className="max-h-[60vh] pr-6">
-                                                        <div ref={letterRef} className="p-8 bg-white text-black">
-                                                            <Card className="shadow-none border-0 text-black">
-                                                                <CardHeader className="text-center space-y-4">
-                                                                    <div className="flex justify-center">
-                                                                        <Logo />
-                                                                    </div>
-                                                                    <CardTitle className="font-normal text-2xl">Appointment Confirmation</CardTitle>
-                                                                    <Separator />
-                                                                </CardHeader>
-                                                                <CardContent className="space-y-6 text-sm">
-                                                                    <p>Dear {appointment.patientName},</p>
-                                                                    <p>This letter confirms your appointment with <strong>{appointment.doctorName}</strong>. Please find the details below:</p>
-                                                                    <div className="border p-4 rounded-lg space-y-2 bg-slate-50">
-                                                                        <p><strong>Date:</strong> {format(new Date(appointment.appointmentDate!), 'EEEE, MMMM d, yyyy')}</p>
-                                                                        <p><strong>Time:</strong> {format(new Date(appointment.appointmentDate!), 'p')}</p>
-                                                                        <p><strong>Location:</strong> {appointment.doctorLocation}</p>
-                                                                        <p><strong>Contact:</strong> {appointment.doctorPhone}</p>
-                                                                    </div>
-                                                                    <p>Please arrive 15 minutes early and bring a valid ID. If you need to reschedule, please contact us at least 24 hours in advance.</p>
-                                                                    <div className="pt-8">
-                                                                        <p>Sincerely,</p>
-                                                                        {appointment.doctorSignature && <Image src={appointment.doctorSignature} alt="Doctor's Signature" width={150} height={50} data-ai-hint="signature"/>}
-                                                                        <p><strong>{appointment.doctorName}</strong></p>
-                                                                        <p>SkinWise Dermatology</p>
-                                                                    </div>
-                                                                </CardContent>
-                                                            </Card>
-                                                        </div>
-                                                    </ScrollArea>
-                                                    <Button className="w-full mt-4" onClick={() => handleDownloadLetter(appointment)} disabled={isDownloading}>
-                                                        {isDownloading ? <><Download className="mr-2 h-4 w-4" />Downloading...</> : <><Download className="mr-2 h-4 w-4" />Download PDF</>}
-                                                    </Button>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
-                                        {appointment.notes && (
+                                        {appointment.status === 'Completed' && appointment.notes && (
                                             <Dialog>
                                                 <DialogTrigger asChild>
                                                     <Button size="sm" variant="outline">
@@ -368,7 +364,7 @@ export default function AppointmentsPage() {
                                                 </DialogContent>
                                             </Dialog>
                                         )}
-                                        {appointment.prescription && (
+                                        {appointment.status === 'Completed' && appointment.prescription && (
                                              <Dialog>
                                                 <DialogTrigger asChild>
                                                     <Button size="sm" variant="outline">
@@ -437,12 +433,15 @@ export default function AppointmentsPage() {
                                                 </DialogContent>
                                             </Dialog>
                                         )}
+                                        {(appointment.status === 'Pending' || appointment.status === 'Declined') && (
+                                            <Button variant="ghost" disabled>No Actions</Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center h-24 text-muted-foreground">
-                                        You have no past appointments.
+                                    <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
+                                        You have no past appointments or pending requests.
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -453,3 +452,5 @@ export default function AppointmentsPage() {
         </div>
     );
 }
+
+    

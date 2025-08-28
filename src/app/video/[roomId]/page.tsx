@@ -1,20 +1,20 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   useHMSStore,
   useHMSActions,
   selectIsConnectedToRoom,
   selectPeers,
-  selectLocalPeer,
   selectIsLocalAudioEnabled,
   selectIsLocalVideoEnabled,
+  useVideo,
 } from "@100mslive/react-sdk";
 import { HMSRoomProvider } from "@100mslive/react-sdk";
 import { generate100msToken } from "@/ai/flows/generate-100ms-token";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Mic, MicOff, Video, VideoOff, PhoneOff, User } from "lucide-react";
+import { Loader2, Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
@@ -25,7 +25,6 @@ const Conference = () => {
   const isConnected = useHMSStore(selectIsConnectedToRoom);
   const hmsActions = useHMSActions();
   const peers = useHMSStore(selectPeers);
-  const localPeer = useHMSStore(selectLocalPeer);
   const isLocalAudioEnabled = useHMSStore(selectIsLocalAudioEnabled);
   const isLocalVideoEnabled = useHMSStore(selectIsLocalVideoEnabled);
   const router = useRouter();
@@ -40,12 +39,12 @@ const Conference = () => {
   
   const handleLeave = () => {
     hmsActions.leave();
-    router.push("/appointments");
+    router.back(); // Go back to the previous page (appointments)
   }
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 place-items-center">
         {peers.map((peer) => (
           <Peer key={peer.id} peer={peer} />
         ))}
@@ -57,7 +56,7 @@ const Conference = () => {
                 {isLocalAudioEnabled ? <Mic /> : <MicOff />}
             </Button>
             <Button onClick={toggleVideo} variant={isLocalVideoEnabled ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-12 w-12">
-                {isLocalVideoEnabled ? <Video /> : <VideoOff />}
+                {isLocalVideoEnabled ? <VideoIcon /> : <VideoOff />}
             </Button>
             <Button onClick={handleLeave} variant="destructive" size="icon" className="rounded-full h-12 w-12">
                 <PhoneOff />
@@ -69,52 +68,39 @@ const Conference = () => {
 };
 
 const Peer = ({ peer }: { peer: any }) => {
-  const { videoRef } = useVideo(peer.videoTrack);
-  const isVideoOn = useHMSStore(selectIsLocalVideoEnabled);
+  const { videoRef } = useVideo({
+    trackId: peer.videoTrack,
+  });
+  const isVideoOn = peer.videoEnabled;
+  const peerMetadata = peer.metadata ? JSON.parse(peer.metadata) : {};
 
   return (
-    <Card className="relative flex items-center justify-center overflow-hidden">
+    <Card className="relative w-full h-full flex items-center justify-center overflow-hidden bg-muted">
         <video
           ref={videoRef}
-          className={`h-full w-full object-cover transition-opacity duration-500 ${peer.isLocal ? "mirror" : ""} ${isVideoOn ? 'opacity-100' : 'opacity-0'}`}
+          className={`h-full w-full object-cover transition-opacity duration-300 ${peer.isLocal ? "mirror" : ""}`}
           autoPlay
-          muted={true}
           playsInline
+          style={{ opacity: isVideoOn ? 1 : 0 }}
         />
         {!isVideoOn && (
-             <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center gap-4">
+             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
                 <Avatar className="h-24 w-24">
-                     <AvatarImage src={peer.metadata?.image} />
+                     <AvatarImage src={peerMetadata?.image} />
                      <AvatarFallback><User className="h-10 w-10"/></AvatarFallback>
                 </Avatar>
                 <p className="font-semibold text-lg">{peer.name}</p>
             </div>
         )}
+         <div className="absolute bottom-2 left-2 bg-background/50 text-foreground text-xs px-2 py-1 rounded">
+            {peer.name}
+        </div>
     </Card>
   );
 };
 
-// Custom hook to attach video track to video element
-const useVideo = (videoTrack: any) => {
-    const videoRef = React.useRef(null);
-    const hmsActions = useHMSActions();
 
-    useEffect(() => {
-        if (videoRef.current && videoTrack) {
-            hmsActions.attachVideo(videoTrack, videoRef.current);
-        }
-        return () => {
-             if (videoRef.current && videoTrack) {
-                hmsActions.detachVideo(videoTrack, videoRef.current);
-             }
-        };
-    }, [videoTrack, hmsActions]);
-
-    return { videoRef };
-}
-
-
-export default function VideoCallPage({ params }: { params: { roomId: string } }) {
+function VideoCallPage({ params }: { params: { roomId: string } }) {
   const { user, role, userData, loading: authLoading } = useAuth();
   const [token, setToken] = useState<string | null>(null);
   const hmsActions = useHMSActions();
@@ -139,7 +125,7 @@ export default function VideoCallPage({ params }: { params: { roomId: string } }
         })
       }
     };
-    if (!authLoading) {
+    if (!authLoading && user && role) {
       getToken();
     }
   }, [user, role, authLoading, toast]);
@@ -157,6 +143,10 @@ export default function VideoCallPage({ params }: { params: { roomId: string } }
       },
        metaData: JSON.stringify({ image: userData.photoURL })
     });
+
+    return () => {
+        hmsActions.leave();
+    }
   }, [token, hmsActions, userData]);
 
   if (authLoading || !token) {
@@ -176,10 +166,12 @@ export default function VideoCallPage({ params }: { params: { roomId: string } }
 }
 
 // Wrapper needed for pages that use HMS Hooks
-const VideoCallPageWrapper = ({ params }: { params: { roomId: string } }) => (
-    <HMSRoomProvider>
-        <VideoCallPage params={params}/>
-    </HMSRoomProvider>
-);
+export default function VideoCallPageWrapper({ params }: { params: { roomId: string } }) {
+    return (
+        <HMSRoomProvider>
+            <VideoCallPage params={params}/>
+        </HMSRoomProvider>
+    );
+};
 
-// export default VideoCallPageWrapper;
+    

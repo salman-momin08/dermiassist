@@ -183,7 +183,7 @@ export default function DoctorAppointmentsPage() {
             <TableHeader>
                 <TableRow>
                     <TableHead>Patient</TableHead>
-                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Date &amp; Time</TableHead>
                     <TableHead>Mode</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -210,8 +210,8 @@ export default function DoctorAppointmentsPage() {
                             }
                         </TableCell>
                         <TableCell>
-                           <Badge variant="outline">
-                                {app.mode === "Online" ? <Video className="mr-1 h-3 w-3" /> : <CalendarIcon className="mr-1 h-3 w-3" />}
+                           <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                                {app.mode === "Online" ? <Video className="h-3 w-3" /> : <CalendarIcon className="h-3 w-3" />}
                                 {app.mode}
                             </Badge>
                         </TableCell>
@@ -475,6 +475,8 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
+
+    
 
     
 
