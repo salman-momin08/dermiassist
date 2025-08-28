@@ -97,7 +97,7 @@ export default function DoctorAppointmentsPage() {
 
     const handleConfirmRequest = async (app: Appointment) => {
         if (!scheduleDate || !user) {
-            toast({ title: "Please select a date.", variant: "destructive" });
+            toast({ title: "Please select a date.", variant = "destructive" });
             return;
         }
 
@@ -221,9 +221,10 @@ export default function DoctorAppointmentsPage() {
     }
 
     const getFormattedPreferredDate = (dateString?: string) => {
-        if (!dateString) return 'Not specified';
+        if (!dateString || typeof dateString !== 'string') {
+            return 'Not specified';
+        }
         try {
-            // The date is stored as 'yyyy-MM-dd', parse it as such
             const parsedDate = parse(dateString, 'yyyy-MM-dd', new Date());
             if (isValid(parsedDate)) {
                 return format(parsedDate, 'PPP');
@@ -498,8 +499,8 @@ export default function DoctorAppointmentsPage() {
                                                     />
                                                 </div>
                                                 <DialogFooter>
-                                                    <DialogClose asChild>
-                                                        <Button onClick={handleSaveNotes}>Save Notes & Mark Complete</Button>
+                                                    <DialogClose as Child>
+                                                        <Button onClick={handleSaveNotes}>Save Notes &amp; Mark Complete</Button>
                                                     </DialogClose>
                                                 </DialogFooter>
                                             </DialogContent>
@@ -560,3 +561,5 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
+
+    
