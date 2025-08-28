@@ -198,29 +198,22 @@ export default function DoctorAppointmentsPage() {
                     </TableRow>
                 ) : data.length > 0 ? data.map(app => {
                     let displayDate = 'Not Scheduled';
-                    try {
-                        if (app.status === 'Pending') {
-                            if (app.requestDate && typeof app.requestDate.seconds === 'number') {
-                                const dateObj = new Date(app.requestDate.seconds * 1000);
-                                if (isValid(dateObj)) {
-                                    displayDate = `Requested: ${format(dateObj, 'PP')}`;
-                                } else {
-                                    displayDate = 'Date not set';
-                                }
-                            } else {
-                                displayDate = 'Date not set';
-                            }
-                        } else if (app.appointmentDate) {
-                            const dateObj = new Date(app.appointmentDate);
-                             if (isValid(dateObj)) {
-                                displayDate = format(dateObj, 'PPpp');
-                            }
+                    let dateObj: Date | null = null;
+                    
+                    if (app.status === 'Pending' && app.requestDate?.seconds) {
+                        dateObj = new Date(app.requestDate.seconds * 1000);
+                        if (isValid(dateObj)) {
+                            displayDate = `Requested: ${format(dateObj, 'PP')}`;
+                        } else {
+                            displayDate = 'Date not set';
                         }
-                    } catch (e) {
-                         // Catches any other error during date processing
-                         console.error("Error processing date for appointment", app.id, e);
+                    } else if (app.appointmentDate) {
+                        dateObj = new Date(app.appointmentDate);
+                        if (isValid(dateObj)) {
+                            displayDate = format(dateObj, 'PPpp');
+                        }
                     }
-
+                    
                     return (
                         <TableRow key={app.id}>
                             <TableCell>
