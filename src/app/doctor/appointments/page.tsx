@@ -20,7 +20,7 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar"
 import { format, set } from "date-fns"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 
@@ -28,6 +28,7 @@ type Appointment = {
     id: string;
     patientName: string;
     requestDate: { seconds: number, nanoseconds: number };
+    preferredDate?: string;
     mode: string;
     status: 'Pending' | 'Confirmed' | 'Declined' | 'Completed';
     appointmentDate?: string;
@@ -206,7 +207,11 @@ export default function DoctorAppointmentsPage() {
                                     <DialogContent>
                                         <DialogHeader>
                                             <DialogTitle>Schedule Appointment for {app.patientName}</DialogTitle>
-                                            <DialogDescription>Select a date and time to confirm this appointment.</DialogDescription>
+                                            <DialogDescription>
+                                                Patient preferred date: {app.preferredDate ? format(new Date(app.preferredDate), 'PPP') : 'Not specified'}.
+                                                <br/>
+                                                Select a final date and time to confirm.
+                                            </DialogDescription>
                                         </DialogHeader>
                                         <div className="grid gap-4 py-4">
                                             <div className="space-y-2">

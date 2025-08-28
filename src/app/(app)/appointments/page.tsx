@@ -25,7 +25,7 @@ import { db } from "@/lib/firebase";
 type Appointment = {
     id: string;
     doctorName: string;
-    date: string; // ISO string
+    appointmentDate: string; // ISO string
     mode: 'Online' | 'Offline';
     status: 'Confirmed' | 'Completed' | 'Pending' | 'Declined';
     notes?: string;
@@ -61,7 +61,6 @@ export default function AppointmentsPage() {
             const fetchedAppointments = snapshot.docs.map(doc => ({ 
                 id: doc.id,
                 ...doc.data(),
-                date: doc.data().appointmentDate, // This was the bug, appointmentDate is correct.
             } as Appointment));
             setAppointments(fetchedAppointments);
             setIsLoading(false);
@@ -131,8 +130,8 @@ export default function AppointmentsPage() {
         return "Join your video consultation now.";
     }
 
-    const upcomingAppointments = appointments.filter(a => a.status === 'Confirmed' && a.date && isFuture(new Date(a.date)));
-    const pastAppointments = appointments.filter(a => a.status === 'Completed' || (a.status === 'Confirmed' && a.date && isPast(new Date(a.date))));
+    const upcomingAppointments = appointments.filter(a => a.status === 'Confirmed' && a.appointmentDate && isFuture(new Date(a.appointmentDate)));
+    const pastAppointments = appointments.filter(a => a.status === 'Completed' || (a.status === 'Confirmed' && a.appointmentDate && isPast(new Date(a.appointmentDate))));
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -177,7 +176,7 @@ export default function AppointmentsPage() {
                             ) : upcomingAppointments.length > 0 ? upcomingAppointments.map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
-                                    <TableCell>{format(new Date(appointment.date), 'PPpp')}</TableCell>
+                                    <TableCell>{format(new Date(appointment.appointmentDate), 'PPpp')}</TableCell>
                                     <TableCell className="hidden md:table-cell">
                                         <Badge variant="outline">
                                             {appointment.mode === "Online" ? <Video className="mr-1 h-3 w-3" /> : <Calendar className="mr-1 h-3 w-3" />}
@@ -197,7 +196,7 @@ export default function AppointmentsPage() {
                                                     <TooltipTrigger asChild>
                                                         {/* This div is necessary to prevent Tooltip from complaining about a disabled button */}
                                                         <div> 
-                                                          <Button asChild size="sm" disabled={!isJoinButtonEnabled(appointment.date)}>
+                                                          <Button asChild size="sm" disabled={!isJoinButtonEnabled(appointment.appointmentDate)}>
                                                               <Link href={`/video/${appointment.id}`}>
                                                                 <Video className="mr-2 h-4 w-4" /> Join Call
                                                               </Link>
@@ -205,7 +204,7 @@ export default function AppointmentsPage() {
                                                         </div>
                                                     </TooltipTrigger>
                                                     <TooltipContent>
-                                                        <p>{getJoinTooltipContent(appointment.date)}</p>
+                                                        <p>{getJoinTooltipContent(appointment.appointmentDate)}</p>
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </TooltipProvider>
@@ -248,7 +247,7 @@ export default function AppointmentsPage() {
                             ) : pastAppointments.length > 0 ? pastAppointments.map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
-                                    <TableCell>{format(new Date(appointment.date), 'PP')}</TableCell>
+                                    <TableCell>{format(new Date(appointment.appointmentDate), 'PP')}</TableCell>
                                     <TableCell className="text-right space-x-2">
                                          {appointment.mode === 'Offline' && (
                                             <Dialog>
@@ -276,8 +275,8 @@ export default function AppointmentsPage() {
                                                                     <p>Dear {appointment.patientName},</p>
                                                                     <p>This letter confirms your appointment with <strong>{appointment.doctorName}</strong>. Please find the details below:</p>
                                                                     <div className="border p-4 rounded-lg space-y-2 bg-slate-50">
-                                                                        <p><strong>Date:</strong> {format(new Date(appointment.date), 'EEEE, MMMM d, yyyy')}</p>
-                                                                        <p><strong>Time:</strong> {format(new Date(appointment.date), 'p')}</p>
+                                                                        <p><strong>Date:</strong> {format(new Date(appointment.appointmentDate), 'EEEE, MMMM d, yyyy')}</p>
+                                                                        <p><strong>Time:</strong> {format(new Date(appointment.appointmentDate), 'p')}</p>
                                                                         <p><strong>Location:</strong> {appointment.doctorLocation}</p>
                                                                         <p><strong>Contact:</strong> {appointment.doctorPhone}</p>
                                                                     </div>
@@ -310,7 +309,7 @@ export default function AppointmentsPage() {
                                                     <DialogHeader>
                                                         <DialogTitle>Follow-up notes from Dr. {appointment.doctorName}</DialogTitle>
                                                         <DialogDescription>
-                                                            Notes from your appointment on {format(new Date(appointment.date), 'PP')}.
+                                                            Notes from your appointment on {format(new Date(appointment.appointmentDate), 'PP')}.
                                                         </DialogDescription>
                                                     </DialogHeader>
                                                     <div className="py-4 text-sm text-muted-foreground">
@@ -347,7 +346,7 @@ export default function AppointmentsPage() {
                                                                 <div>
                                                                     <p className="font-semibold">Patient Details</p>
                                                                     <p>{appointment.patientName}</p>
-                                                                    <p>Appointment: {format(new Date(appointment.date), 'PP')}</p>
+                                                                    <p>Appointment: {format(new Date(appointment.appointmentDate), 'PP')}</p>
                                                                 </div>
                                                                  <div className="text-right">
                                                                     <p className="font-semibold">Prescribing Doctor</p>
