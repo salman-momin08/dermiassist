@@ -10,30 +10,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Eye, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
-import { collection, query, where, onSnapshot, orderBy, getDocs } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { format, isValid } from "date-fns";
 
-type Appointment = {
-    id: string;
+type CaseLink = {
     patientId: string;
     patientName: string;
-    requestDate: { seconds: number, nanoseconds: number };
-    [key: string]: any;
+    lastAppointmentDate: string;
 };
 
-type PatientCase = {
-    patientId: string;
-    patientName: string;
+type PatientCase = CaseLink & {
     patientAvatar: string;
-    lastInteraction: string;
     fileCount: number;
     status: 'Active' | 'Resolved';
 };
 
 export default function DoctorCasesPage() {
     const { user } = useAuth();
-    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [patientCases, setPatientCases] = useState<PatientCase[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -41,66 +36,45 @@ export default function DoctorCasesPage() {
             setIsLoading(false);
             return;
         }
-        
-        // This query fetches all appointments for the current doctor.
-        // This is used to derive the list of unique patients.
-        const q = query(collection(db, "appointments"), where("doctorId", "==", user.uid), orderBy("requestDate", "desc"));
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const fetchedAppointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
-            setAppointments(fetchedAppointments);
+        // 1. Fetch the list of patients linked to the doctor
+        const casesCollectionRef = collection(db, "doctorCases", user.uid, "patients");
+
+        const unsubscribe = onSnapshot(casesCollectionRef, async (snapshot) => {
+            if (snapshot.empty) {
+                setPatientCases([]);
+                setIsLoading(false);
+                return;
+            }
+
+            const caseLinks = snapshot.docs.map(doc => doc.data() as CaseLink);
+            
+            // 2. Fetch full details for each patient
+            const casesPromises = caseLinks.map(async (caseLink) => {
+                const patientDocRef = doc(db, "users", caseLink.patientId);
+                const patientDoc = await getDoc(patientDocRef);
+                const patientData = patientDoc.exists() ? patientDoc.data() : {};
+
+                // In a real app, you would fetch file counts and proper status
+                return {
+                    ...caseLink,
+                    patientAvatar: patientData.photoURL || `https://placehold.co/100x100.png?text=${caseLink.patientName.charAt(0)}`,
+                    lastInteraction: isValid(new Date(caseLink.lastAppointmentDate)) ? format(new Date(caseLink.lastAppointmentDate), 'yyyy-MM-dd') : 'N/A',
+                    fileCount: 0, // Placeholder
+                    status: 'Active', // Placeholder
+                } as PatientCase;
+            });
+            
+            const resolvedCases = await Promise.all(casesPromises);
+            setPatientCases(resolvedCases);
             setIsLoading(false);
         }, (error) => {
-            console.error("Error fetching appointments for patient cases:", error);
+            console.error("Error fetching patient cases:", error);
             setIsLoading(false);
         });
 
         return () => unsubscribe();
     }, [user]);
-
-    const patientCases = useMemo((): PatientCase[] => {
-        if (appointments.length === 0) {
-            return [];
-        }
-        
-        const cases: Record<string, PatientCase> = {};
-        
-        appointments.forEach(app => {
-            // Initialize patient case if it's the first time we see this patient
-            if (!cases[app.patientId]) {
-                 cases[app.patientId] = {
-                    patientId: app.patientId,
-                    patientName: app.patientName,
-                    patientAvatar: app.patientAvatar || `https://placehold.co/100x100.png?text=${app.patientName.charAt(0)}`,
-                    lastInteraction: new Date(0).toISOString(), // Initialize with a very old date
-                    fileCount: 0,
-                    status: 'Active' // Default status
-                };
-            }
-            
-            // Update last interaction date if this one is newer
-            const interactionDate = new Date(app.requestDate.seconds * 1000);
-            const lastInteractionDate = new Date(cases[app.patientId].lastInteraction);
-            if (interactionDate > lastInteractionDate) {
-                cases[app.patientId].lastInteraction = interactionDate.toISOString();
-            }
-
-            // Aggregate file counts
-            const fileCount = (app.uploadedImageUrls?.length || 0) + (app.uploadedReportUrls?.length || 0) + (app.attachedReport ? 1 : 0);
-            cases[app.patientId].fileCount += fileCount;
-            
-            // Update status (example logic: if any appointment is completed, case is resolved)
-            if (app.status === 'Completed') {
-                cases[app.patientId].status = 'Resolved';
-            }
-        });
-
-        // Convert the record to an array and format the date for display
-        return Object.values(cases).map(c => ({
-            ...c,
-            lastInteraction: isValid(new Date(c.lastInteraction)) ? format(new Date(c.lastInteraction), 'yyyy-MM-dd') : 'N/A'
-        }));
-    }, [appointments]);
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -159,7 +133,7 @@ export default function DoctorCasesPage() {
                             )) : (
                                 <TableRow>
                                     <TableCell colSpan={5} className="h-24 text-center">
-                                        No patient cases found.
+                                        No patient cases found. Confirm appointments to create cases.
                                     </TableCell>
                                 </TableRow>
                             )}

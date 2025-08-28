@@ -106,13 +106,13 @@ export default function DoctorAppointmentsPage() {
                 appointmentDate: finalDateTime.toISOString(),
             });
 
-            // Create a record in doctorCases to link patient to doctor
+            // Create a record in doctorCases to link patient to doctor for security rules
             await setDoc(doctorCaseRef, {
                 patientId: app.patientId,
                 patientName: app.patientName,
                 lastAppointmentDate: finalDateTime.toISOString(),
                 linkedAt: serverTimestamp()
-            }, { merge: true }); // Use merge to avoid overwriting existing case data if any
+            }, { merge: true });
 
              toast({
                 title: `Request Confirmed`,
