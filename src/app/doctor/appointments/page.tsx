@@ -259,32 +259,41 @@ export default function DoctorAppointmentsPage() {
         return "Join your video consultation now.";
     }
 
-    const getFormattedPreferredDate = (dateString?: string, timeString?: string) => {
-        if (!dateString || typeof dateString !== 'string') {
-            return 'Date not specified';
-        }
-        try {
-            const baseDate = parse(dateString, 'yyyy-MM-dd', new Date());
-            if (!isValid(baseDate)) return 'Invalid Date';
-            
-            let timePart = '';
-            if (timeString) {
-                // Manually format time from HH:mm to am/pm
-                const [hoursStr, minutesStr] = timeString.split(':');
-                const hours = parseInt(hoursStr, 10);
-                const minutes = parseInt(minutesStr, 10);
-                if (!isNaN(hours) && !isNaN(minutes)) {
-                    const ampm = hours >= 12 ? 'PM' : 'AM';
-                    const formattedHours = hours % 12 || 12; // Convert 0 to 12
-                    const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
-                    timePart = ` at ${formattedHours}:${formattedMinutes} ${ampm}`;
+    const getFormattedPreferredDate = (app: Appointment) => {
+        let datePart = 'Date not specified';
+        
+        // Use preferredDate if available
+        if (app.preferredDate && typeof app.preferredDate === 'string') {
+            try {
+                const parsedDate = parse(app.preferredDate, 'yyyy-MM-dd', new Date());
+                if (isValid(parsedDate)) {
+                    datePart = format(parsedDate, 'PP');
                 }
-            }
-            return `${format(baseDate, 'PP')}${timePart}`;
-        } catch (e) {
-            console.error('Error formatting date:', e);
-            return 'Invalid Date Format';
+            } catch (e) { /* Fallback to default */ }
+        } 
+        // Fallback to requestDate if preferredDate is not set
+        else if (app.requestDate?.seconds) {
+            try {
+                const parsedDate = new Date(app.requestDate.seconds * 1000);
+                 if (isValid(parsedDate)) {
+                    datePart = `Requested: ${format(parsedDate, 'PP')}`;
+                }
+            } catch(e) { /* Fallback to default */ }
         }
+
+        let timePart = '';
+        if (app.preferredTime) {
+            const [hoursStr, minutesStr] = app.preferredTime.split(':');
+            const hours = parseInt(hoursStr, 10);
+            const minutes = parseInt(minutesStr, 10);
+            if (!isNaN(hours) && !isNaN(minutes)) {
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                const formattedHours = hours % 12 || 12;
+                const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+                timePart = ` at ${formattedHours}:${formattedMinutes} ${ampm}`;
+            }
+        }
+        return `${datePart}${timePart}`;
     };
 
 
@@ -310,7 +319,7 @@ export default function DoctorAppointmentsPage() {
                     let displayDate = 'Not Scheduled';
                     
                     if (app.status === 'Pending') {
-                       displayDate = getFormattedPreferredDate(app.preferredDate, app.preferredTime);
+                       displayDate = getFormattedPreferredDate(app);
                     } else if (app.appointmentDate) {
                         const dateObj = new Date(app.appointmentDate);
                          if (isValid(dateObj)) {
@@ -385,7 +394,7 @@ export default function DoctorAppointmentsPage() {
                                             <DialogHeader>
                                                 <DialogTitle>Schedule Appointment for {app.patientName}</DialogTitle>
                                                 <DialogDescription>
-                                                    Patient preferred: {getFormattedPreferredDate(app.preferredDate, app.preferredTime)}.
+                                                    Patient preferred: {getFormattedPreferredDate(app)}.
                                                     <br/>
                                                     Select a final date and time to confirm.
                                                 </DialogDescription>
@@ -629,3 +638,5 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
+
+    
