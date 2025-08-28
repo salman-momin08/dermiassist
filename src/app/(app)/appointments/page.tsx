@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect, useRef } from "react";
@@ -143,9 +144,11 @@ export default function AppointmentsPage() {
                                                     <TooltipTrigger asChild>
                                                         {/* This div is necessary to prevent Tooltip from complaining about a disabled button */}
                                                         <div> 
-                                                            <Button size="sm" disabled={!isJoinButtonEnabled(appointment.date)}>
+                                                          <Button asChild size="sm" disabled={!isJoinButtonEnabled(appointment.date)}>
+                                                              <Link href={`/video/${appointment.id}`}>
                                                                 <Video className="mr-2 h-4 w-4" /> Join Call
-                                                            </Button>
+                                                              </Link>
+                                                          </Button>
                                                         </div>
                                                     </TooltipTrigger>
                                                     <TooltipContent>
