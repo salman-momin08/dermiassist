@@ -12,7 +12,6 @@ import {
   useVideo,
   HMSRoomProvider,
 } from "@100mslive/react-sdk";
-import { generate100msToken } from "@/ai/flows/generate-100ms-token";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2, Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { generate100msToken } from "@/ai/flows/generate-100ms-token";
 
 const Conference = () => {
   const isConnected = useHMSStore(selectIsConnectedToRoom);
