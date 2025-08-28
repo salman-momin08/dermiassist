@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Separator } from "@/components/ui/separator";
 import { Logo } from "@/components/logo";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { addMinutes, differenceInMinutes, format, isFuture, isPast } from 'date-fns';
+import { differenceInMinutes, format, isFuture, isPast } from 'date-fns';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Image from "next/image";
@@ -25,7 +25,7 @@ import { db } from "@/lib/firebase";
 type Appointment = {
     id: string;
     doctorName: string;
-    appointmentDate: string; // ISO string
+    appointmentDate?: string; // ISO string, optional because it doesn't exist for pending
     mode: 'Online' | 'Offline';
     status: 'Confirmed' | 'Completed' | 'Pending' | 'Declined';
     notes?: string;
@@ -109,7 +109,7 @@ export default function AppointmentsPage() {
         }
     };
     
-    const isJoinButtonEnabled = (appointmentDate: string) => {
+    const isJoinButtonEnabled = (appointmentDate?: string) => {
         if (!appointmentDate) return false;
         const appointmentTime = new Date(appointmentDate);
         const diff = differenceInMinutes(appointmentTime, now);
@@ -117,15 +117,14 @@ export default function AppointmentsPage() {
         return diff <= 10 && diff > -10;
     };
 
-    const getJoinTooltipContent = (appointmentDate: string) => {
+    const getJoinTooltipContent = (appointmentDate?: string) => {
         if (!appointmentDate) return "This appointment has not been scheduled yet.";
         const appointmentTime = new Date(appointmentDate);
-        const diff = differenceInMinutes(appointmentTime, now);
-        if (diff > 10) {
-            return `You can join the call ${diff - 10} minutes before the start time.`;
+        if (isPast(appointmentTime) && differenceInMinutes(now, appointmentTime) > 10) {
+             return "The window to join this call has passed.";
         }
-        if (diff <= -10) {
-            return "The window to join this call has passed.";
+        if (isFuture(appointmentTime) && differenceInMinutes(appointmentTime, now) > 10) {
+             return `You can join the call 10 minutes before the start time.`;
         }
         return "Join your video consultation now.";
     }
@@ -176,7 +175,7 @@ export default function AppointmentsPage() {
                             ) : upcomingAppointments.length > 0 ? upcomingAppointments.map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
-                                    <TableCell>{format(new Date(appointment.appointmentDate), 'PPpp')}</TableCell>
+                                    <TableCell>{appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PPpp') : 'Not Scheduled'}</TableCell>
                                     <TableCell className="hidden md:table-cell">
                                         <Badge variant="outline">
                                             {appointment.mode === "Online" ? <Video className="mr-1 h-3 w-3" /> : <Calendar className="mr-1 h-3 w-3" />}
@@ -194,8 +193,7 @@ export default function AppointmentsPage() {
                                              <TooltipProvider>
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
-                                                        {/* This div is necessary to prevent Tooltip from complaining about a disabled button */}
-                                                        <div> 
+                                                        <div style={{ display: 'inline-block' }}> 
                                                           <Button asChild size="sm" disabled={!isJoinButtonEnabled(appointment.appointmentDate)}>
                                                               <Link href={`/video/${appointment.id}`}>
                                                                 <Video className="mr-2 h-4 w-4" /> Join Call
@@ -247,9 +245,9 @@ export default function AppointmentsPage() {
                             ) : pastAppointments.length > 0 ? pastAppointments.map(appointment => (
                                 <TableRow key={appointment.id}>
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
-                                    <TableCell>{format(new Date(appointment.appointmentDate), 'PP')}</TableCell>
+                                    <TableCell>{appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PP') : 'N/A'}</TableCell>
                                     <TableCell className="text-right space-x-2">
-                                         {appointment.mode === 'Offline' && (
+                                         {appointment.mode === 'Offline' && appointment.appointmentDate && (
                                             <Dialog>
                                                 <DialogTrigger asChild>
                                                     <Button size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Appointment Letter</Button>
@@ -275,8 +273,8 @@ export default function AppointmentsPage() {
                                                                     <p>Dear {appointment.patientName},</p>
                                                                     <p>This letter confirms your appointment with <strong>{appointment.doctorName}</strong>. Please find the details below:</p>
                                                                     <div className="border p-4 rounded-lg space-y-2 bg-slate-50">
-                                                                        <p><strong>Date:</strong> {format(new Date(appointment.appointmentDate), 'EEEE, MMMM d, yyyy')}</p>
-                                                                        <p><strong>Time:</strong> {format(new Date(appointment.appointmentDate), 'p')}</p>
+                                                                        <p><strong>Date:</strong> {format(new Date(appointment.appointmentDate!), 'EEEE, MMMM d, yyyy')}</p>
+                                                                        <p><strong>Time:</strong> {format(new Date(appointment.appointmentDate!), 'p')}</p>
                                                                         <p><strong>Location:</strong> {appointment.doctorLocation}</p>
                                                                         <p><strong>Contact:</strong> {appointment.doctorPhone}</p>
                                                                     </div>
@@ -309,7 +307,7 @@ export default function AppointmentsPage() {
                                                     <DialogHeader>
                                                         <DialogTitle>Follow-up notes from Dr. {appointment.doctorName}</DialogTitle>
                                                         <DialogDescription>
-                                                            Notes from your appointment on {format(new Date(appointment.appointmentDate), 'PP')}.
+                                                            Notes from your appointment on {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PP') : ''}.
                                                         </DialogDescription>
                                                     </DialogHeader>
                                                     <div className="py-4 text-sm text-muted-foreground">
@@ -346,7 +344,7 @@ export default function AppointmentsPage() {
                                                                 <div>
                                                                     <p className="font-semibold">Patient Details</p>
                                                                     <p>{appointment.patientName}</p>
-                                                                    <p>Appointment: {format(new Date(appointment.appointmentDate), 'PP')}</p>
+                                                                    <p>Appointment: {appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PP') : ''}</p>
                                                                 </div>
                                                                  <div className="text-right">
                                                                     <p className="font-semibold">Prescribing Doctor</p>

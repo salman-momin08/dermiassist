@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"
-import { Pill, StickyNote, Loader2 } from "lucide-react"
+import { Pill, StickyNote, Loader2, Video, Calendar as CalendarIcon } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
@@ -15,7 +15,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar as CalendarIcon } from "lucide-react"
 import { Calendar as CalendarPicker } from "@/components/ui/calendar"
 import { format, set } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -29,7 +28,8 @@ type Appointment = {
     patientName: string;
     requestDate: { seconds: number, nanoseconds: number };
     preferredDate?: string;
-    mode: string;
+    preferredTime?: string;
+    mode: 'Online' | 'Offline';
     status: 'Pending' | 'Confirmed' | 'Declined' | 'Completed';
     appointmentDate?: string;
     notes?: string;
@@ -52,11 +52,9 @@ export default function DoctorAppointmentsPage() {
     const [currentAppointmentId, setCurrentAppointmentId] = useState<string | null>(null);
     const { toast } = useToast();
     
-    // State for scheduling modal
     const [scheduleDate, setScheduleDate] = useState<Date | undefined>(new Date());
     const [scheduleTime, setScheduleTime] = useState("09:00");
     
-    // State for prescription modal
     const [prescriptionForm, setPrescriptionForm] = useState({
         medication: '',
         type: '',
@@ -143,7 +141,7 @@ export default function DoctorAppointmentsPage() {
                 }
             });
             toast({ title: "E-Prescription Sent", description: `The prescription has been sent to ${patientName}.` });
-            setPrescriptionForm({ medication: '', type: '', time: '', dosage: '', instructions: '' }); // Reset form
+            setPrescriptionForm({ medication: '', type: '', time: '', dosage: '', instructions: '' }); 
             setCurrentAppointmentId(null);
          } catch(error) {
             toast({ title: "Error sending prescription", variant: "destructive" });
@@ -166,6 +164,7 @@ export default function DoctorAppointmentsPage() {
                 <TableRow>
                     <TableHead>Patient</TableHead>
                     <TableHead>Date & Time</TableHead>
+                    <TableHead>Mode</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -173,7 +172,7 @@ export default function DoctorAppointmentsPage() {
             <TableBody>
                 {isLoading ? (
                     <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center">
+                        <TableCell colSpan={5} className="h-24 text-center">
                             <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                         </TableCell>
                     </TableRow>
@@ -181,7 +180,6 @@ export default function DoctorAppointmentsPage() {
                     <TableRow key={app.id}>
                         <TableCell>
                             <div className="font-medium">{app.patientName}</div>
-                            <div className="text-sm text-muted-foreground">{app.mode}</div>
                         </TableCell>
                         <TableCell>
                            {app.status === 'Pending' 
@@ -190,6 +188,12 @@ export default function DoctorAppointmentsPage() {
                                     ? format(new Date(app.appointmentDate), 'PPpp') 
                                     : 'Not Scheduled'
                             }
+                        </TableCell>
+                        <TableCell>
+                           <Badge variant="outline">
+                                {app.mode === "Online" ? <Video className="mr-1 h-3 w-3" /> : <CalendarIcon className="mr-1 h-3 w-3" />}
+                                {app.mode}
+                            </Badge>
                         </TableCell>
                          <TableCell>
                             <Badge variant={
@@ -208,7 +212,7 @@ export default function DoctorAppointmentsPage() {
                                         <DialogHeader>
                                             <DialogTitle>Schedule Appointment for {app.patientName}</DialogTitle>
                                             <DialogDescription>
-                                                Patient preferred date: {app.preferredDate ? format(new Date(app.preferredDate), 'PPP') : 'Not specified'}.
+                                                Patient preferred date: {app.preferredDate ? format(new Date(app.preferredDate), 'PPP') : 'Not specified'} at {app.preferredTime || 'any time'}.
                                                 <br/>
                                                 Select a final date and time to confirm.
                                             </DialogDescription>
@@ -360,7 +364,7 @@ export default function DoctorAppointmentsPage() {
                     </TableRow>
                 )) : (
                     <TableRow>
-                        <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
                             No appointments in this category.
                         </TableCell>
                     </TableRow>
@@ -370,7 +374,6 @@ export default function DoctorAppointmentsPage() {
     );
 
     const getAppointmentsByStatus = (status: Appointment['status']) => appointments.filter(a => a.status === status);
-    const getCompletedAppointments = () => appointments.filter(a => a.status === 'Completed');
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -389,7 +392,7 @@ export default function DoctorAppointmentsPage() {
                         <TabsList className="grid w-full grid-cols-4">
                             <TabsTrigger value="pending">Pending ({getAppointmentsByStatus('Pending').length})</TabsTrigger>
                             <TabsTrigger value="confirmed">Confirmed ({getAppointmentsByStatus('Confirmed').length})</TabsTrigger>
-                            <TabsTrigger value="completed">Completed ({getCompletedAppointments().length})</TabsTrigger>
+                            <TabsTrigger value="completed">Completed ({getAppointmentsByStatus('Completed').length})</TabsTrigger>
                             <TabsTrigger value="declined">Declined ({getAppointmentsByStatus('Declined').length})</TabsTrigger>
                         </TabsList>
                         <TabsContent value="pending">
@@ -399,7 +402,7 @@ export default function DoctorAppointmentsPage() {
                             {renderTable(getAppointmentsByStatus('Confirmed'))}
                         </TabsContent>
                         <TabsContent value="completed">
-                            {renderTable(getCompletedAppointments())}
+                            {renderTable(getAppointmentsByStatus('Completed'))}
                         </TabsContent>
                         <TabsContent value="declined">
                             {renderTable(getAppointmentsByStatus('Declined'))}
