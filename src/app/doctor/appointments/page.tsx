@@ -211,11 +211,21 @@ export default function DoctorAppointmentsPage() {
 
     const openScheduleDialog = (app: Appointment) => {
         // Pre-fill the dialog with patient's preferred date/time if available
-        if (app.preferredDate) {
-            setScheduleDate(parse(app.preferredDate, 'yyyy-MM-dd', new Date()));
+        if (app.preferredDate && typeof app.preferredDate === 'string') {
+            try {
+                const parsedDate = parse(app.preferredDate, 'yyyy-MM-dd', new Date());
+                if (isValid(parsedDate)) {
+                    setScheduleDate(parsedDate);
+                } else {
+                    setScheduleDate(new Date());
+                }
+            } catch (e) {
+                setScheduleDate(new Date());
+            }
         } else {
             setScheduleDate(new Date());
         }
+
         if (app.preferredTime) {
             setScheduleTime(app.preferredTime);
         } else {
