@@ -17,6 +17,7 @@ import { collection, query, where, doc, getDoc, getDocs, updateDoc } from "fireb
 import { db } from "@/lib/firebase";
 import { format } from "date-fns";
 import { AnalysisReport } from "@/hooks/use-analyses";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 type Appointment = {
     id: string;
@@ -24,7 +25,11 @@ type Appointment = {
     appointmentDate?: string;
     status: string;
     notes?: string;
-    attachedReport?: any;
+    attachedReport?: {
+      conditionName: string;
+      condition: string;
+      recommendations: string;
+    };
     uploadedImageUrls?: string[];
     uploadedReportUrls?: string[];
 };
@@ -34,6 +39,7 @@ type TimelineItem = {
     title: string;
     description: string;
     date: string;
+    data?: any;
 };
 
 type CaseDetails = {
@@ -86,11 +92,16 @@ export default function CaseDetailPage() {
                 // Create timeline
                 const timeline: TimelineItem[] = [];
                 appointments.forEach((app: Appointment) => {
+                    let description = `Appointment was ${app.status.toLowerCase()}`;
+                    if (app.attachedReport) {
+                        description += ` with AI report for ${app.attachedReport.conditionName}.`;
+                    }
                     timeline.push({
                         type: 'appointment',
                         title: `Appointment ${app.status}`,
-                        description: `Appointment was ${app.status.toLowerCase()}`,
+                        description: description,
                         date: app.appointmentDate ? format(new Date(app.appointmentDate), "PPp") : format(new Date(app.requestDate.seconds * 1000), "PPp"),
+                        data: app
                     });
                 });
                 analyses.forEach((an: AnalysisReport) => {
@@ -99,6 +110,7 @@ export default function CaseDetailPage() {
                         title: 'AI Analysis Completed',
                         description: `Identified: ${an.conditionName}`,
                         date: format(new Date(an.date), "PPp"),
+                        data: an
                     });
                 });
 
@@ -187,137 +199,171 @@ export default function CaseDetailPage() {
                 </Button>
             </div>
             
-            <div className="grid gap-8 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-8">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-2xl font-headline">Case Details</CardTitle>
-                            <div className="flex items-center gap-2 pt-1">
-                                <span className="text-sm text-muted-foreground">Patient ID: {caseDetails.patient.uid}</span>
-                            </div>
-                        </CardHeader>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Uploaded Files</CardTitle>
-                            <CardDescription>All files uploaded by the patient across all appointments.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {allUploadedImages.length > 0 && (
-                                <div className="mb-4">
-                                    <h4 className="font-semibold mb-2">Condition Photos</h4>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        {allUploadedImages.map((url, i) => (
-                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                                                <img src={url} alt={`Patient upload ${i + 1}`} className="rounded-lg object-cover aspect-square hover:opacity-80 transition-opacity" />
-                                            </a>
-                                        ))}
-                                    </div>
+            <Dialog>
+                <div className="grid gap-8 lg:grid-cols-3">
+                    <div className="lg:col-span-2 space-y-8">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-2xl font-headline">Case Details</CardTitle>
+                                <div className="flex items-center gap-2 pt-1">
+                                    <span className="text-sm text-muted-foreground">Patient ID: {caseDetails.patient.uid}</span>
                                 </div>
-                            )}
-                             {allUploadedReports.length > 0 && (
-                                <div>
-                                    <h4 className="font-semibold mb-2">Previous Medical Reports</h4>
-                                    <div className="space-y-2">
-                                        {allUploadedReports.map((url, i) => (
-                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                                                <Button variant="secondary" className="w-full justify-start">
-                                                    <Download className="mr-2" /> Report {i + 1}
-                                                </Button>
-                                            </a>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                             {allUploadedImages.length === 0 && allUploadedReports.length === 0 && (
-                                 <p className="text-muted-foreground text-center py-8">No files have been uploaded by this patient.</p>
-                             )}
-                        </CardContent>
-                    </Card>
+                            </CardHeader>
+                        </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Case Activity</CardTitle>
-                            <CardDescription>A timeline of the patient's reports and appointments.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-6">
-                                {caseDetails.timeline.map((item: any, index: number) => (
-                                    <div key={index} className="flex gap-4">
-                                        <div className="flex flex-col items-center">
-                                            <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary">
-                                                {item.type === 'appointment' ? <Calendar className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Uploaded Files</CardTitle>
+                                <CardDescription>All files uploaded by the patient across all appointments.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {allUploadedImages.length > 0 && (
+                                    <div className="mb-4">
+                                        <h4 className="font-semibold mb-2">Condition Photos</h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            {allUploadedImages.map((url, i) => (
+                                                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                                    <img src={url} alt={`Patient upload ${i + 1}`} className="rounded-lg object-cover aspect-square hover:opacity-80 transition-opacity" />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {allUploadedReports.length > 0 && (
+                                    <div>
+                                        <h4 className="font-semibold mb-2">Previous Medical Reports</h4>
+                                        <div className="space-y-2">
+                                            {allUploadedReports.map((url, i) => (
+                                                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                                    <Button variant="secondary" className="w-full justify-start">
+                                                        <Download className="mr-2" /> Report {i + 1}
+                                                    </Button>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {allUploadedImages.length === 0 && allUploadedReports.length === 0 && (
+                                    <p className="text-muted-foreground text-center py-8">No files have been uploaded by this patient.</p>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Case Activity</CardTitle>
+                                <CardDescription>A timeline of the patient's reports and appointments.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-6">
+                                    {caseDetails.timeline.map((item, index) => (
+                                        <div key={index} className="flex gap-4">
+                                            <div className="flex flex-col items-center">
+                                                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary">
+                                                    {item.type === 'appointment' ? <Calendar className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
+                                                </div>
+                                                {index < caseDetails.timeline.length - 1 && <div className="w-px h-full bg-border" />}
                                             </div>
-                                            {index < caseDetails.timeline.length - 1 && <div className="w-px h-full bg-border" />}
+                                            <div className="pb-6 w-full">
+                                                <p className="font-semibold">{item.title}</p>
+                                                <p className="text-sm text-muted-foreground">{item.description}</p>
+                                                <p className="text-xs text-muted-foreground mt-1">{item.date}</p>
+                                                {item.type === 'appointment' && item.data.attachedReport && (
+                                                     <DialogTrigger asChild>
+                                                        <Button variant="secondary" size="sm" className="mt-2">
+                                                            <FileText className="mr-2 h-4 w-4"/> View AI Report
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                )}
+                                                {item.type === 'analysis' && (
+                                                    <Button variant="secondary" size="sm" className="mt-2" asChild>
+                                                        <Link href={`/my-analyses/${item.data.id}`}>
+                                                            <FileText className="mr-2 h-4 w-4"/> View Full Report
+                                                        </Link>
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="pb-6">
-                                            <p className="font-semibold">{item.title}</p>
-                                            <p className="text-sm text-muted-foreground">{item.description}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">{item.date}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-                
-                <div className="space-y-8">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <User className="text-primary" />
-                                Patient Information
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center space-x-4">
-                                <Avatar className="h-16 w-16">
-                                    <AvatarImage src={caseDetails.patient.photoURL || `https://placehold.co/100x100.png?text=${caseDetails.patient.displayName.charAt(0)}`} data-ai-hint="patient portrait" />
-                                    <AvatarFallback>{caseDetails.patient.displayName.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div>
-                                    <h3 className="font-semibold text-lg">{caseDetails.patient.displayName}</h3>
-                                    <p className="text-sm text-muted-foreground">
-                                        {caseDetails.patient.dob ? `${new Date().getFullYear() - new Date(caseDetails.patient.dob).getFullYear()} years old, ` : ''} 
-                                        {caseDetails.patient.gender}
-                                    </p>
+                                    ))}
                                 </div>
-                            </div>
-                            <Separator />
-                             <div className="space-y-2">
-                                <Button className="w-full" variant="outline">
-                                    <FileText className="mr-2 h-4 w-4" /> View Full Medical History
-                                </Button>
-                                 <Button className="w-full" asChild>
-                                    <Link href="/doctor/chat">
-                                        <MessageSquare className="mr-2 h-4 w-4" /> Chat with Patient
-                                    </Link>
-                                </Button>
-                             </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    </div>
+                    
+                    <div className="space-y-8">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <User className="text-primary" />
+                                    Patient Information
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex items-center space-x-4">
+                                    <Avatar className="h-16 w-16">
+                                        <AvatarImage src={caseDetails.patient.photoURL || `https://placehold.co/100x100.png?text=${caseDetails.patient.displayName.charAt(0)}`} data-ai-hint="patient portrait" />
+                                        <AvatarFallback>{caseDetails.patient.displayName.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                        <h3 className="font-semibold text-lg">{caseDetails.patient.displayName}</h3>
+                                        <p className="text-sm text-muted-foreground">
+                                            {caseDetails.patient.dob ? `${new Date().getFullYear() - new Date(caseDetails.patient.dob).getFullYear()} years old, ` : ''} 
+                                            {caseDetails.patient.gender}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Separator />
+                                <div className="space-y-2">
+                                    <Button className="w-full" variant="outline">
+                                        <FileText className="mr-2 h-4 w-4" /> View Full Medical History
+                                    </Button>
+                                    <Button className="w-full" asChild>
+                                        <Link href="/doctor/chat">
+                                            <MessageSquare className="mr-2 h-4 w-4" /> Chat with Patient
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Doctor's Notes</CardTitle>
-                            <CardDescription>Private notes for this case. Not visible to the patient.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <Textarea
-                                placeholder="Add your notes here..."
-                                className="min-h-[200px]"
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                            />
-                            <Button className="w-full" onClick={handleSaveNotes}>
-                                Save Notes
-                            </Button>
-                        </CardContent>
-                    </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Doctor's Notes</CardTitle>
+                                <CardDescription>Private notes for this case. Not visible to the patient.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <Textarea
+                                    placeholder="Add your notes here..."
+                                    className="min-h-[200px]"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                />
+                                <Button className="w-full" onClick={handleSaveNotes}>
+                                    Save Notes
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
-            </div>
+
+                <DialogContent className="sm:max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle>Attached AI Report</DialogTitle>
+                    </DialogHeader>
+                    {caseDetails.timeline.find(item => item.type === 'appointment' && item.data.attachedReport)?.data.attachedReport ? (
+                        <div className="space-y-4 py-4">
+                            <h3 className="font-bold text-lg">{caseDetails.timeline.find(item => item.type === 'appointment' && item.data.attachedReport)?.data.attachedReport.conditionName}</h3>
+                            <p className="text-sm text-muted-foreground">{caseDetails.timeline.find(item => item.type === 'appointment' && item.data.attachedReport)?.data.attachedReport.condition}</p>
+                            <Separator/>
+                            <h4 className="font-semibold">Recommendations:</h4>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{caseDetails.timeline.find(item => item.type === 'appointment' && item.data.attachedReport)?.data.attachedReport.recommendations}</p>
+                        </div>
+                    ) : (
+                        <p>No report found.</p>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
+
