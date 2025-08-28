@@ -207,7 +207,7 @@ export default function AppointmentsPage() {
                                                  <TooltipProvider>
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
-                                                            <div style={{ display: 'inline-block' }}> 
+                                                            <div className="inline-block"> 
                                                               <Button asChild size="sm" disabled={!isJoinButtonEnabled(appointment.appointmentDate)}>
                                                                   <Link href={`/video/${appointment.id}`}>
                                                                     <Video className="mr-2 h-4 w-4" /> Join Call
