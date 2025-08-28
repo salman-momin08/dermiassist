@@ -101,8 +101,8 @@ export default function DoctorAppointmentsPage() {
         let finalDateTime;
         
         if (usePatientTime && app.preferredDate && app.preferredTime) {
-             const [hours, minutes] = app.preferredTime.split(':').map(Number);
              const baseDate = parse(app.preferredDate, 'yyyy-MM-dd', new Date());
+             const [hours, minutes] = app.preferredTime.split(':').map(Number);
              finalDateTime = set(baseDate, { hours, minutes, seconds: 0, milliseconds: 0 });
         } else {
             if (!scheduleDate) {
@@ -112,6 +112,12 @@ export default function DoctorAppointmentsPage() {
             const [hours, minutes] = scheduleTime.split(':').map(Number);
             finalDateTime = set(scheduleDate, { hours, minutes, seconds: 0, milliseconds: 0 });
         }
+        
+        if (!isValid(finalDateTime)) {
+            toast({ title: "Invalid date/time for confirmation.", variant: "destructive"});
+            return;
+        }
+
 
         const appointmentRef = doc(db, 'appointments', app.id);
         const doctorCaseRef = doc(db, 'doctorCases', user.uid, 'patients', app.patientId);
@@ -261,18 +267,20 @@ export default function DoctorAppointmentsPage() {
             const baseDate = parse(dateString, 'yyyy-MM-dd', new Date());
             if (!isValid(baseDate)) return 'Invalid Date';
             
+            let timePart = '';
             if (timeString) {
                 // Manually format time from HH:mm to am/pm
                 const [hoursStr, minutesStr] = timeString.split(':');
                 const hours = parseInt(hoursStr, 10);
                 const minutes = parseInt(minutesStr, 10);
-                const ampm = hours >= 12 ? 'PM' : 'AM';
-                const formattedHours = hours % 12 || 12; // Convert 0 to 12
-                const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
-                const time = `${formattedHours}:${formattedMinutes} ${ampm}`;
-                return `${format(baseDate, 'PP')} at ${time}`;
+                if (!isNaN(hours) && !isNaN(minutes)) {
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    const formattedHours = hours % 12 || 12; // Convert 0 to 12
+                    const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+                    timePart = ` at ${formattedHours}:${formattedMinutes} ${ampm}`;
+                }
             }
-            return format(baseDate, 'PP');
+            return `${format(baseDate, 'PP')}${timePart}`;
         } catch (e) {
             console.error('Error formatting date:', e);
             return 'Invalid Date Format';
@@ -319,10 +327,7 @@ export default function DoctorAppointmentsPage() {
                             </TableCell>
                             <TableCell>{displayDate}</TableCell>
                             <TableCell>
-                               <Badge variant="outline" className="flex items-center gap-1 w-fit">
-                                    {app.mode === "Online" ? <Video className="h-3 w-3" /> : <CalendarIcon className="h-3 w-3" />}
-                                    {app.mode}
-                                </Badge>
+                               <Badge variant="outline">{app.mode}</Badge>
                             </TableCell>
                              <TableCell>
                                 <Badge variant={
