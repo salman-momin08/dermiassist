@@ -37,7 +37,7 @@ type Appointment = {
 };
 
 type TimelineItem = {
-    type: 'appointment' | 'analysis';
+    type: 'appointment';
     title: string;
     description: string;
     date: Date; // Use Date object for sorting
@@ -91,7 +91,7 @@ export default function CaseDetailPage() {
         fetchPatient();
     }, [user, patientId, toast]);
 
-    // Fetch related appointments and analyses after patient data is loaded
+    // Fetch related appointments after patient data is loaded
     useEffect(() => {
         const fetchRelatedData = async () => {
             if (!patient || !user) return;
@@ -103,18 +103,10 @@ export default function CaseDetailPage() {
                     where("patientId", "==", patient.uid),
                     orderBy("requestDate", "desc")
                 );
-                const analysesQuery = query(
-                    collection(db, "users", patient.uid, "analyses"),
-                    orderBy("date", "desc")
-                );
-
-                const [apptSnapshot, analysesSnapshot] = await Promise.all([
-                    getDocs(apptQuery),
-                    getDocs(analysesQuery)
-                ]);
+                
+                const apptSnapshot = await getDocs(apptQuery);
 
                 const appointments = apptSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-                const analyses = analysesSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
 
                 const newTimeline: TimelineItem[] = [];
                 appointments.forEach((app: Appointment) => {
@@ -128,15 +120,6 @@ export default function CaseDetailPage() {
                         description: description,
                         date: app.appointmentDate ? new Date(app.appointmentDate) : new Date(app.requestDate.seconds * 1000),
                         data: app
-                    });
-                });
-                analyses.forEach((an: AnalysisReport) => {
-                    newTimeline.push({
-                        type: 'analysis',
-                        title: 'AI Analysis Completed',
-                        description: `Identified: ${an.conditionName}`,
-                        date: new Date(an.date),
-                        data: an
                     });
                 });
 
@@ -243,7 +226,7 @@ export default function CaseDetailPage() {
                                         <div key={index} className="flex gap-4">
                                             <div className="flex flex-col items-center">
                                                 <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary">
-                                                    {item.type === 'appointment' ? <Calendar className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
+                                                    <Calendar className="h-5 w-5" />
                                                 </div>
                                                 {index < timeline.length - 1 && <div className="w-px h-full bg-border" />}
                                             </div>
@@ -251,9 +234,9 @@ export default function CaseDetailPage() {
                                                 <p className="font-semibold">{item.title}</p>
                                                 <p className="text-sm text-muted-foreground">{item.description}</p>
                                                 <p className="text-xs text-muted-foreground mt-1">{formatDate(item.date)}</p>
-                                                {(item.type === 'appointment' && item.data.attachedReport) || item.type === 'analysis' ? (
+                                                {item.data.attachedReport ? (
                                                      <DialogTrigger asChild>
-                                                        <Button variant="secondary" size="sm" className="mt-2" onClick={() => setActiveReport(item.data.attachedReport || item.data)}>
+                                                        <Button variant="secondary" size="sm" className="mt-2" onClick={() => setActiveReport(item.data.attachedReport)}>
                                                             <FileText className="mr-2 h-4 w-4"/> View AI Report
                                                         </Button>
                                                     </DialogTrigger>
