@@ -245,7 +245,7 @@ export default function DoctorAppointmentsPage() {
                         if (app.requestDate && app.requestDate.seconds) {
                             const dateObj = new Date(app.requestDate.seconds * 1000);
                             if (isValid(dateObj)) {
-                                displayDate = `Requested: ${format(dateObj, 'PP', { timeZone: 'Asia/Kolkata' })}`;
+                                displayDate = `Requested: ${format(dateObj, 'PP')}`;
                             } else {
                                 displayDate = 'Invalid Request Date';
                             }
@@ -255,7 +255,7 @@ export default function DoctorAppointmentsPage() {
                     } else if (app.appointmentDate) {
                         const dateObj = new Date(app.appointmentDate);
                          if (isValid(dateObj)) {
-                            displayDate = format(dateObj, 'PPpp', { timeZone: 'Asia/Kolkata' });
+                            displayDate = format(dateObj, 'PPpp');
                         } else {
                             displayDate = 'Invalid Appointment Date'
                         }

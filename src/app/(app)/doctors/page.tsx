@@ -198,7 +198,7 @@ export default function DoctorsPage() {
                 doctorSignature: doctor.signatureUrl,
                 status: 'Pending',
                 requestDate: serverTimestamp(),
-                // Saving the requested date and time
+                // Saving the requested date and time in a standardized format
                 preferredDate: formState.preferredDate ? formState.preferredDate.toISOString() : null,
                 preferredTime: formState.preferredTime,
                 ...formState,
