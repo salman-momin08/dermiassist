@@ -29,10 +29,17 @@ type Message = {
     imageUrl?: string;
 };
 
+// Mock data to allow UI to be functional
+const mockPatients: Patient[] = [
+    { id: 'patient1', name: 'John Doe', avatar: 'https://placehold.co/100x100.png?text=JD', online: true },
+    { id: 'patient2', name: 'Jane Smith', avatar: 'https://placehold.co/100x100.png?text=JS', online: false },
+    { id: 'patient3', name: 'Sam Wilson', avatar: 'https://placehold.co/100x100.png?text=SW', online: true },
+];
+
 export default function DoctorChatPage() {
   const { user } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [isLoadingPatients, setIsLoadingPatients] = useState(false);
+  const [isLoadingPatients, setIsLoadingPatients] = useState(true);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -42,6 +49,12 @@ export default function DoctorChatPage() {
   const [isGeneratingReplies, setIsGeneratingReplies] = useState(false);
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Using mock data since appointments collection is empty
+    setPatients(mockPatients);
+    setIsLoadingPatients(false);
+  }, []);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -255,5 +268,3 @@ export default function DoctorChatPage() {
     </div>
   )
 }
-
-    
