@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"
-import { Pill, StickyNote, Loader2, Video, Calendar as CalendarIcon } from "lucide-react"
+import { Pill, StickyNote, Loader2, Video, Calendar as CalendarIcon, Trash2, MoreHorizontal } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
@@ -19,8 +19,10 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar"
 import { format, set } from "date-fns"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
-import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import Link from "next/link"
 
 
 type Appointment = {
@@ -116,6 +118,23 @@ export default function DoctorAppointmentsPage() {
             toast({ title: "Error declining request", variant: "destructive" });
         }
     }
+    
+    const handleDelete = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, "appointments", id));
+            toast({
+                title: "Appointment Cancelled",
+                description: "The appointment has been removed.",
+            });
+        } catch (error) {
+            console.error("Error cancelling appointment:", error);
+            toast({
+                title: "Error",
+                description: "Could not cancel the appointment.",
+                variant: "destructive",
+            });
+        }
+    };
     
     const handleSaveNotes = async () => {
         if (!currentAppointmentId) return;
@@ -257,7 +276,49 @@ export default function DoctorAppointmentsPage() {
                                     </DialogContent>
                                 </Dialog>
                              )} 
-                             {(app.status === 'Confirmed' || app.status === 'Completed') && (
+                             {(app.status === 'Confirmed') && (
+                                <>
+                                  {app.mode === 'Online' && (
+                                    <Button asChild size="sm">
+                                      <Link href={`/video/${app.id}`}>
+                                        <Video className="mr-2 h-4 w-4" /> Join Call
+                                      </Link>
+                                    </Button>
+                                  )}
+                                  <AlertDialog>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent>
+                                        <AlertDialogTrigger asChild>
+                                          <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Cancel Appointment
+                                          </DropdownMenuItem>
+                                        </AlertDialogTrigger>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          This will cancel the appointment for {app.patientName}. This action cannot be undone.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Go Back</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDelete(app.id)} className="bg-destructive hover:bg-destructive/90">
+                                          Yes, Cancel
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </>
+                             )}
+                             {app.status === 'Completed' && (
                                 <>
                                     <Dialog>
                                         <DialogTrigger asChild>
@@ -413,5 +474,3 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
-
-    

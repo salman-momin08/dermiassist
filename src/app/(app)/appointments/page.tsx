@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Video, Clock, Download, FileText, Printer, Loader2 } from "lucide-react";
+import { Calendar, Video, Clock, Download, FileText, Printer, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -19,8 +19,10 @@ import html2canvas from 'html2canvas';
 import Image from "next/image";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/use-auth";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 type Appointment = {
     id: string;
@@ -128,6 +130,23 @@ export default function AppointmentsPage() {
         }
         return "Join your video consultation now.";
     }
+    
+    const handleDelete = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, "appointments", id));
+            toast({
+                title: "Appointment Cancelled",
+                description: "Your appointment has been successfully cancelled.",
+            });
+        } catch (error) {
+            console.error("Error cancelling appointment:", error);
+            toast({
+                title: "Error",
+                description: "Could not cancel the appointment. Please try again.",
+                variant: "destructive",
+            });
+        }
+    };
 
     const upcomingAppointments = appointments.filter(a => a.status === 'Confirmed' && a.appointmentDate && isFuture(new Date(a.appointmentDate)));
     const pastAppointments = appointments.filter(a => a.status === 'Completed' || (a.status === 'Confirmed' && a.appointmentDate && isPast(new Date(a.appointmentDate))));
@@ -189,26 +208,59 @@ export default function AppointmentsPage() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        {appointment.mode === "Online" ? (
-                                             <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <div style={{ display: 'inline-block' }}> 
-                                                          <Button asChild size="sm" disabled={!isJoinButtonEnabled(appointment.appointmentDate)}>
-                                                              <Link href={`/video/${appointment.id}`}>
-                                                                <Video className="mr-2 h-4 w-4" /> Join Call
-                                                              </Link>
-                                                          </Button>
-                                                        </div>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>{getJoinTooltipContent(appointment.appointmentDate)}</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        ) : (
-                                            <Button size="sm" variant="outline" disabled>View Details</Button>
-                                        )}
+                                        <div className="flex items-center justify-end gap-2">
+                                            {appointment.mode === "Online" ? (
+                                                 <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <div style={{ display: 'inline-block' }}> 
+                                                              <Button asChild size="sm" disabled={!isJoinButtonEnabled(appointment.appointmentDate)}>
+                                                                  <Link href={`/video/${appointment.id}`}>
+                                                                    <Video className="mr-2 h-4 w-4" /> Join Call
+                                                                  </Link>
+                                                              </Button>
+                                                            </div>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>{getJoinTooltipContent(appointment.appointmentDate)}</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            ) : (
+                                                <Button size="sm" variant="outline" disabled>In-Person</Button>
+                                            )}
+                                            <AlertDialog>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent>
+                                                        <AlertDialogTrigger asChild>
+                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                                Cancel Appointment
+                                                            </DropdownMenuItem>
+                                                        </AlertDialogTrigger>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            This will permanently cancel your appointment with {appointment.doctorName}. This action cannot be undone.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Go Back</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDelete(appointment.id)} className="bg-destructive hover:bg-destructive/90">
+                                                            Yes, Cancel
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             )) : (
@@ -401,5 +453,3 @@ export default function AppointmentsPage() {
         </div>
     );
 }
-
-    
