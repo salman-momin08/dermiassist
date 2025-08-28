@@ -202,8 +202,8 @@ export default function DoctorAppointmentsPage() {
                             <div className="font-medium">{app.patientName}</div>
                         </TableCell>
                         <TableCell>
-                           {app.status === 'Pending' 
-                                ? `Requested: ${format(new Date(app.requestDate.seconds * 1000), 'PP')}` 
+                            {app.status === 'Pending' 
+                                ? (app.requestDate?.seconds ? `Requested: ${format(new Date(app.requestDate.seconds * 1000), 'PP')}` : 'Date not set')
                                 : app.appointmentDate 
                                     ? format(new Date(app.appointmentDate), 'PPpp') 
                                     : 'Not Scheduled'
@@ -475,9 +475,3 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
-
-    
-
-    
-
-    
