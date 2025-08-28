@@ -29,6 +29,8 @@ type Appointment = {
       conditionName: string;
       condition: string;
       recommendations: string;
+      dos?: string[];
+      donts?: string[];
     };
     uploadedImageUrls?: string[];
     uploadedReportUrls?: string[];
@@ -42,12 +44,11 @@ type TimelineItem = {
     data?: any;
 };
 
-type CaseDetails = {
-    patient: any;
-    appointments: Appointment[];
-    analyses: AnalysisReport[];
-    timeline: TimelineItem[];
-};
+type PatientData = {
+    uid: string;
+    displayName: string;
+    [key: string]: any;
+}
 
 export default function CaseDetailPage() {
     const params = useParams();
@@ -55,94 +56,104 @@ export default function CaseDetailPage() {
     const { user } = useAuth();
     const { toast } = useToast();
 
-    const [caseDetails, setCaseDetails] = useState<CaseDetails | null>(null);
+    const [patient, setPatient] = useState<PatientData | null>(null);
+    const [timeline, setTimeline] = useState<TimelineItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [notes, setNotes] = useState("");
     const [activeReport, setActiveReport] = useState<any>(null);
 
-    const fetchCaseDetails = useCallback(async () => {
-        if (!user || !patientId) return;
-
-        setIsLoading(true);
-        try {
-            // 1. Fetch all data in parallel
-            const patientDocRef = doc(db, "users", patientId);
-            const apptQuery = query(
-                collection(db, "appointments"),
-                where("doctorId", "==", user.uid),
-                where("patientId", "==", patientId),
-                orderBy("requestDate", "desc")
-            );
-            const analysesQuery = query(
-                collection(db, "users", patientId, "analyses"),
-                orderBy("date", "desc")
-            );
-
-            const [patientDoc, apptSnapshot, analysesSnapshot] = await Promise.all([
-                getDoc(patientDocRef),
-                getDocs(apptQuery),
-                getDocs(analysesQuery)
-            ]);
-
-            // 2. Check if patient exists
-            if (!patientDoc.exists()) {
-                notFound();
+    // Fetch primary patient data first
+    useEffect(() => {
+        const fetchPatient = async () => {
+            if (!user || !patientId) {
+                setIsLoading(false);
                 return;
-            }
-            const patientData = patientDoc.data();
-            setNotes(patientData.doctorNotes?.[user.uid] || "");
+            };
 
-            // 3. Process results
-            const appointments = apptSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-            const analyses = analysesSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+            setIsLoading(true);
+            try {
+                const patientDocRef = doc(db, "users", patientId);
+                const patientDoc = await getDoc(patientDocRef);
 
-            // 4. Create timeline
-            const timeline: TimelineItem[] = [];
-            appointments.forEach((app: Appointment) => {
-                let description = `Appointment was ${app.status.toLowerCase()}`;
-                if (app.attachedReport) {
-                    description += ` with AI report for ${app.attachedReport.conditionName}.`;
+                if (patientDoc.exists()) {
+                    const patientData = patientDoc.data() as PatientData;
+                    setPatient(patientData);
+                    setNotes(patientData.doctorNotes?.[user.uid] || "");
+                } else {
+                    notFound();
                 }
-                timeline.push({
-                    type: 'appointment',
-                    title: `Appointment ${app.status}`,
-                    description: description,
-                    date: app.appointmentDate ? new Date(app.appointmentDate) : new Date(app.requestDate.seconds * 1000),
-                    data: app
-                });
-            });
-            analyses.forEach((an: AnalysisReport) => {
-                timeline.push({
-                    type: 'analysis',
-                    title: 'AI Analysis Completed',
-                    description: `Identified: ${an.conditionName}`,
-                    date: new Date(an.date),
-                    data: an
-                });
-            });
-
-            // 5. Sort timeline by date descending
-            timeline.sort((a, b) => b.date.getTime() - a.date.getTime());
-
-            setCaseDetails({
-                patient: patientData,
-                appointments,
-                analyses,
-                timeline
-            });
-
-        } catch (error) {
-            console.error("Error fetching case details:", error);
-            toast({ title: "Error", description: "Could not load case details.", variant: "destructive" });
-        } finally {
-            setIsLoading(false);
-        }
+            } catch (error) {
+                console.error("Error fetching patient document:", error);
+                toast({ title: "Error", description: "Could not load patient data.", variant: "destructive" });
+                setIsLoading(false);
+            }
+        };
+        fetchPatient();
     }, [user, patientId, toast]);
 
+    // Fetch related appointments and analyses after patient data is loaded
     useEffect(() => {
-        fetchCaseDetails();
-    }, [fetchCaseDetails]);
+        const fetchRelatedData = async () => {
+            if (!patient || !user) return;
 
+            try {
+                const apptQuery = query(
+                    collection(db, "appointments"),
+                    where("doctorId", "==", user.uid),
+                    where("patientId", "==", patient.uid),
+                    orderBy("requestDate", "desc")
+                );
+                const analysesQuery = query(
+                    collection(db, "users", patient.uid, "analyses"),
+                    orderBy("date", "desc")
+                );
+
+                const [apptSnapshot, analysesSnapshot] = await Promise.all([
+                    getDocs(apptQuery),
+                    getDocs(analysesQuery)
+                ]);
+
+                const appointments = apptSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+                const analyses = analysesSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+
+                const newTimeline: TimelineItem[] = [];
+                appointments.forEach((app: Appointment) => {
+                    let description = `Appointment was ${app.status.toLowerCase()}`;
+                    if (app.attachedReport?.conditionName) {
+                        description += ` with AI report for ${app.attachedReport.conditionName}.`;
+                    }
+                    newTimeline.push({
+                        type: 'appointment',
+                        title: `Appointment ${app.status}`,
+                        description: description,
+                        date: app.appointmentDate ? new Date(app.appointmentDate) : new Date(app.requestDate.seconds * 1000),
+                        data: app
+                    });
+                });
+                analyses.forEach((an: AnalysisReport) => {
+                    newTimeline.push({
+                        type: 'analysis',
+                        title: 'AI Analysis Completed',
+                        description: `Identified: ${an.conditionName}`,
+                        date: new Date(an.date),
+                        data: an
+                    });
+                });
+
+                newTimeline.sort((a, b) => b.date.getTime() - a.date.getTime());
+                setTimeline(newTimeline);
+
+            } catch (error) {
+                console.error("Error fetching related case data:", error);
+                toast({ title: "Error", description: "Could not load timeline details.", variant: "destructive" });
+            } finally {
+                setIsLoading(false); // Set loading to false after all fetches are done
+            }
+        };
+
+        fetchRelatedData();
+
+    }, [patient, user, toast]);
 
     const handleSaveNotes = async () => {
         if (!user) return;
@@ -163,10 +174,6 @@ export default function CaseDetailPage() {
         }
     };
     
-    const allUploadedImages = caseDetails?.appointments.flatMap(a => a.uploadedImageUrls || []) || [];
-    const allUploadedReports = caseDetails?.appointments.flatMap(a => a.uploadedReportUrls || []) || [];
-
-
     if (isLoading) {
         return (
              <div className="container mx-auto p-4 md:p-8 flex justify-center">
@@ -175,7 +182,7 @@ export default function CaseDetailPage() {
         );
     }
 
-    if (!caseDetails) {
+    if (!patient) {
        return (
         <div className="container mx-auto p-4 md:p-8">
              <div className="mb-6">
@@ -220,47 +227,9 @@ export default function CaseDetailPage() {
                             <CardHeader>
                                 <CardTitle className="text-2xl font-headline">Case Details</CardTitle>
                                 <div className="flex items-center gap-2 pt-1">
-                                    <span className="text-sm text-muted-foreground">Patient ID: {caseDetails.patient.uid}</span>
+                                    <span className="text-sm text-muted-foreground">Patient ID: {patient.uid}</span>
                                 </div>
                             </CardHeader>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Uploaded Files</CardTitle>
-                                <CardDescription>All files uploaded by the patient across all appointments.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                {allUploadedImages.length > 0 && (
-                                    <div className="mb-4">
-                                        <h4 className="font-semibold mb-2">Condition Photos</h4>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                            {allUploadedImages.map((url, i) => (
-                                                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                                                    <img src={url} alt={`Patient upload ${i + 1}`} className="rounded-lg object-cover aspect-square hover:opacity-80 transition-opacity" />
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                {allUploadedReports.length > 0 && (
-                                    <div>
-                                        <h4 className="font-semibold mb-2">Previous Medical Reports</h4>
-                                        <div className="space-y-2">
-                                            {allUploadedReports.map((url, i) => (
-                                                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                                                    <Button variant="secondary" className="w-full justify-start">
-                                                        <Download className="mr-2" /> Report {i + 1}
-                                                    </Button>
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                {allUploadedImages.length === 0 && allUploadedReports.length === 0 && (
-                                    <p className="text-muted-foreground text-center py-8">No files have been uploaded by this patient.</p>
-                                )}
-                            </CardContent>
                         </Card>
 
                         <Card>
@@ -270,35 +239,31 @@ export default function CaseDetailPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-6">
-                                    {caseDetails.timeline.map((item, index) => (
+                                    {timeline.map((item, index) => (
                                         <div key={index} className="flex gap-4">
                                             <div className="flex flex-col items-center">
                                                 <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary">
                                                     {item.type === 'appointment' ? <Calendar className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
                                                 </div>
-                                                {index < caseDetails.timeline.length - 1 && <div className="w-px h-full bg-border" />}
+                                                {index < timeline.length - 1 && <div className="w-px h-full bg-border" />}
                                             </div>
                                             <div className="pb-6 w-full">
                                                 <p className="font-semibold">{item.title}</p>
                                                 <p className="text-sm text-muted-foreground">{item.description}</p>
                                                 <p className="text-xs text-muted-foreground mt-1">{formatDate(item.date)}</p>
-                                                {item.type === 'appointment' && item.data.attachedReport && (
+                                                {(item.type === 'appointment' && item.data.attachedReport) || item.type === 'analysis' ? (
                                                      <DialogTrigger asChild>
-                                                        <Button variant="secondary" size="sm" className="mt-2" onClick={() => setActiveReport(item.data.attachedReport)}>
+                                                        <Button variant="secondary" size="sm" className="mt-2" onClick={() => setActiveReport(item.data.attachedReport || item.data)}>
                                                             <FileText className="mr-2 h-4 w-4"/> View AI Report
                                                         </Button>
                                                     </DialogTrigger>
-                                                )}
-                                                {item.type === 'analysis' && (
-                                                    <DialogTrigger asChild>
-                                                        <Button variant="secondary" size="sm" className="mt-2" onClick={() => setActiveReport(item.data)}>
-                                                            <FileText className="mr-2 h-4 w-4"/> View Full Report
-                                                        </Button>
-                                                    </DialogTrigger>
-                                                )}
+                                                ) : null }
                                             </div>
                                         </div>
                                     ))}
+                                    {timeline.length === 0 && (
+                                        <p className="text-muted-foreground text-center py-8">No activity found for this case.</p>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
@@ -315,14 +280,14 @@ export default function CaseDetailPage() {
                             <CardContent className="space-y-4">
                                 <div className="flex items-center space-x-4">
                                     <Avatar className="h-16 w-16">
-                                        <AvatarImage src={caseDetails.patient.photoURL || `https://placehold.co/100x100.png?text=${caseDetails.patient.displayName.charAt(0)}`} data-ai-hint="patient portrait" />
-                                        <AvatarFallback>{caseDetails.patient.displayName.charAt(0)}</AvatarFallback>
+                                        <AvatarImage src={patient.photoURL || `https://placehold.co/100x100.png?text=${patient.displayName.charAt(0)}`} data-ai-hint="patient portrait" />
+                                        <AvatarFallback>{patient.displayName.charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <h3 className="font-semibold text-lg">{caseDetails.patient.displayName}</h3>
+                                        <h3 className="font-semibold text-lg">{patient.displayName}</h3>
                                         <p className="text-sm text-muted-foreground">
-                                            {caseDetails.patient.dob ? `${new Date().getFullYear() - new Date(caseDetails.patient.dob).getFullYear()} years old, ` : ''} 
-                                            {caseDetails.patient.gender}
+                                            {patient.dob ? `${new Date().getFullYear() - new Date(patient.dob).getFullYear()} years old, ` : ''} 
+                                            {patient.gender}
                                         </p>
                                     </div>
                                 </div>
@@ -371,21 +336,25 @@ export default function CaseDetailPage() {
                             <Separator/>
                             <h4 className="font-semibold">Expert Recommendations:</h4>
                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{activeReport.recommendations}</p>
-                            <Separator/>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <h4 className="font-semibold mb-2">Do's</h4>
-                                    <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                                        {activeReport.dos?.map((item: string, i: number) => <li key={i}>{item}</li>)}
-                                    </ul>
+                            {(activeReport.dos && activeReport.dos.length > 0) && (
+                                <>
+                                <Separator/>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <h4 className="font-semibold mb-2">Do's</h4>
+                                        <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                                            {activeReport.dos?.map((item: string, i: number) => <li key={i}>{item}</li>)}
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold mb-2">Don'ts</h4>
+                                        <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                                            {activeReport.donts?.map((item: string, i: number) => <li key={i}>{item}</li>)}
+                                        </ul>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h4 className="font-semibold mb-2">Don'ts</h4>
-                                    <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                                        {activeReport.donts?.map((item: string, i: number) => <li key={i}>{item}</li>)}
-                                    </ul>
-                                </div>
-                            </div>
+                                </>
+                            )}
                         </div>
                     ) : (
                         <p>No report details to display.</p>
