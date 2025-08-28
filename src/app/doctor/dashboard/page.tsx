@@ -234,7 +234,7 @@ export default function DoctorDashboardPage() {
     };
     
     const getFormattedDate = (dateString?: string) => {
-        if (!dateString) return 'Not specified';
+        if (!dateString || typeof dateString !== 'string') return 'Not specified';
         try {
             // Robustly parse the 'YYYY-MM-DD' string to avoid timezone issues
             const parsedDate = parse(dateString, 'yyyy-MM-dd', new Date());
