@@ -196,9 +196,9 @@ export default function AppointmentsPage() {
                                     <TableCell className="font-medium">{appointment.doctorName}</TableCell>
                                     <TableCell>{appointment.appointmentDate ? format(new Date(appointment.appointmentDate), 'PPpp', { timeZone: 'Asia/Kolkata' }) : 'Not Scheduled'}</TableCell>
                                     <TableCell className="hidden md:table-cell">
-                                        <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                                        <Badge variant="outline" className="flex items-center gap-1.5 w-fit">
                                             {appointment.mode === "Online" ? <Video className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
-                                            {appointment.mode}
+                                            <span>{appointment.mode}</span>
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">

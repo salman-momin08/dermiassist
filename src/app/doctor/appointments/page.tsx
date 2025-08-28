@@ -327,7 +327,10 @@ export default function DoctorAppointmentsPage() {
                             </TableCell>
                             <TableCell>{displayDate}</TableCell>
                             <TableCell>
-                               <Badge variant="outline">{app.mode}</Badge>
+                               <Badge variant="outline" className="flex items-center gap-1.5 w-fit">
+                                    {app.mode === "Online" ? <Video className="h-3 w-3" /> : <CalendarIcon className="h-3 w-3" />}
+                                    <span>{app.mode}</span>
+                                </Badge>
                             </TableCell>
                              <TableCell>
                                 <Badge variant={
