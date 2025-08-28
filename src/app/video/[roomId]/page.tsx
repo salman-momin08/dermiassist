@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, use } from "react";
 import {
   useHMSStore,
   useHMSActions,
@@ -133,7 +133,7 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
 
     return () => {
         if(hmsActions.leave) {
-          hmsactions.leave();
+          hmsActions.leave();
         }
     }
   }, [token, hmsActions, userData]);
@@ -155,7 +155,8 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
 }
 
 // Wrapper needed for pages that use HMS Hooks
-export default function VideoCallPageWrapper({ params }: { params: { roomId:string } }) {
+export default function VideoCallPageWrapper({ params: paramsPromise }: { params: Promise<{ roomId:string }> }) {
+    const params = use(paramsPromise);
     return (
         <HMSRoomProvider>
             <VideoCallPage params={params}/>
