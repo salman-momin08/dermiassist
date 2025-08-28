@@ -56,7 +56,10 @@ service cloud.firestore {
       // --- Analyses Subcollection -> /users/{userId}/analyses/{analysisId} ---
       match /analyses/{analysisId} {
         // Full access is granted only to the owner of the parent user document.
-        allow read, write, delete: if isOwner(userId);
+        // A doctor can read analyses if they are linked via a case file.
+        allow read: if isOwner(userId) || 
+                       (isDoctor() && exists(/databases/$(database)/documents/doctorCases/$(request.auth.uid)/patients/$(userId)));
+        allow write, delete: if isOwner(userId);
       }
     }
 
@@ -76,6 +79,21 @@ service cloud.firestore {
       // Any authenticated user can create an appointment request.
       allow create: if request.auth != null;
     }
+
+    // =====================================================================
+    // Doctor Cases -> /doctorCases/{doctorId}/patients/{patientId}
+    // =====================================================================
+    match /doctorCases/{doctorId} {
+        // A doctor can only access their own case files.
+        allow read, write, delete: if isOwner(doctorId);
+
+        match /patients/{patientId} {
+            // A doctor can read/write their own patient case entries.
+            // An admin can also manage these for administrative purposes.
+            allow read, write, delete: if isOwner(doctorId) || isAdmin();
+        }
+    }
+
 
     // =====================================================================
     // Chats -> /chats/{chatId}
