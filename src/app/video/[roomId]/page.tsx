@@ -106,15 +106,17 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Temporarily disabled token generation due to dependency issues.
-    // In a real scenario, you would fetch a token from your backend here.
+    if (authLoading || !user || !role || !userData) return;
+
+    // We can't generate a token without the server-sdk, so we'll show an error.
+    // In a real app, this would be an API call to a backend.
     toast({
         title: "Video Service Unavailable",
-        description: "The video call feature is temporarily disabled due to a configuration issue.",
-        variant: "destructive"
+        description: "Could not generate an authentication token to join the call.",
+        variant: "destructive",
     });
-  }, [toast]);
 
+  }, [authLoading, user, role, userData, params.roomId, toast]);
 
   useEffect(() => {
     if (!token || !userData) return;
@@ -131,16 +133,16 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
 
     return () => {
         if(hmsActions.leave) {
-          hmsActions.leave();
+          hmsactions.leave();
         }
     }
   }, [token, hmsActions, userData]);
 
-  if (authLoading) {
+  if (authLoading || !token) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Loading...</p>
+        <p className="mt-4 text-muted-foreground">Authenticating for video call...</p>
       </div>
     );
   }
@@ -153,7 +155,7 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
 }
 
 // Wrapper needed for pages that use HMS Hooks
-export default function VideoCallPageWrapper({ params }: { params: { roomId: string } }) {
+export default function VideoCallPageWrapper({ params }: { params: { roomId:string } }) {
     return (
         <HMSRoomProvider>
             <VideoCallPage params={params}/>
