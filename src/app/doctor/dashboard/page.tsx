@@ -233,22 +233,27 @@ export default function DoctorDashboardPage() {
         );
     };
     
-    const getFormattedDate = (dateString?: string) => {
-        if (!dateString || typeof dateString !== 'string') {
-            return 'Not specified';
-        }
-        try {
-            // Robustly parse the 'YYYY-MM-DD' string to avoid timezone issues
-            const parsedDate = parse(dateString, 'yyyy-MM-dd', new Date());
+    const getFormattedRequestedDate = (app: Appointment) => {
+        // 1. Prioritize the preferredDate if it exists and is valid
+        if (app.preferredDate && typeof app.preferredDate === 'string') {
+            const parsedDate = parse(app.preferredDate, 'yyyy-MM-dd', new Date());
             if (isValid(parsedDate)) {
-                 return format(parsedDate, 'PP');
+                return format(parsedDate, 'PP');
             }
-            return 'Invalid Date';
-        } catch (e) {
-            console.error('Invalid date value for formatting:', dateString, e);
-            return 'Invalid Date';
         }
+        
+        // 2. Fallback to the requestDate
+        if (app.requestDate && app.requestDate.seconds) {
+             const dateObj = new Date(app.requestDate.seconds * 1000);
+             if (isValid(dateObj)) {
+                return `Requested: ${format(dateObj, 'PP')}`;
+            }
+        }
+        
+        // 3. Final fallback
+        return 'Not specified';
     };
+
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -332,7 +337,7 @@ export default function DoctorDashboardPage() {
                                         <div className="text-sm text-muted-foreground">{app.mode}</div>
                                     </TableCell>
                                     <TableCell className="hidden sm:table-cell">
-                                        {`${getFormattedDate(app.preferredDate)} at ${app.preferredTime || 'any time'}`}
+                                        {`${getFormattedRequestedDate(app)} at ${app.preferredTime || 'any time'}`}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
@@ -381,3 +386,5 @@ export default function DoctorDashboardPage() {
         </div>
     );
 }
+
+    
