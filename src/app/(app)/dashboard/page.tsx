@@ -11,9 +11,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
-
-const chartData: any[] = [];
+import { format, subMonths, startOfMonth } from "date-fns";
 
 const chartConfig = {
   analyses: {
@@ -42,6 +40,40 @@ export default function DashboardPage() {
 
     return { totalAnalyses, analysesLastMonth, recentAnalyses };
   }, [analyses]);
+
+  const chartData = useMemo(() => {
+    if (isLoading || analyses.length === 0) {
+      return [];
+    }
+
+    const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));
+    const monthlyCounts: { [key: string]: number } = {};
+
+    // Initialize the last 6 months
+    for (let i = 0; i < 6; i++) {
+        const month = format(subMonths(new Date(), i), 'MMM yyyy');
+        monthlyCounts[month] = 0;
+    }
+
+    analyses.forEach(analysis => {
+      const analysisDate = new Date(analysis.date);
+      if (analysisDate >= sixMonthsAgo) {
+        const month = format(analysisDate, 'MMM yyyy');
+        if (monthlyCounts.hasOwnProperty(month)) {
+            monthlyCounts[month]++;
+        }
+      }
+    });
+    
+    return Object.entries(monthlyCounts)
+      .map(([month, count]) => ({
+        month: month.split(' ')[0], // Just get month name
+        analyses: count,
+        date: startOfMonth(new Date(month))
+      }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime()); // Sort from oldest to newest
+  }, [analyses, isLoading]);
+
 
   if (isLoading) {
     return (
@@ -138,7 +170,6 @@ export default function DashboardPage() {
                       tickLine={false}
                       tickMargin={10}
                       axisLine={false}
-                      tickFormatter={(value) => value.slice(0, 3)}
                     />
                     <ChartTooltip
                       cursor={false}
@@ -149,7 +180,7 @@ export default function DashboardPage() {
                 </ChartContainer>
             ) : (
                 <div className="flex h-[300px] w-full items-center justify-center text-muted-foreground">
-                    No analysis data available.
+                    No analysis data available. Perform an analysis to see your history.
                 </div>
             )}
           </CardContent>
