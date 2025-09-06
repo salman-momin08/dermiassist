@@ -14,3 +14,4 @@ import '@/ai/flows/generate-chat-summary.ts';
 import '@/ai/flows/detect-disease-name.ts';
 import '@/ai/flows/proforma-chat.ts';
 import '@/ai/flows/generate-100ms-token.ts';
+import '@/ai/flows/explain-report-multimodal.ts';

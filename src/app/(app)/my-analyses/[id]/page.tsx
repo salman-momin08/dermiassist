@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit } from "lucide-react";
+import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit, Languages } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -18,7 +18,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import jsPDF from 'jspdf';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { generateHealingVideo } from '@/ai/flows/generate-healing-video';
-
+import { explainReportMultimodal } from '@/ai/flows/explain-report-multimodal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 export default function AnalysisDetailPage() {
     const params = useParams();
@@ -39,6 +41,14 @@ export default function AnalysisDetailPage() {
     const [videoUri, setVideoUri] = useState<string | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
+
+    // State for explanation modal
+    const [explanationDialogOpen, setExplanationDialogOpen] = useState(false);
+    const [explanationLoading, setExplanationLoading] = useState(false);
+    const [selectedLanguage, setSelectedLanguage] = useState('English');
+    const [explanationText, setExplanationText] = useState<string | null>(null);
+    const [explanationAudio, setExplanationAudio] = useState<string | null>(null);
+    const [explanationError, setExplanationError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchAnalysis = async () => {
@@ -139,6 +149,35 @@ export default function AnalysisDetailPage() {
             });
         } finally {
             setIsGeneratingVideo(false);
+        }
+    };
+
+    const handleGenerateExplanation = async () => {
+        if (!analysis) return;
+
+        setExplanationLoading(true);
+        setExplanationText(null);
+        setExplanationAudio(null);
+        setExplanationError(null);
+
+        try {
+            const result = await explainReportMultimodal({
+                reportConditionName: analysis.conditionName,
+                reportRecommendations: analysis.recommendations,
+                targetLanguage: selectedLanguage,
+            });
+            setExplanationText(result.explanationText);
+            setExplanationAudio(result.audioDataUri);
+        } catch (err) {
+            console.error("Explanation generation failed:", err);
+            setExplanationError("An unexpected error occurred while generating the explanation. Please try again.");
+            toast({
+                title: "Explanation Failed",
+                description: "Could not generate the explanation.",
+                variant: "destructive",
+            });
+        } finally {
+            setExplanationLoading(false);
         }
     };
     
@@ -331,12 +370,21 @@ export default function AnalysisDetailPage() {
         }
     };
 
-    const resetDialog = () => {
+    const resetProgressDialog = () => {
         setProgressImage(null);
         setProgressSummary(null);
         setError(null);
         setVideoUri(null);
     };
+
+    const resetExplanationDialog = () => {
+        setExplanationLoading(false);
+        setSelectedLanguage('English');
+        setExplanationText(null);
+        setExplanationAudio(null);
+        setExplanationError(null);
+    };
+
 
     if (isLoading) {
         return (
@@ -455,8 +503,64 @@ export default function AnalysisDetailPage() {
                            )}
                         </CardContent>
                     </Card>
+                    
+                    <Dialog open={explanationDialogOpen} onOpenChange={(open) => { setExplanationDialogOpen(open); if(!open) resetExplanationDialog(); }}>
+                        <DialogTrigger asChild>
+                           <Button className="w-full">
+                                <Languages className="mr-2 h-4 w-4" />
+                                Explain My Report
+                            </Button>
+                        </DialogTrigger>
+                         <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Explain Report in Another Language</DialogTitle>
+                                <DialogDescription>
+                                    Select a language to get a simplified explanation of your report in both text and audio.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="language-select">Language</Label>
+                                    <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                                        <SelectTrigger id="language-select">
+                                            <SelectValue placeholder="Select a language" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="English">English</SelectItem>
+                                            <SelectItem value="Hindi">Hindi</SelectItem>
+                                            <SelectItem value="Spanish">Spanish</SelectItem>
+                                            <SelectItem value="French">French</SelectItem>
+                                            <SelectItem value="German">German</SelectItem>
+                                            <SelectItem value="Mandarin Chinese">Mandarin Chinese</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Button onClick={handleGenerateExplanation} disabled={explanationLoading} className="w-full">
+                                    {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                    Generate Explanation
+                                </Button>
+                                {explanationLoading && (
+                                     <p className="text-sm text-center text-muted-foreground">Generating... this may take a moment.</p>
+                                )}
+                                {explanationError && (
+                                     <Alert variant="destructive">
+                                        <AlertTitle>Error</AlertTitle>
+                                        <AlertDescription>{explanationError}</AlertDescription>
+                                    </Alert>
+                                )}
+                                {(explanationText || explanationAudio) && (
+                                    <Card className="mt-4">
+                                        <CardContent className="pt-6 space-y-4">
+                                            {explanationText && <p className="text-muted-foreground">{explanationText}</p>}
+                                            {explanationAudio && <audio controls src={explanationAudio} className="w-full" />}
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </div>
+                        </DialogContent>
+                    </Dialog>
 
-                    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if(!open) resetDialog(); }}>
+                    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if(!open) resetProgressDialog(); }}>
                         <DialogTrigger asChild>
                             <Button className="w-full" variant="secondary">
                                 <LineChart className="mr-2 h-4 w-4" />
