@@ -14,14 +14,14 @@ import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
 import wav from 'wav';
 
-export const ExplainReportMultimodalInputSchema = z.object({
+const ExplainReportMultimodalInputSchema = z.object({
   reportConditionName: z.string().describe('The name of the diagnosed skin condition.'),
   reportRecommendations: z.string().describe('The detailed recommendations from the report.'),
   targetLanguage: z.string().describe('The language for the explanation (e.g., Hindi, Spanish, French).'),
 });
 export type ExplainReportMultimodalInput = z.infer<typeof ExplainReportMultimodalInputSchema>;
 
-export const ExplainReportMultimodalOutputSchema = z.object({
+const ExplainReportMultimodalOutputSchema = z.object({
   explanationText: z.string().describe('The simplified explanation of the report in the target language.'),
   audioDataUri: z.string().describe("The text-to-speech audio of the explanation, as a data URI. Expected format: 'data:audio/wav;base64,<encoded_data>'."),
 });
