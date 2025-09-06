@@ -463,19 +463,30 @@ export default function AdminDashboardPage() {
                                                 </AlertDialogTrigger>
                                             </>
                                         )}
-                                        {doctor.status === 'Verified' && <DropdownMenuItem>Suspend</DropdownMenuItem>}
+                                        {doctor.status !== 'Pending' && (
+                                             <AlertDialogTrigger asChild>
+                                                <DropdownMenuItem className="text-red-600 dark:text-red-500 focus:text-red-600 focus:dark:text-red-500" onSelect={(e) => e.preventDefault()}>
+                                                    <Trash2 className="mr-2 h-4 w-4" />Delete User
+                                                </DropdownMenuItem>
+                                            </AlertDialogTrigger>
+                                        )}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                                 <AlertDialogContent>
                                      <AlertDialogHeader>
                                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                         <AlertDialogDescription>
-                                            This will reject the verification request for Dr. {doctor.name}. They will need to re-upload their certificate to apply again.
+                                            {doctor.status === 'Pending'
+                                                ? `This will reject the verification request for Dr. ${doctor.name}. They will need to re-upload their certificate to apply again.`
+                                                : `This will permanently delete Dr. ${doctor.name}'s record from Firestore.`
+                                            }
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleReject(doctor.id)} className="bg-destructive hover:bg-destructive/90">Reject</AlertDialogAction>
+                                        <AlertDialogAction onClick={() => doctor.status === 'Pending' ? handleReject(doctor.id) : handleDeleteUser(doctor.id)} className="bg-destructive hover:bg-destructive/90">
+                                            {doctor.status === 'Pending' ? 'Reject' : 'Delete'}
+                                        </AlertDialogAction>
                                     </AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>

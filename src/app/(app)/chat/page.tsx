@@ -1,14 +1,43 @@
 
 "use client"
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
-import { StreamChat } from 'stream-chat';
-import { Chat, Channel, ChannelList, Window, MessageList, MessageInput, ChannelHeader, LoadingIndicator } from 'stream-chat-react';
+import { StreamChat, Message } from 'stream-chat';
+import { Chat, Channel, ChannelList, Window, MessageList, MessageInput, ChannelHeader, LoadingIndicator, useChatContext } from 'stream-chat-react';
 import 'stream-chat-react/dist/css/v2/index.css';
+import { CustomMessage } from '@/components/chat/custom-message';
 
 const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
+
+const ChatEventListeners = () => {
+    const { client } = useChatContext();
+    const [deletedMessages, setDeletedMessages] = useState<string[]>([]);
+
+    const handleEvent = useCallback((event: any) => {
+        if (event.type === 'message.deleted') {
+            // This is a hard delete, it will be removed automatically
+            // This listener is more for soft deletes or other custom events
+        }
+        if (event.type === 'message.flagged' && event.message?.id) {
+             if (event.message.user?.id === client.userID) {
+                setDeletedMessages(prev => [...prev, event.message.id]);
+             }
+        }
+    }, [client.userID]);
+
+    useEffect(() => {
+        client.on('message.deleted', handleEvent);
+        client.on('message.flagged', handleEvent);
+        return () => {
+            client.off('message.deleted', handleEvent);
+            client.off('message.flagged', handleEvent);
+        };
+    }, [client, handleEvent]);
+
+    return <MessageList Message={(props) => <CustomMessage {...props} deletedMessages={deletedMessages} />} />;
+};
 
 export default function ChatPage() {
   const { user, userData, loading } = useAuth();
@@ -113,7 +142,7 @@ export default function ChatPage() {
                 <Channel>
                     <Window>
                         <ChannelHeader />
-                        <MessageList />
+                        <ChatEventListeners />
                         <MessageInput />
                     </Window>
                 </Channel>
