@@ -528,10 +528,16 @@ export default function AnalysisDetailPage() {
                                         <SelectContent>
                                             <SelectItem value="English">English</SelectItem>
                                             <SelectItem value="Hindi">Hindi</SelectItem>
-                                            <SelectItem value="Spanish">Spanish</SelectItem>
-                                            <SelectItem value="French">French</SelectItem>
-                                            <SelectItem value="German">German</SelectItem>
-                                            <SelectItem value="Mandarin Chinese">Mandarin Chinese</SelectItem>
+                                            <SelectItem value="Bengali">Bengali</SelectItem>
+                                            <SelectItem value="Telugu">Telugu</SelectItem>
+                                            <SelectItem value="Marathi">Marathi</SelectItem>
+                                            <SelectItem value="Tamil">Tamil</SelectItem>
+                                            <SelectItem value="Urdu">Urdu</SelectItem>
+                                            <SelectItem value="Gujarati">Gujarati</SelectItem>
+                                            <SelectItem value="Kannada">Kannada</SelectItem>
+                                            <SelectItem value="Odia">Odia</SelectItem>
+                                            <SelectItem value="Malayalam">Malayalam</SelectItem>
+                                            <SelectItem value="Punjabi">Punjabi</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
