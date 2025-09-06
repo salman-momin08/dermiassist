@@ -112,7 +112,11 @@ export default function AnalysisDetailPage() {
         
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
             console.error('Speech recognition error:', event.error);
-            toast({ title: "Speech Error", description: event.error, variant: "destructive" });
+            if (event.error === 'not-allowed') {
+                 toast({ title: "Permission Denied", description: "Please enable microphone access in your browser settings.", variant: "destructive" });
+            } else {
+                toast({ title: "Speech Error", description: event.error, variant: "destructive" });
+            }
             setIsListening(false);
         };
         
@@ -124,7 +128,7 @@ export default function AnalysisDetailPage() {
 
     }, [toast]);
     
-    const handleMicClick = () => {
+    const handleMicClick = async () => {
         if (!recognitionRef.current) {
             toast({ title: "Unsupported", description: "Speech recognition is not supported in your browser.", variant: "destructive" });
             return;
@@ -132,9 +136,29 @@ export default function AnalysisDetailPage() {
         
         if (isListening) {
             recognitionRef.current.stop();
-        } else {
+            return;
+        }
+        
+        try {
+            // Check permission status
+            const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+            
+            if (permissionStatus.state === 'denied') {
+                toast({
+                    title: "Microphone Access Denied",
+                    description: "Please enable microphone permissions in your browser's site settings to use this feature.",
+                    variant: "destructive",
+                });
+                return;
+            }
+            
+            // If granted or prompt, start recognition
             recognitionRef.current.start();
             setIsListening(true);
+            
+        } catch (err) {
+             console.error("Error checking microphone permissions:", err);
+             toast({ title: "Error", description: "Could not check microphone permissions.", variant: "destructive"});
         }
     };
 
@@ -760,5 +784,7 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
+
+    
 
     
