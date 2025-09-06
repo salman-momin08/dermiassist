@@ -23,6 +23,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+
+// Check for window object to avoid SSR errors with SpeechRecognition
+const SpeechRecognition =
+  typeof window !== 'undefined'
+    ? window.SpeechRecognition || (window as any).webkitSpeechRecognition
+    : null;
+
 
 export default function AnalysisDetailPage() {
     const params = useParams();
@@ -53,6 +61,10 @@ export default function AnalysisDetailPage() {
     const [explanationError, setExplanationError] = useState<string | null>(null);
     const [followUpQuestion, setFollowUpQuestion] = useState("");
 
+    // State for speech recognition
+    const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const [isListening, setIsListening] = useState(false);
+
     useEffect(() => {
         const fetchAnalysis = async () => {
             if (!user) {
@@ -81,6 +93,50 @@ export default function AnalysisDetailPage() {
             router.push('/login');
         }
     }, [id, user, isAuthLoading, getAnalysisById, router]);
+
+    // Setup Speech Recognition
+    useEffect(() => {
+        if (!SpeechRecognition) {
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+            const transcript = event.results[0][0].transcript;
+            setFollowUpQuestion(transcript);
+        };
+        
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+            console.error('Speech recognition error:', event.error);
+            toast({ title: "Speech Error", description: event.error, variant: "destructive" });
+            setIsListening(false);
+        };
+        
+        recognition.onend = () => {
+            setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+
+    }, [toast]);
+    
+    const handleMicClick = () => {
+        if (!recognitionRef.current) {
+            toast({ title: "Unsupported", description: "Speech recognition is not supported in your browser.", variant: "destructive" });
+            return;
+        }
+        
+        if (isListening) {
+            recognitionRef.current.stop();
+        } else {
+            recognitionRef.current.start();
+            setIsListening(true);
+        }
+    };
 
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -571,7 +627,7 @@ export default function AnalysisDetailPage() {
                                                     value={followUpQuestion}
                                                     onChange={(e) => setFollowUpQuestion(e.target.value)}
                                                 />
-                                                <Button size="icon" variant="ghost" className="absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8">
+                                                <Button size="icon" variant="ghost" className={cn("absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick}>
                                                     <Mic className="h-4 w-4" />
                                                 </Button>
                                                 <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8">
@@ -704,3 +760,5 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
+
+    
