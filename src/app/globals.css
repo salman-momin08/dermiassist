@@ -165,5 +165,5 @@ html {
 
 /* Correcting the Tailwind JIT class generation */
 .bg-\[var\(--str-chat__channel-list-bg-color\)\] {
-  background-color: var(--str-chat__channel-list-bg-color);
+  background-color: var(--str-chat-channel-list-bg-color);
 }
