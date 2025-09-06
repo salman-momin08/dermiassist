@@ -99,17 +99,17 @@ export default function ChatPage() {
   const sort = { last_message_at: -1 };
 
   return (
-    <div className="h-[calc(100vh-128px)] container mx-auto p-4 md:p-8">
+    <div className="container mx-auto p-4 md:p-8 h-[calc(100vh-128px)] flex flex-col">
        <div className="space-y-2 mb-8">
             <h1 className="text-3xl font-bold tracking-tight font-headline">Chat with Your Doctor</h1>
             <p className="text-muted-foreground">Communicate directly and securely with your healthcare providers.</p>
         </div>
       <Chat client={chatClient} theme="str-chat__theme-light">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-grow min-h-0">
+            <div className="lg:col-span-1 h-full min-h-0">
                 <ChannelList filters={filters} sort={sort} showChannelSearch />
             </div>
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 h-full min-h-0">
                 <Channel>
                     <Window>
                         <ChannelHeader />
