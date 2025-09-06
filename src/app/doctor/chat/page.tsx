@@ -175,11 +175,11 @@ export default function DoctorChatPage() {
             <p className="text-muted-foreground">Communicate directly and securely with your patients.</p>
         </div>
       <Chat client={chatClient} theme="str-chat__theme-light">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-grow min-h-0">
-             <div className="lg:col-span-1 h-full min-h-0">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8 flex-grow min-h-0">
+             <div className="md:col-span-1 lg:col-span-1 h-full min-h-0">
                 <ChannelList filters={filters} sort={sort} showChannelSearch />
             </div>
-             <div className="lg:col-span-2 h-full min-h-0">
+             <div className="md:col-span-2 lg:col-span-3 h-full min-h-0">
                 <Channel>
                     <Window>
                         <ChannelHeader />
