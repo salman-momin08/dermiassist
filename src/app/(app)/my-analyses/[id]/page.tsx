@@ -24,6 +24,17 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 // Check for window object to avoid SSR errors with SpeechRecognition
 const SpeechRecognition =
@@ -64,6 +75,9 @@ export default function AnalysisDetailPage() {
     // State for speech recognition
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const [isListening, setIsListening] = useState(false);
+    const [permissionDenied, setPermissionDenied] = useState(false);
+    const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+
 
     useEffect(() => {
         const fetchAnalysis = async () => {
@@ -113,6 +127,7 @@ export default function AnalysisDetailPage() {
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
             console.error('Speech recognition error:', event.error);
             if (event.error === 'not-allowed') {
+                 setPermissionDenied(true);
                  toast({ title: "Permission Denied", description: "Please enable microphone access in your browser settings.", variant: "destructive" });
             } else {
                 toast({ title: "Speech Error", description: event.error, variant: "destructive" });
@@ -128,37 +143,32 @@ export default function AnalysisDetailPage() {
 
     }, [toast]);
     
+    const startRecognition = () => {
+        if (recognitionRef.current) {
+            recognitionRef.current.start();
+            setIsListening(true);
+        }
+    }
+    
     const handleMicClick = async () => {
         if (!recognitionRef.current) {
             toast({ title: "Unsupported", description: "Speech recognition is not supported in your browser.", variant: "destructive" });
             return;
         }
-        
         if (isListening) {
             recognitionRef.current.stop();
             return;
         }
-        
         try {
-            // Check permission status
             const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-            
             if (permissionStatus.state === 'denied') {
-                toast({
-                    title: "Microphone Access Denied",
-                    description: "Please enable microphone permissions in your browser's site settings to use this feature.",
-                    variant: "destructive",
-                });
-                return;
+                setPermissionDenied(true);
             }
-            
-            // If granted or prompt, start recognition
-            recognitionRef.current.start();
-            setIsListening(true);
-            
+            setShowPermissionDialog(true);
         } catch (err) {
-             console.error("Error checking microphone permissions:", err);
-             toast({ title: "Error", description: "Could not check microphone permissions.", variant: "destructive"});
+            console.error("Error checking microphone permissions:", err);
+            // Fallback for browsers that don't support query
+            startRecognition();
         }
     };
 
@@ -588,82 +598,101 @@ export default function AnalysisDetailPage() {
                         </CardContent>
                     </Card>
                     
-                    <Dialog open={explanationDialogOpen} onOpenChange={(open) => { setExplanationDialogOpen(open); if(!open) resetExplanationDialog(); }}>
-                        <DialogTrigger asChild>
-                           <Button className="w-full">
-                                <Languages className="mr-2 h-4 w-4" />
-                                Explain My Report
-                            </Button>
-                        </DialogTrigger>
-                         <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Explain Report in Another Language</DialogTitle>
-                                <DialogDescription>
-                                    Select a language to get a simplified explanation of your report in both text and audio.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="language-select">Language</Label>
-                                    <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                                        <SelectTrigger id="language-select">
-                                            <SelectValue placeholder="Select a language" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="English">English</SelectItem>
-                                            <SelectItem value="Hindi">Hindi</SelectItem>
-                                            <SelectItem value="Bengali">Bengali</SelectItem>
-                                            <SelectItem value="Telugu">Telugu</SelectItem>
-                                            <SelectItem value="Marathi">Marathi</SelectItem>
-                                            <SelectItem value="Tamil">Tamil</SelectItem>
-                                            <SelectItem value="Urdu">Urdu</SelectItem>
-                                            <SelectItem value="Gujarati">Gujarati</SelectItem>
-                                            <SelectItem value="Kannada">Kannada</SelectItem>
-                                            <SelectItem value="Odia">Odia</SelectItem>
-                                            <SelectItem value="Malayalam">Malayalam</SelectItem>
-                                            <SelectItem value="Punjabi">Punjabi</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <Button onClick={handleGenerateExplanation} disabled={explanationLoading} className="w-full">
-                                    {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                    Generate Explanation
+                     <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
+                        <Dialog open={explanationDialogOpen} onOpenChange={(open) => { setExplanationDialogOpen(open); if(!open) resetExplanationDialog(); }}>
+                            <DialogTrigger asChild>
+                               <Button className="w-full">
+                                    <Languages className="mr-2 h-4 w-4" />
+                                    Explain My Report
                                 </Button>
-                                {explanationLoading && (
-                                     <p className="text-sm text-center text-muted-foreground">Generating... this may take a moment.</p>
-                                )}
-                                {explanationError && (
-                                     <Alert variant="destructive">
-                                        <AlertTitle>Error</AlertTitle>
-                                        <AlertDescription>{explanationError}</AlertDescription>
-                                    </Alert>
-                                )}
-                                {(explanationText || explanationAudio) && (
-                                    <Card className="mt-4">
-                                        <CardContent className="pt-6 space-y-4">
-                                            <ScrollArea className="h-24 pr-4">
-                                                {explanationText && <p className="text-muted-foreground">{explanationText}</p>}
-                                            </ScrollArea>
-                                            {explanationAudio && <audio controls src={explanationAudio} className="w-full" />}
-                                            <div className="relative mt-4">
-                                                <Input 
-                                                    placeholder="Have a doubt? Ask here..." 
-                                                    value={followUpQuestion}
-                                                    onChange={(e) => setFollowUpQuestion(e.target.value)}
-                                                />
-                                                <Button size="icon" variant="ghost" className={cn("absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick}>
-                                                    <Mic className="h-4 w-4" />
-                                                </Button>
-                                                <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8">
-                                                    <Send className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                            </DialogTrigger>
+                             <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Explain Report in Another Language</DialogTitle>
+                                    <DialogDescription>
+                                        Select a language to get a simplified explanation of your report in both text and audio.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="language-select">Language</Label>
+                                        <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                                            <SelectTrigger id="language-select">
+                                                <SelectValue placeholder="Select a language" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="English">English</SelectItem>
+                                                <SelectItem value="Hindi">Hindi</SelectItem>
+                                                <SelectItem value="Bengali">Bengali</SelectItem>
+                                                <SelectItem value="Telugu">Telugu</SelectItem>
+                                                <SelectItem value="Marathi">Marathi</SelectItem>
+                                                <SelectItem value="Tamil">Tamil</SelectItem>
+                                                <SelectItem value="Urdu">Urdu</SelectItem>
+                                                <SelectItem value="Gujarati">Gujarati</SelectItem>
+                                                <SelectItem value="Kannada">Kannada</SelectItem>
+                                                <SelectItem value="Odia">Odia</SelectItem>
+                                                <SelectItem value="Malayalam">Malayalam</SelectItem>
+                                                <SelectItem value="Punjabi">Punjabi</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Button onClick={handleGenerateExplanation} disabled={explanationLoading} className="w-full">
+                                        {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                        Generate Explanation
+                                    </Button>
+                                    {explanationLoading && (
+                                         <p className="text-sm text-center text-muted-foreground">Generating... this may take a moment.</p>
+                                    )}
+                                    {explanationError && (
+                                         <Alert variant="destructive">
+                                            <AlertTitle>Error</AlertTitle>
+                                            <AlertDescription>{explanationError}</AlertDescription>
+                                        </Alert>
+                                    )}
+                                    {(explanationText || explanationAudio) && (
+                                        <Card className="mt-4">
+                                            <CardContent className="pt-6 space-y-4">
+                                                <ScrollArea className="h-24 pr-4">
+                                                    {explanationText && <p className="text-muted-foreground">{explanationText}</p>}
+                                                </ScrollArea>
+                                                {explanationAudio && <audio controls src={explanationAudio} className="w-full" />}
+                                                <div className="relative mt-4">
+                                                    <Input 
+                                                        placeholder="Have a doubt? Ask here..." 
+                                                        value={followUpQuestion}
+                                                        onChange={(e) => setFollowUpQuestion(e.target.value)}
+                                                    />
+                                                    <Button size="icon" variant="ghost" className={cn("absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick}>
+                                                        <Mic className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8">
+                                                        <Send className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+                         <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>{permissionDenied ? "Permission Denied" : "Microphone Access"}</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    {permissionDenied
+                                        ? "You have previously denied microphone access. To use this feature, please enable it in your browser's site settings."
+                                        : "SkinWise needs access to your microphone to enable the speech-to-text feature. Click Continue to allow access."
+                                    }
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                {!permissionDenied &&
+                                    <AlertDialogAction onClick={startRecognition}>Continue</AlertDialogAction>
+                                }
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
 
                     <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if(!open) resetProgressDialog(); }}>
                         <DialogTrigger asChild>
@@ -784,7 +813,3 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
-
-    
-
-    
