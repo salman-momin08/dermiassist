@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit, Languages } from "lucide-react";
+import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit, Languages, Mic, Send } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -21,6 +21,8 @@ import { generateHealingVideo } from '@/ai/flows/generate-healing-video';
 import { explainReportMultimodal } from '@/ai/flows/explain-report-multimodal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 
 export default function AnalysisDetailPage() {
     const params = useParams();
@@ -49,6 +51,7 @@ export default function AnalysisDetailPage() {
     const [explanationText, setExplanationText] = useState<string | null>(null);
     const [explanationAudio, setExplanationAudio] = useState<string | null>(null);
     const [explanationError, setExplanationError] = useState<string | null>(null);
+    const [followUpQuestion, setFollowUpQuestion] = useState("");
 
     useEffect(() => {
         const fetchAnalysis = async () => {
@@ -383,6 +386,7 @@ export default function AnalysisDetailPage() {
         setExplanationText(null);
         setExplanationAudio(null);
         setExplanationError(null);
+        setFollowUpQuestion("");
     };
 
 
@@ -557,8 +561,23 @@ export default function AnalysisDetailPage() {
                                 {(explanationText || explanationAudio) && (
                                     <Card className="mt-4">
                                         <CardContent className="pt-6 space-y-4">
-                                            {explanationText && <p className="text-muted-foreground">{explanationText}</p>}
+                                            <ScrollArea className="h-24 pr-4">
+                                                {explanationText && <p className="text-muted-foreground">{explanationText}</p>}
+                                            </ScrollArea>
                                             {explanationAudio && <audio controls src={explanationAudio} className="w-full" />}
+                                            <div className="relative mt-4">
+                                                <Input 
+                                                    placeholder="Have a doubt? Ask here..." 
+                                                    value={followUpQuestion}
+                                                    onChange={(e) => setFollowUpQuestion(e.target.value)}
+                                                />
+                                                <Button size="icon" variant="ghost" className="absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8">
+                                                    <Mic className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8">
+                                                    <Send className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </CardContent>
                                     </Card>
                                 )}
