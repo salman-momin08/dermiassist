@@ -1,263 +1,195 @@
 
 "use client"
 
-import { useState, useEffect, useRef } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Send, User, Sparkles, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
-import { generateChatReply } from '@/ai/flows/generate-chat-reply';
-import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { Skeleton } from '@/components/ui/skeleton';
-import Image from 'next/image';
+import { Loader2 } from 'lucide-react';
+import { StreamChat, Channel as StreamChannel } from 'stream-chat';
+import { Chat, Channel, ChannelList, Window, MessageList, MessageInput, ChannelHeader, LoadingIndicator, useChatContext } from 'stream-chat-react';
+import { Button } from '@/components/ui/button';
+import { Sparkles } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { generateChatReply } from '@/ai/flows/generate-chat-reply';
+import 'stream-chat-react/dist/css/v2/index.css';
 
-type Patient = {
-    id: string;
-    name: string;
-    avatar: string;
-    online: boolean;
-};
+const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
 
-type Message = {
-    sender: 'user' | 'doctor';
-    text?: string;
-    imageUrl?: string;
+const CustomMessageInput = () => {
+    const { channel } = useChatContext();
+    const [isGenerating, setIsGenerating] = useState(false);
+    const { toast } = useToast();
+
+    const handleGenerateReplies = async () => {
+        if (!channel || !channel.state.messages.length) {
+            toast({ title: "No messages to reply to.", variant: 'destructive'});
+            return;
+        }
+
+        setIsGenerating(true);
+
+        const patient = Object.values(channel.state.members).find(m => m.user?.role === 'patient');
+        if (!patient || !patient.user) {
+             toast({ title: "Could not identify patient in this channel.", variant: 'destructive'});
+             setIsGenerating(false);
+             return;
+        }
+
+        const conversationHistory = channel.state.messages.map(m => `${m.user?.name}: ${m.text}`).join('\n');
+        const lastPatientMessage = channel.state.messages.filter(m => m.user?.id === patient.user?.id).pop()?.text;
+        
+        if (!lastPatientMessage) {
+            toast({ title: "No message from patient found to reply to.", variant: 'destructive'});
+            setIsGenerating(false);
+            return;
+        }
+
+        try {
+            const result = await generateChatReply({
+                patientName: patient.user.name || 'the patient',
+                conversationHistory,
+                lastPatientMessage,
+            });
+            // In a real app, you would have a state to show these replies.
+            // For now, we'll just show the first one as a toast.
+            toast({
+                title: "AI Suggested Reply",
+                description: result.replies[0],
+            });
+        } catch (error) {
+            console.error("Failed to generate replies:", error);
+            toast({ title: "AI Error", description: "Could not generate suggestions.", variant: "destructive" });
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    return (
+        <div className="relative">
+            <MessageInput />
+            <Button
+                size="icon"
+                variant="ghost"
+                className="absolute top-3 right-20"
+                onClick={handleGenerateReplies}
+                disabled={isGenerating}
+                title="Generate AI Reply Suggestions"
+            >
+                {isGenerating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+            </Button>
+        </div>
+    );
 };
 
 export default function DoctorChatPage() {
-  const { user } = useAuth();
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [isLoadingPatients, setIsLoadingPatients] = useState(true);
-  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState("");
-  const [suggestedReplies, setSuggestedReplies] = useState<string[]>([]);
-  const [isGeneratingReplies, setIsGeneratingReplies] = useState(false);
-  const { toast } = useToast();
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { user, userData, loading } = useAuth();
+  const [chatClient, setChatClient] = useState<StreamChat | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // In a real application, you would fetch the doctor's patients here.
-    // For now, we leave it empty and let the UI show the loading/empty state.
-    setIsLoadingPatients(false);
-  }, []);
-
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-        scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    if (loading || !user || !userData) {
+      return;
     }
-  }, [messages]);
 
-  const selectedPatient = patients.find(p => p.id === selectedPatientId);
-
-  const filteredPatients = patients.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleSendMessage = () => {
-    if (!inputValue.trim() || !user || !selectedPatientId) return;
-    const newMessage: Message = { sender: 'doctor', text: inputValue };
-    setMessages(prev => [...prev, newMessage]);
-    setInputValue("");
-    setSuggestedReplies([]);
-  };
-
-  const handleGenerateReplies = async () => {
-    if (!selectedPatient) return;
-    setIsGeneratingReplies(true);
-    setSuggestedReplies([]);
+    if (!apiKey) {
+      console.error("Stream API key is missing.");
+      setError("Chat service is not configured. Please contact support.");
+      return;
+    }
     
-    const conversationHistory = messages.map(m => `${m.sender === 'doctor' ? 'Doctor' : selectedPatient.name}: ${m.text}`).join('\n');
-    const lastPatientMessage = messages.filter(m => m.sender === 'user').pop()?.text;
+    const client = StreamChat.getInstance(apiKey);
 
-    if (!lastPatientMessage) {
-        toast({
-            title: "Cannot generate replies",
-            description: "There are no messages from the patient to reply to.",
-            variant: "destructive"
+    const setupClient = async () => {
+      try {
+        const response = await fetch('/api/stream-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.uid }),
         });
-        setIsGeneratingReplies(false);
-        return;
-    }
 
-    try {
-        const result = await generateChatReply({
-            patientName: selectedPatient.name,
-            conversationHistory,
-            lastPatientMessage,
-        });
-        setSuggestedReplies(result.replies);
-    } catch (error) {
-        console.error("Failed to generate replies:", error);
-        toast({
-            title: "AI Error",
-            description: "Could not generate suggested replies. Please try again.",
-            variant: "destructive"
-        });
-    } finally {
-        setIsGeneratingReplies(false);
+        if (!response.ok) {
+          const { message } = await response.json();
+          throw new Error(message || "Failed to get chat token.");
+        }
+
+        const { token } = await response.json();
+
+        await client.connectUser(
+          {
+            id: user.uid,
+            name: userData.displayName || 'Doctor',
+            image: userData.photoURL,
+            role: 'doctor',
+          },
+          token
+        );
+
+        setChatClient(client);
+
+      } catch (err: any) {
+        console.error("Error setting up chat client:", err);
+        setError(err.message || "An error occurred while connecting to the chat service.");
+        if (chatClient?.user) {
+          await chatClient.disconnectUser();
+        }
+      }
+    };
+
+    if (!chatClient?.user) {
+        setupClient();
     }
+    
+    return () => {
+      if (chatClient) {
+        chatClient.disconnectUser();
+        setChatClient(null);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, userData, loading]);
+
+  if (loading || !chatClient) {
+    return (
+      <div className="flex min-h-[80vh] flex-col items-center justify-center">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">Connecting to chat...</p>
+      </div>
+    );
   }
 
-  return (
-    <div className="container mx-auto p-4 md:p-8">
-        <div className="space-y-2 mb-8">
-            <h1 className="text-3xl font-bold tracking-tight font-headline">Patient Chat</h1>
-            <p className="text-muted-foreground">Communicate directly with your patients.</p>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            <Card className="lg:col-span-1">
-                <CardHeader>
-                    <CardTitle>Patients</CardTitle>
-                    <div className="relative pt-2">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            placeholder="Search patients..." 
-                            className="pl-9"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                </CardHeader>
-                <ScrollArea className="h-[60vh]">
-                    <CardContent className="p-0">
-                        {isLoadingPatients ? (
-                             <div className="p-4 space-y-4">
-                                {Array.from({ length: 3 }).map((_, i) => (
-                                    <div key={i} className="flex items-center gap-4">
-                                        <Skeleton className="h-10 w-10 rounded-full" />
-                                        <div className="space-y-2 flex-grow">
-                                            <Skeleton className="h-4 w-3/4" />
-                                            <Skeleton className="h-3 w-1/2" />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : filteredPatients.length > 0 ? (
-                            <div className="space-y-2">
-                                {filteredPatients.map(patient => (
-                                    <button key={patient.id} onClick={() => { setSelectedPatientId(patient.id); setSuggestedReplies([]); }} className={cn("w-full text-left p-4 hover:bg-muted/50", selectedPatientId === patient.id && "bg-muted")}>
-                                        <div className="flex items-center gap-4">
-                                            <Avatar className="h-10 w-10 relative">
-                                                <AvatarImage src={patient.avatar} alt={patient.name} data-ai-hint="person portrait"/>
-                                                <AvatarFallback>{patient.name.charAt(0)}</AvatarFallback>
-                                                {patient.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />}
-                                            </Avatar>
-                                            <div className="flex-grow">
-                                                <p className="font-semibold">{patient.name}</p>
-                                                <p className="text-sm text-muted-foreground truncate">Click to view conversation</p>
-                                            </div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center p-8 text-muted-foreground">
-                                No patient chats found.
-                           </div>
-                        )}
-                    </CardContent>
-                </ScrollArea>
-            </Card>
+  if (error) {
+     return (
+      <div className="flex min-h-[80vh] flex-col items-center justify-center text-center p-4">
+        <p className="text-destructive font-semibold">Chat Unavailable</p>
+        <p className="text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
 
-            <Card className="lg:col-span-2">
-                {selectedPatient && user ? (
-                    <>
-                        <CardHeader className="flex-row items-center gap-4 space-y-0">
-                             <Avatar className="h-12 w-12">
-                                <AvatarImage src={selectedPatient.avatar} alt={selectedPatient.name} data-ai-hint="person portrait" />
-                                <AvatarFallback>{selectedPatient.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className='flex-1'>
-                                <CardTitle>{selectedPatient.name}</CardTitle>
-                                <p className="text-sm text-muted-foreground">{selectedPatient.online ? 'Online' : 'Offline'}</p>
-                            </div>
-                        </CardHeader>
-                        <Separator />
-                        <ScrollArea className="h-[50vh] p-6" ref={scrollAreaRef}>
-                            <div className="space-y-6">
-                                {messages.map((msg, index) => (
-                                    <div key={index} className={cn("flex items-end gap-2", msg.sender === 'doctor' ? 'justify-end' : 'justify-start')}>
-                                        {msg.sender === 'user' && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarImage src={selectedPatient.avatar} alt={selectedPatient.name} data-ai-hint="person portrait" />
-                                                <AvatarFallback>{selectedPatient.name.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                        <div className={cn("max-w-[70%] rounded-xl p-3", msg.sender === 'doctor' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                            {msg.text && <p>{msg.text}</p>}
-                                            {msg.imageUrl && <Image src={msg.imageUrl} alt="attached image" width={200} height={200} className="rounded-md" />}
-                                        </div>
-                                        {msg.sender === 'doctor' && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback><User /></AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </ScrollArea>
-                        <div className="p-4 border-t space-y-2">
-                             {(isGeneratingReplies || suggestedReplies.length > 0) && (
-                                <div className="p-2 space-y-2">
-                                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                        <Sparkles className="w-4 h-4 text-primary" />
-                                        AI Suggested Replies
-                                    </h4>
-                                     {isGeneratingReplies ? (
-                                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            Generating...
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-wrap gap-2">
-                                            {suggestedReplies.map((reply, i) => (
-                                                <Button key={i} variant="outline" size="sm" onClick={() => setInputValue(reply)}>
-                                                    {reply}
-                                                </Button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            <div className="relative flex items-center gap-2">
-                                <Input 
-                                    placeholder="Type your message..." 
-                                    className="pr-12" 
-                                    value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                />
-                                <Button size="icon" variant="ghost" onClick={handleGenerateReplies} disabled={isGeneratingReplies}>
-                                    <Sparkles className="h-5 w-5" />
-                                </Button>
-                                <Button size="icon" onClick={handleSendMessage} disabled={!inputValue.trim()}>
-                                    <Send className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    </>
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-[calc(60vh + 120px)] text-muted-foreground p-12 text-center">
-                         {isLoadingPatients ? (
-                            <>
-                                <Loader2 className="h-8 w-8 animate-spin mb-4" />
-                                <p>Loading patient chats...</p>
-                            </>
-                        ) : (
-                           <p>Select a patient to start a conversation</p>
-                        )}
-                    </div>
-                )}
-            </Card>
+  const filters = { type: 'messaging', members: { $in: [user!.uid] } };
+  const sort = { last_message_at: -1 };
+
+  return (
+    <div className="h-[calc(100vh-128px)] container mx-auto p-4 md:p-8">
+       <div className="space-y-2 mb-8">
+            <h1 className="text-3xl font-bold tracking-tight font-headline">Patient Chat</h1>
+            <p className="text-muted-foreground">Communicate directly and securely with your patients.</p>
         </div>
+      <Chat client={chatClient} theme="str-chat__theme-light">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+             <div className="lg:col-span-1">
+                <ChannelList filters={filters} sort={sort} showChannelSearch />
+            </div>
+             <div className="lg:col-span-2">
+                <Channel>
+                    <Window>
+                        <ChannelHeader />
+                        <MessageList />
+                        <CustomMessageInput />
+                    </Window>
+                </Channel>
+            </div>
+        </div>
+      </Chat>
     </div>
-  )
+  );
 }

@@ -25,6 +25,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { StreamChat } from 'stream-chat';
 
 
 type Appointment = {
@@ -123,7 +124,7 @@ export default function DoctorAppointmentsPage() {
         const doctorCaseRef = doc(db, 'doctorCases', user.uid, 'patients', app.patientId);
 
         try {
-            // Update appointment status
+            // Update appointment status in Firestore
             await updateDoc(appointmentRef, { 
                 status: 'Confirmed',
                 appointmentDate: finalDateTime.toISOString(),
@@ -137,13 +138,23 @@ export default function DoctorAppointmentsPage() {
                 linkedAt: serverTimestamp()
             }, { merge: true });
 
+            // Create chat channel in Stream
+            const streamClient = StreamChat.getInstance(process.env.NEXT_PUBLIC_STREAM_API_KEY!);
+            if (streamClient) {
+                const channel = streamClient.channel('messaging', {
+                    members: [user.uid, app.patientId],
+                    name: `Consultation: Dr. ${user.displayName} & ${app.patientName}`,
+                });
+                await channel.create();
+            }
+
              toast({
                 title: `Request Confirmed`,
-                description: `The appointment has been scheduled.`,
+                description: `The appointment has been scheduled and a chat channel has been created.`,
             });
         } catch(error) {
             console.error("Error confirming appointment:", error);
-            toast({ title: "Error confirming request", variant: "destructive" });
+            toast({ title: "Error confirming request", description: "Could not confirm the appointment or create the chat channel.", variant: "destructive" });
         }
     };
     
@@ -635,5 +646,3 @@ export default function DoctorAppointmentsPage() {
         </div>
     );
 }
-
-    

@@ -1,235 +1,125 @@
 
 "use client"
 
-import { useState, useRef, useEffect } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Send, User, Paperclip, Image as ImageIcon, X, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
-import Image from 'next/image';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
+import { Loader2 } from 'lucide-react';
+import { StreamChat } from 'stream-chat';
+import { Chat, Channel, ChannelList, Window, MessageList, MessageInput, ChannelHeader, LoadingIndicator } from 'stream-chat-react';
+import 'stream-chat-react/dist/css/v2/index.css';
 
-type Doctor = {
-    id: string;
-    name: string;
-    avatar: string;
-    online: boolean;
-};
-
-type Message = {
-    sender: 'user' | 'doctor';
-    text?: string;
-    imageUrl?: string;
-};
-
+const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
 
 export default function ChatPage() {
-  const { user } = useAuth();
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
-  const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState("");
-  const [attachedImage, setAttachedImage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { user, userData, loading } = useAuth();
+  const [chatClient, setChatClient] = useState<StreamChat | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-        scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    if (loading || !user || !userData) {
+      return;
     }
-  }, [messages]);
 
-  const selectedDoctor = doctors.find(p => p.id === selectedDoctorId);
-
-  const filteredDoctors = doctors.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleSendMessage = () => {
-    if ((!inputValue.trim() && !attachedImage) || !user || !selectedDoctorId) return;
-
-    const newMessage: Message = { sender: 'user' };
-    if (inputValue.trim()) {
-        newMessage.text = inputValue.trim();
+    if (!apiKey) {
+      console.error("Stream API key is missing.");
+      setError("Chat service is not configured. Please contact support.");
+      return;
     }
-    if (attachedImage) {
-        newMessage.imageUrl = attachedImage;
-    }
-    setMessages(prev => [...prev, newMessage]);
-    setInputValue("");
-    setAttachedImage(null);
-  };
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAttachedImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
-  const lastMessageText = (docId: string) => {
-    return 'Click to view conversation';
+    const client = StreamChat.getInstance(apiKey);
+
+    const setupClient = async () => {
+      try {
+        const response = await fetch('/api/stream-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.uid }),
+        });
+        
+        if (!response.ok) {
+          const { message } = await response.json();
+          throw new Error(message || "Failed to get chat token.");
+        }
+        
+        const { token } = await response.json();
+
+        await client.connectUser(
+          {
+            id: user.uid,
+            name: userData.displayName || 'Anonymous User',
+            image: userData.photoURL,
+            role: 'patient',
+          },
+          token
+        );
+        
+        setChatClient(client);
+
+      } catch (err: any) {
+        console.error("Error setting up chat client:", err);
+        setError(err.message || "An error occurred while connecting to the chat service.");
+        if (chatClient?.user) {
+          await chatClient.disconnectUser();
+        }
+      }
+    };
+    
+    if (!chatClient?.user) {
+        setupClient();
+    }
+
+    return () => {
+      if (chatClient) {
+        chatClient.disconnectUser();
+        setChatClient(null);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, userData, loading]);
+
+  if (loading || !chatClient) {
+    return (
+      <div className="flex min-h-[80vh] flex-col items-center justify-center">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">Connecting to chat...</p>
+      </div>
+    );
   }
+  
+  if (error) {
+     return (
+      <div className="flex min-h-[80vh] flex-col items-center justify-center text-center p-4">
+        <p className="text-destructive font-semibold">Chat Unavailable</p>
+        <p className="text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
+  
+  const filters = { type: 'messaging', members: { $in: [user!.uid] } };
+  const sort = { last_message_at: -1 };
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
-        <div className="space-y-2 mb-8">
+    <div className="h-[calc(100vh-128px)] container mx-auto p-4 md:p-8">
+       <div className="space-y-2 mb-8">
             <h1 className="text-3xl font-bold tracking-tight font-headline">Chat with Your Doctor</h1>
             <p className="text-muted-foreground">Communicate directly and securely with your healthcare providers.</p>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            <Card className="lg:col-span-1">
-                <CardHeader>
-                    <CardTitle>Your Doctors</CardTitle>
-                    <div className="relative pt-2">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            placeholder="Search doctors..." 
-                            className="pl-9"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                </CardHeader>
-                <ScrollArea className="h-[60vh]">
-                    <CardContent className="p-0">
-                        {isLoadingDoctors ? (
-                             <div className="p-4 space-y-4">
-                                {Array.from({ length: 3 }).map((_, i) => (
-                                    <div key={i} className="flex items-center gap-4">
-                                        <Skeleton className="h-10 w-10 rounded-full" />
-                                        <div className="space-y-2 flex-grow">
-                                            <Skeleton className="h-4 w-3/4" />
-                                            <Skeleton className="h-3 w-1/2" />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : filteredDoctors.length > 0 ? (
-                            <div className="space-y-2">
-                                {filteredDoctors.map(doctor => (
-                                    <button key={doctor.id} onClick={() => setSelectedDoctorId(doctor.id)} className={cn("w-full text-left p-4 hover:bg-muted/50", selectedDoctorId === doctor.id && "bg-muted")}>
-                                        <div className="flex items-center gap-4">
-                                            <Avatar className="h-10 w-10 relative">
-                                                <AvatarImage src={doctor.avatar} alt={doctor.name} data-ai-hint="doctor portrait"/>
-                                                <AvatarFallback>{doctor.name.charAt(0)}</AvatarFallback>
-                                                {doctor.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />}
-                                            </Avatar>
-                                            <div className="flex-grow">
-                                                <p className="font-semibold">{doctor.name}</p>
-                                                <p className="text-sm text-muted-foreground truncate">{lastMessageText(doctor.id)}</p>
-                                            </div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        ) : (
-                           <div className="text-center p-8 text-muted-foreground">
-                                No doctors found.
-                           </div>
-                        )}
-                    </CardContent>
-                </ScrollArea>
-            </Card>
-
-            <Card className="lg:col-span-2">
-                {selectedDoctor && user ? (
-                    <>
-                        <CardHeader className="flex-row items-center gap-4 space-y-0">
-                             <Avatar className="h-12 w-12">
-                                <AvatarImage src={selectedDoctor.avatar} alt={selectedDoctor.name} data-ai-hint="doctor portrait" />
-                                <AvatarFallback>{selectedDoctor.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className='flex-1'>
-                                <CardTitle>{selectedDoctor.name}</CardTitle>
-                                <p className="text-sm text-muted-foreground">{selectedDoctor.online ? 'Online' : 'Offline'}</p>
-                            </div>
-                        </CardHeader>
-                        <Separator />
-                        <ScrollArea className="h-[50vh] p-6" ref={scrollAreaRef}>
-                            <div className="space-y-6">
-                                {messages.map((msg, index) => (
-                                    <div key={index} className={cn("flex items-end gap-2", msg.sender === 'user' ? 'justify-end' : 'justify-start')}>
-                                        {msg.sender !== 'user' && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarImage src={selectedDoctor.avatar} alt={selectedDoctor.name} data-ai-hint="doctor portrait" />
-                                                <AvatarFallback>{selectedDoctor.name.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                        <div className={cn("max-w-[70%] rounded-xl p-3 space-y-2", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                            {msg.text && <p>{msg.text}</p>}
-                                            {msg.imageUrl && <Image src={msg.imageUrl} alt="attached image" width={200} height={200} className="rounded-md" />}
-                                        </div>
-                                        {msg.sender === 'user' && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback><User /></AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </ScrollArea>
-                        <div className="p-4 border-t space-y-2">
-                             {attachedImage && (
-                                <div className="relative w-24 h-24">
-                                    <Image src={attachedImage} alt="preview" layout="fill" objectFit="cover" className="rounded-md" />
-                                    <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => setAttachedImage(null)}>
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            )}
-                            <div className="relative flex items-center gap-2">
-                                <Input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={handleFileChange}
-                                />
-                                <Button size="icon" variant="ghost" onClick={() => fileInputRef.current?.click()}>
-                                    <Paperclip className="h-5 w-5" />
-                                </Button>
-                                <Input 
-                                    placeholder="Type your message..." 
-                                    className="pr-12" 
-                                    value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                />
-                                <Button size="icon" onClick={handleSendMessage} disabled={(!inputValue.trim() && !attachedImage)}>
-                                    <Send className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    </>
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-[calc(60vh + 80px)] text-muted-foreground p-12 text-center">
-                        {isLoadingDoctors ? (
-                            <>
-                                <Loader2 className="h-8 w-8 animate-spin mb-4" />
-                                <p>Loading doctors...</p>
-                            </>
-                        ) : (
-                           <p>Select a doctor to start a conversation</p>
-                        )}
-                    </div>
-                )}
-            </Card>
+      <Chat client={chatClient} theme="str-chat__theme-light">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1">
+                <ChannelList filters={filters} sort={sort} showChannelSearch />
+            </div>
+            <div className="lg:col-span-2">
+                <Channel>
+                    <Window>
+                        <ChannelHeader />
+                        <MessageList />
+                        <MessageInput />
+                    </Window>
+                </Channel>
+            </div>
         </div>
+      </Chat>
     </div>
-  )
+  );
 }
-
-    

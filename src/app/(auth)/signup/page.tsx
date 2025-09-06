@@ -39,6 +39,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { StreamChat } from 'stream-chat';
 
 
 function GoogleIcon() {
@@ -134,7 +135,19 @@ export default function SignupPage() {
         displayName: `${values.firstName} ${values.lastName}`
       });
 
-      // 3. Prepare user data for Firestore
+      // 3. Create user in Stream Chat
+      // This part should be on a server, but for simplicity in this prototype, we do it here.
+      // In a real app, this would be a server-side call after signup.
+      const streamClient = StreamChat.getInstance(process.env.NEXT_PUBLIC_STREAM_API_KEY!, {
+          timeout: 6000,
+      });
+      await streamClient.upsertUser({
+          id: user.uid,
+          name: `${values.firstName} ${values.lastName}`,
+          role: values.role,
+      });
+
+      // 4. Prepare user data for Firestore
       const userDocRef = doc(db, "users", user.uid);
       const userData: any = {
           uid: user.uid,
@@ -155,7 +168,7 @@ export default function SignupPage() {
         userData.verified = false; // Doctors start as unverified
       }
       
-      // 4. Write user data to Firestore
+      // 5. Write user data to Firestore
       await setDoc(userDocRef, userData);
 
       toast({
@@ -171,6 +184,8 @@ export default function SignupPage() {
       let errorMessage = "An unexpected error occurred. Please try again.";
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = "This email is already registered. Please login instead.";
+      } else if (error.message?.includes('Stream')) {
+        errorMessage = "Could not create your chat account. Please contact support.";
       } else if (error.code === 'permission-denied' || error.code === 'unauthenticated') {
         errorMessage = "There was a permission error. Please check your network and try again.";
       } else if (error.message) {
@@ -405,5 +420,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
-    
