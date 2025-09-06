@@ -650,114 +650,115 @@ setError(null);
                         </CardContent>
                     </Card>
                     
-                     <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
-                        <Dialog open={explanationDialogOpen} onOpenChange={(open) => { setExplanationDialogOpen(open); if(!open) resetExplanationDialog(); }}>
-                            <DialogTrigger asChild>
-                               <Button className="w-full">
-                                    <Languages className="mr-2 h-4 w-4" />
-                                    Explain My Report
+                    <Dialog open={explanationDialogOpen} onOpenChange={(open) => { setExplanationDialogOpen(open); if(!open) resetExplanationDialog(); }}>
+                        <DialogTrigger asChild>
+                            <Button className="w-full">
+                                <Languages className="mr-2 h-4 w-4" />
+                                Explain My Report
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-lg">
+                            <DialogHeader>
+                                <DialogTitle>Explain Report in Another Language</DialogTitle>
+                                <DialogDescription>
+                                    Select a language to get a simplified explanation of your report in both text and audio.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="language-select">Language</Label>
+                                    <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                                        <SelectTrigger id="language-select">
+                                            <SelectValue placeholder="Select a language" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="English">English</SelectItem>
+                                            <SelectItem value="Hindi">Hindi</SelectItem>
+                                            <SelectItem value="Bengali">Bengali</SelectItem>
+                                            <SelectItem value="Telugu">Telugu</SelectItem>
+                                            <SelectItem value="Marathi">Marathi</SelectItem>
+                                            <SelectItem value="Tamil">Tamil</SelectItem>
+                                            <SelectItem value="Urdu">Urdu</SelectItem>
+                                            <SelectItem value="Gujarati">Gujarati</SelectItem>
+                                            <SelectItem value="Kannada">Kannada</SelectItem>
+                                            <SelectItem value="Odia">Odia</SelectItem>
+                                            <SelectItem value="Malayalam">Malayalam</SelectItem>
+                                            <SelectItem value="Punjabi">Punjabi</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Button onClick={handleGenerateExplanation} disabled={explanationLoading} className="w-full">
+                                    {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                    Generate Explanation
                                 </Button>
-                            </DialogTrigger>
-                             <DialogContent className="sm:max-w-lg">
-                                <DialogHeader>
-                                    <DialogTitle>Explain Report in Another Language</DialogTitle>
-                                    <DialogDescription>
-                                        Select a language to get a simplified explanation of your report in both text and audio.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="language-select">Language</Label>
-                                        <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                                            <SelectTrigger id="language-select">
-                                                <SelectValue placeholder="Select a language" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="English">English</SelectItem>
-                                                <SelectItem value="Hindi">Hindi</SelectItem>
-                                                <SelectItem value="Bengali">Bengali</SelectItem>
-                                                <SelectItem value="Telugu">Telugu</SelectItem>
-                                                <SelectItem value="Marathi">Marathi</SelectItem>
-                                                <SelectItem value="Tamil">Tamil</SelectItem>
-                                                <SelectItem value="Urdu">Urdu</SelectItem>
-                                                <SelectItem value="Gujarati">Gujarati</SelectItem>
-                                                <SelectItem value="Kannada">Kannada</SelectItem>
-                                                <SelectItem value="Odia">Odia</SelectItem>
-                                                <SelectItem value="Malayalam">Malayalam</SelectItem>
-                                                <SelectItem value="Punjabi">Punjabi</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <Button onClick={handleGenerateExplanation} disabled={explanationLoading} className="w-full">
-                                        {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                        Generate Explanation
-                                    </Button>
-                                    {explanationLoading && (
-                                         <p className="text-sm text-center text-muted-foreground">Generating... this may take a moment.</p>
-                                    )}
-                                    {explanationError && (
-                                         <Alert variant="destructive">
-                                            <AlertTitle>Error</AlertTitle>
-                                            <AlertDescription>{explanationError}</AlertDescription>
-                                        </Alert>
-                                    )}
-                                    {explanationMessages.length > 0 && (
-                                        <Card className="mt-4 flex flex-col h-[400px]">
-                                            <CardContent className="pt-6 flex-grow flex flex-col gap-4">
-                                                <ScrollArea className="flex-grow pr-4">
-                                                    <div className="space-y-4">
-                                                        {explanationMessages.map((msg, index) => (
-                                                            <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : '')}>
-                                                                {msg.sender === 'bot' && (
-                                                                    <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-                                                                        <AvatarFallback><Bot size={18} /></AvatarFallback>
-                                                                    </Avatar>
-                                                                )}
-                                                                <div className={cn("rounded-lg px-3 py-2 max-w-[85%]", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                                                    <p className="text-sm">{msg.text}</p>
-                                                                </div>
-                                                                {msg.sender === 'user' && (
-                                                                    <Avatar className="h-8 w-8">
-                                                                        <AvatarFallback><User size={18} /></AvatarFallback>
-                                                                    </Avatar>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                        {isAnswering && (
-                                                            <div className="flex items-start gap-3">
+                                {explanationLoading && (
+                                        <p className="text-sm text-center text-muted-foreground">Generating... this may take a moment.</p>
+                                )}
+                                {explanationError && (
+                                        <Alert variant="destructive">
+                                        <AlertTitle>Error</AlertTitle>
+                                        <AlertDescription>{explanationError}</AlertDescription>
+                                    </Alert>
+                                )}
+                                {explanationMessages.length > 0 && (
+                                    <Card className="mt-4 flex flex-col h-[400px]">
+                                        <CardContent className="pt-6 flex-grow flex flex-col gap-4">
+                                            <ScrollArea className="flex-grow pr-4">
+                                                <div className="space-y-4">
+                                                    {explanationMessages.map((msg, index) => (
+                                                        <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : '')}>
+                                                            {msg.sender === 'bot' && (
                                                                 <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
                                                                     <AvatarFallback><Bot size={18} /></AvatarFallback>
                                                                 </Avatar>
-                                                                <div className="rounded-lg px-4 py-2 bg-muted flex items-center">
-                                                                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                                                                </div>
+                                                            )}
+                                                            <div className={cn("rounded-lg px-3 py-2 max-w-[85%]", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                                                <p className="text-sm">{msg.text}</p>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                </ScrollArea>
-                                                {explanationAudio && <audio controls src={explanationAudio} className="w-full shrink-0 mt-2" />}
-                                                <div className="relative mt-auto shrink-0">
-                                                    <Input 
-                                                        placeholder="Have a doubt? Ask here..." 
-                                                        value={followUpQuestion}
-                                                        onChange={(e) => setFollowUpQuestion(e.target.value)}
-                                                        onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
-                                                        disabled={isAnswering}
-                                                    />
-                                                    <Button size="icon" variant="ghost" className={cn("absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick} disabled={isAnswering}>
-                                                        <Mic className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
-                                                        <Send className="h-4 w-4" />
-                                                    </Button>
+                                                            {msg.sender === 'user' && (
+                                                                <Avatar className="h-8 w-8">
+                                                                    <AvatarFallback><User size={18} /></AvatarFallback>
+                                                                </Avatar>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    {isAnswering && (
+                                                        <div className="flex items-start gap-3">
+                                                            <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                                                                <AvatarFallback><Bot size={18} /></AvatarFallback>
+                                                            </Avatar>
+                                                            <div className="rounded-lg px-4 py-2 bg-muted flex items-center">
+                                                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </CardContent>
-                                        </Card>
-                                    )}
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-                         <AlertDialogContent>
+                                            </ScrollArea>
+                                            {explanationAudio && <audio controls src={explanationAudio} className="w-full shrink-0 mt-2" />}
+                                            <div className="relative mt-auto shrink-0">
+                                                <Input 
+                                                    placeholder="Have a doubt? Ask here..." 
+                                                    value={followUpQuestion}
+                                                    onChange={(e) => setFollowUpQuestion(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
+                                                    disabled={isAnswering}
+                                                />
+                                                <Button size="icon" variant="ghost" className={cn("absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick} disabled={isAnswering}>
+                                                    <Mic className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
+                                                    <Send className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                    
+                    <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
+                        <AlertDialogContent>
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Microphone Access</AlertDialogTitle>
                                 <AlertDialogDescription>
@@ -890,3 +891,5 @@ setError(null);
         </div>
     );
 }
+
+    
