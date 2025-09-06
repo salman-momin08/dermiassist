@@ -126,11 +126,18 @@ export default function AnalysisDetailPage() {
         
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
             console.error('Speech recognition error:', event.error);
+             // The 'no-speech' error simply means the user didn't say anything.
+            // We can ignore it to prevent a confusing error message.
+            if (event.error === 'no-speech') {
+                setIsListening(false);
+                return;
+            }
+
             if (event.error === 'not-allowed') {
                  setPermissionDenied(true);
                  toast({ title: "Permission Denied", description: "Please enable microphone access in your browser settings.", variant: "destructive" });
             } else {
-                toast({ title: "Speech Error", description: event.error, variant: "destructive" });
+                toast({ title: "Speech Error", description: `An error occurred: ${event.error}`, variant: "destructive" });
             }
             setIsListening(false);
         };
@@ -159,12 +166,21 @@ export default function AnalysisDetailPage() {
             recognitionRef.current.stop();
             return;
         }
+        
         try {
             const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
             if (permissionStatus.state === 'denied') {
                 setPermissionDenied(true);
+                toast({ title: "Permission Denied", description: "Please enable microphone access in your browser settings.", variant: "destructive" });
+                return;
             }
-            setShowPermissionDialog(true);
+            if (permissionStatus.state === 'prompt') {
+                setShowPermissionDialog(true);
+                return;
+            }
+            
+            startRecognition();
+
         } catch (err) {
             console.error("Error checking microphone permissions:", err);
             // Fallback for browsers that don't support query
@@ -267,7 +283,7 @@ export default function AnalysisDetailPage() {
             toast({
                 title: "Explanation Failed",
                 description: "Could not generate the explanation.",
-                variant: "destructive",
+                variant: "destructive"
             });
         } finally {
             setExplanationLoading(false);
@@ -326,6 +342,7 @@ export default function AnalysisDetailPage() {
             yPos += 7;
 
             // --- Analysis Details ---
+            pdf.setFontSize(12);
             pdf.setFont('helvetica', 'bold');
             pdf.text('Analysis Details', margin, yPos);
             yPos += 7;
@@ -677,19 +694,14 @@ export default function AnalysisDetailPage() {
                         </Dialog>
                          <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>{permissionDenied ? "Permission Denied" : "Microphone Access"}</AlertDialogTitle>
+                                <AlertDialogTitle>Microphone Access</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    {permissionDenied
-                                        ? "You have previously denied microphone access. To use this feature, please enable it in your browser's site settings."
-                                        : "SkinWise needs access to your microphone to enable the speech-to-text feature. Click Continue to allow access."
-                                    }
+                                    SkinWise needs access to your microphone to enable the speech-to-text feature. Click Continue to allow access.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                {!permissionDenied &&
-                                    <AlertDialogAction onClick={startRecognition}>Continue</AlertDialogAction>
-                                }
+                                <AlertDialogAction onClick={startRecognition}>Continue</AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
@@ -813,3 +825,5 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
+
+    
