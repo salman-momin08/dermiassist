@@ -133,9 +133,9 @@ export default function ChatPage() {
             <h1 className="text-3xl font-bold tracking-tight font-headline">Chat with Your Doctor</h1>
             <p className="text-muted-foreground">Communicate directly and securely with your healthcare providers.</p>
         </div>
-      <Chat client={chatClient} theme="whatsapp-clone">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-0 flex-grow min-h-0 border rounded-lg shadow-sm">
-            <div className="md:col-span-1 h-full min-h-0 bg-[var(--str-chat__channel-list-bg-color)] rounded-l-lg">
+      <Chat client={chatClient}>
+        <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-0 flex-grow min-h-0 border rounded-lg shadow-sm">
+            <div className="md:col-span-1 h-full min-h-0 rounded-l-lg">
                 <ChannelList filters={filters} sort={sort} showChannelSearch />
             </div>
             <div className="md:col-span-1 h-full min-h-0 border-l">
