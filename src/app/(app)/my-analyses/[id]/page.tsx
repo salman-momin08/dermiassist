@@ -36,8 +36,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
 import { textToSpeech } from '@/ai/flows/text-to-speech';
 import { uploadFile } from '@/lib/actions';
 
@@ -56,7 +54,7 @@ type ExplanationMessage = {
 export default function AnalysisDetailPage() {
     const params = useParams();
     const id = params.id as string;
-    const { getAnalysisById, forceAnalysisReload } = useAnalyses();
+    const { getAnalysisById, updateAnalysis } = useAnalyses();
     const { user, userData, loading: isAuthLoading } = useAuth();
     const router = useRouter();
 
@@ -92,35 +90,36 @@ export default function AnalysisDetailPage() {
     const [permissionDenied, setPermissionDenied] = useState(false);
     const [showPermissionDialog, setShowPermissionDialog] = useState(false);
 
+    const hasExistingExplanations = () => analysis && analysis.explanations && Object.keys(analysis.explanations).length > 0;
+
+    const fetchAnalysis = async () => {
+        if (!user) {
+            return;
+        }
+        
+        setIsLoading(true);
+        try {
+            const foundAnalysis = await getAnalysisById(user.uid, id);
+            if (foundAnalysis) {
+                setAnalysis(foundAnalysis);
+            } else {
+                notFound();
+            }
+        } catch (err) {
+            console.error("Failed to fetch analysis", err);
+            notFound();
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchAnalysis = async () => {
-            if (!user) {
-                return;
-            }
-            
-            setIsLoading(true);
-            try {
-                const foundAnalysis = await getAnalysisById(user.uid, id);
-                if (foundAnalysis) {
-                    setAnalysis(foundAnalysis);
-                } else {
-                    notFound();
-                }
-            } catch (err) {
-                console.error("Failed to fetch analysis", err);
-                notFound();
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        
         if (!isAuthLoading && user) {
             fetchAnalysis();
         } else if (!isAuthLoading && !user) {
             router.push('/login');
         }
-    }, [id, user, isAuthLoading, getAnalysisById, router]);
+    }, [id, user, isAuthLoading, router]);
     
     useEffect(() => {
         if (scrollAreaRef.current) {
@@ -284,23 +283,19 @@ export default function AnalysisDetailPage() {
         }
     };
     
-     const saveExplanationToFirestore = async (language: string, newExplanationState: Explanation) => {
+    const saveExplanationToFirestore = async (language: string, newExplanationState: Explanation) => {
         if (!user || !analysis) return;
 
         try {
-            const currentAnalysis = await getAnalysisById(user.uid, analysis.id);
-            if (!currentAnalysis) throw new Error("Analysis not found");
+            const currentAnalysisData = await getAnalysisById(user.uid, analysis.id);
+            if (!currentAnalysisData) throw new Error("Analysis not found");
 
             const updatedExplanations = {
-                ...(currentAnalysis.explanations || {}),
+                ...(currentAnalysisData.explanations || {}),
                 [language]: newExplanationState,
             };
 
-            await updateDoc(doc(db, 'users', user.uid, 'analyses', analysis.id), {
-                explanations: updatedExplanations,
-            });
-            
-            await forceAnalysisReload(user.uid, analysis.id);
+            await updateAnalysis(user.uid, analysis.id, { explanations: updatedExplanations });
             setAnalysis(prev => prev ? { ...prev, explanations: updatedExplanations } : null);
 
         } catch (error) {
@@ -313,16 +308,16 @@ export default function AnalysisDetailPage() {
         }
     };
 
-
-    const handleGenerateExplanation = async () => {
+    const handleExplanationRequest = async (language: string) => {
         if (!analysis) return;
 
         setExplanationLoading(true);
         setExplanationMessages([]);
         setExplanationAudioUrl(null);
         setExplanationError(null);
+        setSelectedLanguage(language);
 
-        const cachedExplanation = analysis.explanations?.[selectedLanguage];
+        const cachedExplanation = analysis.explanations?.[language];
         if (cachedExplanation) {
             setExplanationAudioUrl(cachedExplanation.audioUrl);
             setExplanationMessages(cachedExplanation.chatHistory || [{ sender: 'bot', text: cachedExplanation.explanationText }]);
@@ -334,7 +329,7 @@ export default function AnalysisDetailPage() {
             const result = await explainReportMultimodal({
                 reportConditionName: analysis.conditionName,
                 reportRecommendations: analysis.recommendations,
-                targetLanguage: selectedLanguage,
+                targetLanguage: language,
             });
 
             // Upload audio to Cloudinary
@@ -353,7 +348,7 @@ export default function AnalysisDetailPage() {
             setExplanationMessages([initialMessage]);
             setExplanationAudioUrl(newExplanation.audioUrl);
 
-            await saveExplanationToFirestore(selectedLanguage, newExplanation);
+            await saveExplanationToFirestore(language, newExplanation);
 
         } catch (err) {
             console.error("Explanation generation failed:", err);
@@ -618,6 +613,18 @@ export default function AnalysisDetailPage() {
         setVideoUri(null);
     };
 
+    const onExplanationModalOpen = () => {
+        if (hasExistingExplanations() && analysis?.explanations) {
+            // If explanations exist, load the first available one
+            const firstLanguage = Object.keys(analysis.explanations)[0];
+            handleExplanationRequest(firstLanguage);
+        } else {
+            // Otherwise, just open the modal to show the language selection
+            resetExplanationDialog();
+        }
+        setExplanationDialogOpen(true);
+    };
+
     const resetExplanationDialog = () => {
         setExplanationLoading(false);
         setSelectedLanguage('English');
@@ -751,46 +758,50 @@ export default function AnalysisDetailPage() {
                     
                      <Dialog open={explanationDialogOpen} onOpenChange={(open) => { setExplanationDialogOpen(open); if(!open) resetExplanationDialog(); }}>
                         <DialogTrigger asChild>
-                            <Button className="w-full">
+                            <Button className="w-full" onClick={onExplanationModalOpen}>
                                 <Languages className="mr-2 h-4 w-4" />
                                 Explain My Report
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
                             <DialogHeader>
-                                <DialogTitle>Explain Report in Another Language</DialogTitle>
+                                <DialogTitle>Explain Report</DialogTitle>
                                 <DialogDescription>
-                                    Select a language to get a simplified explanation of your report in both text and audio.
+                                    Get a simplified explanation of your report and ask follow-up questions.
                                 </DialogDescription>
                             </DialogHeader>
-                            <div className="space-y-4 py-2 flex-shrink-0">
-                                <div className="space-y-2">
-                                    <Label htmlFor="language-select">Language</Label>
-                                    <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                                        <SelectTrigger id="language-select">
-                                            <SelectValue placeholder="Select a language" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="English">English</SelectItem>
-                                            <SelectItem value="Hindi">Hindi</SelectItem>
-                                            <SelectItem value="Bengali">Bengali</SelectItem>
-                                            <SelectItem value="Telugu">Telugu</SelectItem>
-                                            <SelectItem value="Marathi">Marathi</SelectItem>
-                                            <SelectItem value="Tamil">Tamil</SelectItem>
-                                            <SelectItem value="Urdu">Urdu</SelectItem>
-                                            <SelectItem value="Gujarati">Gujarati</SelectItem>
-                                            <SelectItem value="Kannada">Kannada</SelectItem>
-                                            <SelectItem value="Odia">Odia</SelectItem>
-                                            <SelectItem value="Malayalam">Malayalam</SelectItem>
-                                            <SelectItem value="Punjabi">Punjabi</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                            
+                            {!hasExistingExplanations() && !explanationLoading && (
+                                <div className="space-y-4 py-2 flex-shrink-0">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="language-select">Select Language</Label>
+                                        <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                                            <SelectTrigger id="language-select">
+                                                <SelectValue placeholder="Select a language" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {/* Language List */}
+                                                <SelectItem value="English">English</SelectItem>
+                                                <SelectItem value="Hindi">Hindi</SelectItem>
+                                                <SelectItem value="Bengali">Bengali</SelectItem>
+                                                <SelectItem value="Telugu">Telugu</SelectItem>
+                                                <SelectItem value="Marathi">Marathi</SelectItem>
+                                                <SelectItem value="Tamil">Tamil</SelectItem>
+                                                <SelectItem value="Urdu">Urdu</SelectItem>
+                                                <SelectItem value="Gujarati">Gujarati</SelectItem>
+                                                <SelectItem value="Kannada">Kannada</SelectItem>
+                                                <SelectItem value="Odia">Odia</SelectItem>
+                                                <SelectItem value="Malayalam">Malayalam</SelectItem>
+                                                <SelectItem value="Punjabi">Punjabi</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Button onClick={() => handleExplanationRequest(selectedLanguage)} disabled={explanationLoading} className="w-full">
+                                        {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                        Generate Explanation
+                                    </Button>
                                 </div>
-                                <Button onClick={handleGenerateExplanation} disabled={explanationLoading} className="w-full">
-                                    {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                    Generate Explanation
-                                </Button>
-                            </div>
+                            )}
 
                             {explanationError && (
                                 <Alert variant="destructive" className="flex-shrink-0">
@@ -800,18 +811,40 @@ export default function AnalysisDetailPage() {
                             )}
 
                             {explanationLoading && (
-                                <div className="flex justify-center items-center flex-grow">
+                                <div className="flex justify-center items-center flex-grow py-8">
                                     <Loader2 className="h-8 w-8 animate-spin" />
                                 </div>
                             )}
 
                             {explanationMessages.length > 0 && !explanationLoading && (
                                 <div className="flex flex-col flex-grow min-h-0">
+                                     <div className="space-y-2 flex-shrink-0">
+                                        <Label htmlFor="language-select-active">Language</Label>
+                                        <Select value={selectedLanguage} onValueChange={handleExplanationRequest}>
+                                            <SelectTrigger id="language-select-active">
+                                                <SelectValue placeholder="Select a language" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="English">English</SelectItem>
+                                                <SelectItem value="Hindi">Hindi</SelectItem>
+                                                <SelectItem value="Bengali">Bengali</SelectItem>
+                                                <SelectItem value="Telugu">Telugu</SelectItem>
+                                                <SelectItem value="Marathi">Marathi</SelectItem>
+                                                <SelectItem value="Tamil">Tamil</SelectItem>
+                                                <SelectItem value="Urdu">Urdu</SelectItem>
+                                                <SelectItem value="Gujarati">Gujarati</SelectItem>
+                                                <SelectItem value="Kannada">Kannada</SelectItem>
+                                                <SelectItem value="Odia">Odia</SelectItem>
+                                                <SelectItem value="Malayalam">Malayalam</SelectItem>
+                                                <SelectItem value="Punjabi">Punjabi</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                     <Separator className="my-4 flex-shrink-0" />
                                     {explanationAudioUrl && (
                                         <div className="flex-shrink-0">
                                             <p className="text-sm font-medium mb-2">Main Explanation Audio</p>
-                                            <audio controls src={explanationAudioUrl} className="w-full" />
+                                            <audio controls src={explanationAudioUrl} className="w-full h-10" />
                                             <Separator className="my-4"/>
                                         </div>
                                     )}
@@ -870,6 +903,7 @@ export default function AnalysisDetailPage() {
                             )}
                         </DialogContent>
                     </Dialog>
+                    
                     <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
                          <AlertDialogContent>
                             <AlertDialogHeader>
@@ -1005,4 +1039,3 @@ export default function AnalysisDetailPage() {
     );
 }
 
-    

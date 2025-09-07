@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './use-auth';
 import { db } from '@/lib/firebase';
-import { collection, doc, addDoc, getDoc, getDocs, deleteDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, doc, addDoc, getDoc, getDocs, deleteDoc, query, orderBy, onSnapshot, updateDoc } from 'firebase/firestore';
 
 
 export interface Explanation {
@@ -40,15 +40,6 @@ export function useAnalyses() {
     const { user } = useAuth();
     const [analyses, setAnalyses] = useState<AnalysisReport[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-
-    const forceAnalysisReload = useCallback(async (userId: string, analysisId: string) => {
-        const docRef = doc(db, 'users', userId, 'analyses', analysisId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            const updatedAnalysis = { id: docSnap.id, ...docSnap.data() } as AnalysisReport;
-            setAnalyses(prev => prev.map(a => a.id === analysisId ? updatedAnalysis : a));
-        }
-    }, []);
 
     useEffect(() => {
         if (!user) {
@@ -117,6 +108,14 @@ export function useAnalyses() {
         }
     }, [analyses]);
 
+    const updateAnalysis = useCallback(async (userId: string, analysisId: string, data: Partial<AnalysisReport>) => {
+        if (!userId || !analysisId) return;
+        const docRef = doc(db, 'users', userId, 'analyses', analysisId);
+        await updateDoc(docRef, data);
+        // The onSnapshot listener will update the state automatically, but we can force a local update for immediate UI response.
+        setAnalyses(prev => prev.map(a => a.id === analysisId ? { ...a, ...data } : a));
+    }, []);
+
     const deleteAnalysis = useCallback(async (userId: string, id: string) => {
         if (!userId) throw new Error("User not authenticated.");
         const docRef = doc(db, 'users', userId, 'analyses', id);
@@ -124,5 +123,5 @@ export function useAnalyses() {
         // The onSnapshot listener will automatically update the local state
     }, []);
 
-    return { analyses, addAnalysis, getAnalysisById, deleteAnalysis, isLoading, forceAnalysisReload };
+    return { analyses, addAnalysis, getAnalysisById, updateAnalysis, deleteAnalysis, isLoading };
 }
