@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useEffect, useState } from "react";
 import {
   useHMSStore,
   useHMSActions,
@@ -102,7 +102,7 @@ const Peer = ({ peer }: { peer: any }) => {
 };
 
 
-function VideoCallPage({ params }: { params: { roomId: string } }) {
+function VideoCallClient({ roomId }: { roomId: string }) {
   const { user, role, userData, loading: authLoading } = useAuth();
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -124,7 +124,7 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    roomId: params.roomId,
+                    roomId: roomId,
                     role: role,
                     userId: user.uid,
                 })
@@ -152,7 +152,7 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
     
     getToken();
 
-  }, [authLoading, user, role, userData, params.roomId, toast]);
+  }, [authLoading, user, role, userData, roomId, toast]);
 
   useEffect(() => {
     if (!token || !userData || !hmsActions) return;
@@ -217,12 +217,16 @@ function VideoCallPage({ params }: { params: { roomId: string } }) {
   );
 }
 
-// Wrapper needed for pages that use HMS Hooks
-export default function VideoCallPageWrapper({ params: paramsPromise }: { params: Promise<{ roomId:string }> }) {
-    const params = use(paramsPromise);
+// This wrapper component is now a proper client component that provides the HMSRoomProvider
+const VideoCallProvider = ({ children }: { children: React.ReactNode }) => {
+    return <HMSRoomProvider>{children}</HMSRoomProvider>;
+}
+
+// The page itself is a Server Component that handles params and wraps the client components
+export default async function VideoCallPage({ params }: { params: { roomId: string } }) {
     return (
-        <HMSRoomProvider>
-            <VideoCallPage params={params}/>
-        </HMSRoomProvider>
+        <VideoCallProvider>
+            <VideoCallClient roomId={params.roomId} />
+        </VideoCallProvider>
     );
 };
