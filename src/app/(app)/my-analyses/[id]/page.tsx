@@ -763,7 +763,7 @@ setError(null);
                                 Explain My Report
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
+                        <DialogContent className="sm:max-w-lg flex flex-col h-[90vh] max-h-[700px]">
                             <DialogHeader className="flex-shrink-0">
                                 <DialogTitle>Explain Report</DialogTitle>
                                 <DialogDescription>
@@ -771,136 +771,136 @@ setError(null);
                                 </DialogDescription>
                             </DialogHeader>
                             
-                            {!hasExistingExplanations() && !explanationLoading && (
-                                <div className="space-y-4 py-2 flex-shrink-0">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="language-select">Select Language</Label>
-                                        <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                                            <SelectTrigger id="language-select">
-                                                <SelectValue placeholder="Select a language" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {/* Language List */}
-                                                <SelectItem value="English">English</SelectItem>
-                                                <SelectItem value="Hindi">Hindi</SelectItem>
-                                                <SelectItem value="Bengali">Bengali</SelectItem>
-                                                <SelectItem value="Telugu">Telugu</SelectItem>
-                                                <SelectItem value="Marathi">Marathi</SelectItem>
-                                                <SelectItem value="Tamil">Tamil</SelectItem>
-                                                <SelectItem value="Urdu">Urdu</SelectItem>
-                                                <SelectItem value="Gujarati">Gujarati</SelectItem>
-                                                <SelectItem value="Kannada">Kannada</SelectItem>
-                                                <SelectItem value="Odia">Odia</SelectItem>
-                                                <SelectItem value="Malayalam">Malayalam</SelectItem>
-                                                <SelectItem value="Punjabi">Punjabi</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <Button onClick={() => handleExplanationRequest(selectedLanguage)} disabled={explanationLoading} className="w-full">
-                                        {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                        Generate Explanation
-                                    </Button>
-                                </div>
-                            )}
-
-                            {explanationError && (
-                                <Alert variant="destructive" className="flex-shrink-0">
-                                    <AlertTitle>Error</AlertTitle>
-                                    <AlertDescription>{explanationError}</AlertDescription>
-                                </Alert>
-                            )}
-
-                            {explanationLoading && (
-                                <div className="flex justify-center items-center flex-grow py-8">
-                                    <Loader2 className="h-8 w-8 animate-spin" />
-                                </div>
-                            )}
-
-                            {explanationMessages.length > 0 && !explanationLoading && (
-                                <div className="flex flex-col flex-grow min-h-0">
-                                     <div className="space-y-2 flex-shrink-0">
-                                        <Label htmlFor="language-select-active">Language</Label>
-                                        <Select value={selectedLanguage} onValueChange={handleExplanationRequest}>
-                                            <SelectTrigger id="language-select-active">
-                                                <SelectValue placeholder="Select a language" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="English">English</SelectItem>
-                                                <SelectItem value="Hindi">Hindi</SelectItem>
-                                                <SelectItem value="Bengali">Bengali</SelectItem>
-                                                <SelectItem value="Telugu">Telugu</SelectItem>
-                                                <SelectItem value="Marathi">Marathi</SelectItem>
-                                                <SelectItem value="Tamil">Tamil</SelectItem>
-                                                <SelectItem value="Urdu">Urdu</SelectItem>
-                                                <SelectItem value="Gujarati">Gujarati</SelectItem>
-                                                <SelectItem value="Kannada">Kannada</SelectItem>
-                                                <SelectItem value="Odia">Odia</SelectItem>
-                                                <SelectItem value="Malayalam">Malayalam</SelectItem>
-                                                <SelectItem value="Punjabi">Punjabi</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <Separator className="my-4 flex-shrink-0" />
-                                    {explanationAudioUrl && (
-                                        <div className="flex-shrink-0">
-                                            <p className="text-sm font-medium mb-2">Main Explanation Audio</p>
-                                            <audio controls src={explanationAudioUrl} className="w-full h-10" />
-                                            <Separator className="my-4"/>
+                            <div className="flex-grow flex flex-col min-h-0">
+                                {!hasExistingExplanations() && !explanationLoading && (
+                                    <div className="space-y-4 py-2 flex-shrink-0">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="language-select">Select Language</Label>
+                                            <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                                                <SelectTrigger id="language-select">
+                                                    <SelectValue placeholder="Select a language" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {/* Language List */}
+                                                    <SelectItem value="English">English</SelectItem>
+                                                    <SelectItem value="Hindi">Hindi</SelectItem>
+                                                    <SelectItem value="Bengali">Bengali</SelectItem>
+                                                    <SelectItem value="Telugu">Telugu</SelectItem>
+                                                    <SelectItem value="Marathi">Marathi</SelectItem>
+                                                    <SelectItem value="Tamil">Tamil</SelectItem>
+                                                    <SelectItem value="Urdu">Urdu</SelectItem>
+                                                    <SelectItem value="Gujarati">Gujarati</SelectItem>
+                                                    <SelectItem value="Kannada">Kannada</SelectItem>
+                                                    <SelectItem value="Odia">Odia</SelectItem>
+                                                    <SelectItem value="Malayalam">Malayalam</SelectItem>
+                                                    <SelectItem value="Punjabi">Punjabi</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
-                                    )}
-                                    <ScrollArea className="flex-grow pr-4 -mr-4" ref={scrollAreaRef}>
-                                        <div className="space-y-4">
-                                            {explanationMessages.map((msg, index) => (
-                                                <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : '')}>
-                                                    {msg.sender === 'bot' && (
+                                        <Button onClick={() => handleExplanationRequest(selectedLanguage)} disabled={explanationLoading} className="w-full">
+                                            {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                            Generate Explanation
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {explanationError && (
+                                    <Alert variant="destructive" className="flex-shrink-0">
+                                        <AlertTitle>Error</AlertTitle>
+                                        <AlertDescription>{explanationError}</AlertDescription>
+                                    </Alert>
+                                )}
+
+                                {explanationLoading && (
+                                    <div className="flex justify-center items-center flex-grow py-8">
+                                        <Loader2 className="h-8 w-8 animate-spin" />
+                                    </div>
+                                )}
+
+                                {explanationMessages.length > 0 && !explanationLoading && (
+                                    <div className="flex flex-col flex-grow min-h-0 space-y-4">
+                                        <div className="space-y-2 flex-shrink-0">
+                                            <Label htmlFor="language-select-active">Language</Label>
+                                            <Select value={selectedLanguage} onValueChange={handleExplanationRequest}>
+                                                <SelectTrigger id="language-select-active">
+                                                    <SelectValue placeholder="Select a language" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="English">English</SelectItem>
+                                                    <SelectItem value="Hindi">Hindi</SelectItem>
+                                                    <SelectItem value="Bengali">Bengali</SelectItem>
+                                                    <SelectItem value="Telugu">Telugu</SelectItem>
+                                                    <SelectItem value="Marathi">Marathi</SelectItem>
+                                                    <SelectItem value="Tamil">Tamil</SelectItem>
+                                                    <SelectItem value="Urdu">Urdu</SelectItem>
+                                                    <SelectItem value="Gujarati">Gujarati</SelectItem>
+                                                    <SelectItem value="Kannada">Kannada</SelectItem>
+                                                    <SelectItem value="Odia">Odia</SelectItem>
+                                                    <SelectItem value="Malayalam">Malayalam</SelectItem>
+                                                    <SelectItem value="Punjabi">Punjabi</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        {explanationAudioUrl && (
+                                            <div className="flex-shrink-0">
+                                                <p className="text-sm font-medium mb-2">Main Explanation Audio</p>
+                                                <audio controls src={explanationAudioUrl} className="w-full h-10" />
+                                            </div>
+                                        )}
+                                        <ScrollArea className="flex-grow pr-4 -mr-4" ref={scrollAreaRef}>
+                                            <div className="space-y-4">
+                                                {explanationMessages.map((msg, index) => (
+                                                    <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : '')}>
+                                                        {msg.sender === 'bot' && (
+                                                            <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                                                                <AvatarFallback><Bot size={18} /></AvatarFallback>
+                                                            </Avatar>
+                                                        )}
+                                                        <div className={cn("rounded-lg px-3 py-2 max-w-[85%] flex items-center gap-2", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                                            <p className="text-sm">{msg.text}</p>
+                                                            {msg.sender === 'bot' && index > 0 && (
+                                                                <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => handlePlayMessageAudio(msg.text)}>
+                                                                    <Volume2 className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                        {msg.sender === 'user' && (
+                                                            <Avatar className="h-8 w-8">
+                                                                <AvatarFallback><User size={18} /></AvatarFallback>
+                                                            </Avatar>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                {isAnswering && (
+                                                    <div className="flex items-start gap-3">
                                                         <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
                                                             <AvatarFallback><Bot size={18} /></AvatarFallback>
                                                         </Avatar>
-                                                    )}
-                                                    <div className={cn("rounded-lg px-3 py-2 max-w-[85%] flex items-center gap-2", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                                        <p className="text-sm">{msg.text}</p>
-                                                        {msg.sender === 'bot' && index > 0 && (
-                                                            <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => handlePlayMessageAudio(msg.text)}>
-                                                                <Volume2 className="h-4 w-4" />
-                                                            </Button>
-                                                        )}
+                                                        <div className="rounded-lg px-4 py-2 bg-muted flex items-center">
+                                                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                                        </div>
                                                     </div>
-                                                    {msg.sender === 'user' && (
-                                                        <Avatar className="h-8 w-8">
-                                                            <AvatarFallback><User size={18} /></AvatarFallback>
-                                                        </Avatar>
-                                                    )}
-                                                </div>
-                                            ))}
-                                            {isAnswering && (
-                                                <div className="flex items-start gap-3">
-                                                    <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-                                                        <AvatarFallback><Bot size={18} /></AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="rounded-lg px-4 py-2 bg-muted flex items-center">
-                                                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                                                    </div>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
+                                        </ScrollArea>
+                                        <div className="relative mt-auto pt-4 flex-shrink-0">
+                                            <Input 
+                                                placeholder="Have a doubt? Ask here..." 
+                                                value={followUpQuestion}
+                                                onChange={(e) => setFollowUpQuestion(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
+                                                disabled={isAnswering}
+                                            />
+                                            <Button size="icon" variant="ghost" className={cn("absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick} disabled={isAnswering}>
+                                                <Mic className="h-4 w-4" />
+                                            </Button>
+                                            <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
+                                                <Send className="h-4 w-4" />
+                                            </Button>
                                         </div>
-                                    </ScrollArea>
-                                    <div className="relative mt-4 flex-shrink-0">
-                                        <Input 
-                                            placeholder="Have a doubt? Ask here..." 
-                                            value={followUpQuestion}
-                                            onChange={(e) => setFollowUpQuestion(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
-                                            disabled={isAnswering}
-                                        />
-                                        <Button size="icon" variant="ghost" className={cn("absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick} disabled={isAnswering}>
-                                            <Mic className="h-4 w-4" />
-                                        </Button>
-                                        <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
-                                            <Send className="h-4 w-4" />
-                                        </Button>
                                     </div>
-                                </div>
-                            )}
+                                )}
+                           </div>
                         </DialogContent>
                     </Dialog>
                     
