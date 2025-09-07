@@ -10,6 +10,7 @@ import { collection, doc, addDoc, getDoc, getDocs, deleteDoc, query, orderBy, on
 export interface Explanation {
     explanationText: string;
     audioDataUri: string;
+    chatHistory?: { sender: 'user' | 'bot'; text: string }[];
 }
 
 // Define the structure of a single analysis report

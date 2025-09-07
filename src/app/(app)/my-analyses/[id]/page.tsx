@@ -276,20 +276,19 @@ export default function AnalysisDetailPage() {
         }
     };
     
-    const saveExplanationToFirestore = async (language: string, explanation: Explanation) => {
+    const updateExplanationState = async (language: string, newExplanationState: Explanation) => {
         if (!user || !analysis) return;
 
         const analysisDocRef = doc(db, 'users', user.uid, 'analyses', analysis.id);
 
         try {
-            // To prevent "invalid nested entity" errors, we read the doc, update the map locally, then write it back.
             const currentDoc = await getDoc(analysisDocRef);
             const currentData = currentDoc.data();
             const currentExplanations = currentData?.explanations || {};
 
             const updatedExplanations = {
                 ...currentExplanations,
-                [language]: explanation,
+                [language]: newExplanationState,
             };
 
             await updateDoc(analysisDocRef, {
@@ -318,8 +317,12 @@ export default function AnalysisDetailPage() {
 
         const cachedExplanation = analysis.explanations?.[selectedLanguage];
         if (cachedExplanation) {
-            setExplanationMessages([{ sender: 'bot', text: cachedExplanation.explanationText }]);
             setExplanationAudio(cachedExplanation.audioDataUri);
+            if (cachedExplanation.chatHistory && cachedExplanation.chatHistory.length > 0) {
+                 setExplanationMessages(cachedExplanation.chatHistory);
+            } else {
+                 setExplanationMessages([{ sender: 'bot', text: cachedExplanation.explanationText }]);
+            }
             setExplanationLoading(false);
             return;
         }
@@ -330,16 +333,18 @@ export default function AnalysisDetailPage() {
                 reportRecommendations: analysis.recommendations,
                 targetLanguage: selectedLanguage,
             });
-
+            
+            const initialMessage: ExplanationMessage = { sender: 'bot', text: result.explanationText };
             const newExplanation: Explanation = {
                 explanationText: result.explanationText,
-                audioDataUri: result.audioDataUri
+                audioDataUri: result.audioDataUri,
+                chatHistory: [initialMessage]
             };
             
-            setExplanationMessages([{ sender: 'bot', text: newExplanation.explanationText }]);
+            setExplanationMessages([initialMessage]);
             setExplanationAudio(newExplanation.audioDataUri);
 
-            await saveExplanationToFirestore(selectedLanguage, newExplanation);
+            await updateExplanationState(selectedLanguage, newExplanation);
 
         } catch (err) {
             console.error("Explanation generation failed:", err);
@@ -358,13 +363,13 @@ export default function AnalysisDetailPage() {
         if (!followUpQuestion.trim() || !analysis) return;
 
         const newUserMessage: ExplanationMessage = { sender: 'user', text: followUpQuestion };
-        const currentHistory = [...explanationMessages, newUserMessage];
-        setExplanationMessages(currentHistory);
+        let updatedHistory = [...explanationMessages, newUserMessage];
+        setExplanationMessages(updatedHistory);
         setFollowUpQuestion("");
         setIsAnswering(true);
 
         try {
-            const historyString = currentHistory.map(m => `${m.sender}: ${m.text}`).join('\n');
+            const historyString = updatedHistory.map(m => `${m.sender}: ${m.text}`).join('\n');
             const result = await generateChatSummary({
                 reportConditionName: analysis.conditionName,
                 reportRecommendations: analysis.recommendations,
@@ -372,7 +377,17 @@ export default function AnalysisDetailPage() {
                 question: followUpQuestion,
             });
             const newBotMessage: ExplanationMessage = { sender: 'bot', text: result.answer };
-            setExplanationMessages(prev => [...prev, newBotMessage]);
+            updatedHistory = [...updatedHistory, newBotMessage];
+            setExplanationMessages(updatedHistory);
+
+            const currentExplanationState = analysis.explanations?.[selectedLanguage];
+             if(currentExplanationState) {
+                await updateExplanationState(selectedLanguage, {
+                    ...currentExplanationState,
+                    chatHistory: updatedHistory,
+                });
+            }
+
         } catch (error) {
             const errorMessage: ExplanationMessage = { sender: 'bot', text: "Sorry, I couldn't process that. Please try rephrasing your question."};
             setExplanationMessages(prev => [...prev, errorMessage]);
