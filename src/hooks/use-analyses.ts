@@ -9,7 +9,7 @@ import { collection, doc, addDoc, getDoc, getDocs, deleteDoc, query, orderBy, on
 
 export interface Explanation {
     explanationText: string;
-    audioDataUri: string;
+    audioUrl: string;
     chatHistory?: { sender: 'user' | 'bot'; text: string }[];
 }
 

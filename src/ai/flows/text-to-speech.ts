@@ -20,10 +20,10 @@ const TextToSpeechInputSchema = z.object({
 export type TextToSpeechInput = z.infer<typeof TextToSpeechInputSchema>;
 
 const TextToSpeechOutputSchema = z.object({
-  audioDataUri: z
+  audioBase64: z
     .string()
     .describe(
-      "The text-to-speech audio of the text, as a data URI. Expected format: 'data:audio/wav;base64,<encoded_data>'."
+      "The text-to-speech audio of the text, as a base64 encoded string."
     ),
 });
 export type TextToSpeechOutput = z.infer<typeof TextToSpeechOutputSchema>;
@@ -92,10 +92,9 @@ const textToSpeechFlow = ai.defineFlow(
     );
 
     const wavBase64 = await toWav(audioBuffer);
-    const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
 
     return {
-      audioDataUri: audioDataUri,
+      audioBase64: wavBase64,
     };
   }
 );

@@ -39,6 +39,7 @@ import {
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { textToSpeech } from '@/ai/flows/text-to-speech';
+import { uploadFile } from '@/lib/actions';
 
 
 // Check for window object to avoid SSR errors with SpeechRecognition
@@ -77,7 +78,7 @@ export default function AnalysisDetailPage() {
     const [explanationLoading, setExplanationLoading] = useState(false);
     const [selectedLanguage, setSelectedLanguage] = useState('English');
     const [explanationMessages, setExplanationMessages] = useState<ExplanationMessage[]>([]);
-    const [explanationAudio, setExplanationAudio] = useState<string | null>(null);
+    const [explanationAudioUrl, setExplanationAudioUrl] = useState<string | null>(null);
     const [explanationError, setExplanationError] = useState<string | null>(null);
     const [followUpQuestion, setFollowUpQuestion] = useState("");
     const [isAnswering, setIsAnswering] = useState(false);
@@ -325,12 +326,12 @@ export default function AnalysisDetailPage() {
 
         setExplanationLoading(true);
         setExplanationMessages([]);
-        setExplanationAudio(null);
+        setExplanationAudioUrl(null);
         setExplanationError(null);
 
         const cachedExplanation = analysis.explanations?.[selectedLanguage];
         if (cachedExplanation) {
-            setExplanationAudio(cachedExplanation.audioDataUri);
+            setExplanationAudioUrl(cachedExplanation.audioUrl);
             if (cachedExplanation.chatHistory && cachedExplanation.chatHistory.length > 0) {
                  setExplanationMessages(cachedExplanation.chatHistory);
             } else {
@@ -346,25 +347,32 @@ export default function AnalysisDetailPage() {
                 reportRecommendations: analysis.recommendations,
                 targetLanguage: selectedLanguage,
             });
+
+            // Upload audio to Cloudinary
+            const uploadResult = await uploadFile(null, result.audioBase64);
+            if (!uploadResult.success || !uploadResult.url) {
+                throw new Error(uploadResult.message || "Audio upload failed.");
+            }
             
             const initialMessage: ExplanationMessage = { sender: 'bot', text: result.explanationText };
             const newExplanation: Explanation = {
                 explanationText: result.explanationText,
-                audioDataUri: result.audioDataUri,
+                audioUrl: uploadResult.url,
                 chatHistory: [initialMessage]
             };
             
             setExplanationMessages([initialMessage]);
-            setExplanationAudio(newExplanation.audioDataUri);
+            setExplanationAudioUrl(newExplanation.audioUrl);
 
             await updateExplanationState(selectedLanguage, newExplanation);
 
         } catch (err) {
             console.error("Explanation generation failed:", err);
-            setExplanationError("An unexpected error occurred while generating the explanation. Please try again.");
+            const errorMessage = err instanceof Error ? err.message : "Could not generate the explanation.";
+            setExplanationError(errorMessage);
             toast({
                 title: "Explanation Failed",
-                description: "Could not generate the explanation.",
+                description: errorMessage,
                 variant: "destructive"
             });
         } finally {
@@ -416,7 +424,8 @@ export default function AnalysisDetailPage() {
         }
         
         try {
-            const { audioDataUri } = await textToSpeech({ text });
+            const { audioBase64 } = await textToSpeech({ text });
+            const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
             const audio = new Audio(audioDataUri);
             setPlayingAudio(audio);
             audio.play();
@@ -624,7 +633,7 @@ export default function AnalysisDetailPage() {
         setExplanationLoading(false);
         setSelectedLanguage('English');
         setExplanationMessages([]);
-        setExplanationAudio(null);
+        setExplanationAudioUrl(null);
         setExplanationError(null);
         setFollowUpQuestion("");
          if (playingAudio) {
@@ -810,10 +819,10 @@ export default function AnalysisDetailPage() {
                             {explanationMessages.length > 0 && !explanationLoading && (
                                 <div className="flex flex-col flex-grow min-h-0">
                                     <Separator className="my-4 flex-shrink-0" />
-                                    {explanationAudio && (
+                                    {explanationAudioUrl && (
                                         <div className="flex-shrink-0">
                                             <p className="text-sm font-medium mb-2">Main Explanation Audio</p>
-                                            <audio controls src={explanationAudio} className="w-full" />
+                                            <audio controls src={explanationAudioUrl} className="w-full" />
                                             <Separator className="my-4"/>
                                         </div>
                                     )}
@@ -1006,5 +1015,3 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
-
-    

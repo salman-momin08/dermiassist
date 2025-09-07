@@ -23,7 +23,7 @@ export type ExplainReportMultimodalInput = z.infer<typeof ExplainReportMultimoda
 
 const ExplainReportMultimodalOutputSchema = z.object({
   explanationText: z.string().describe('The simplified explanation of the report in the target language.'),
-  audioDataUri: z.string().describe("The text-to-speech audio of the explanation, as a data URI. Expected format: 'data:audio/wav;base64,<encoded_data>'."),
+  audioBase64: z.string().describe("The text-to-speech audio of the explanation, as a base64 encoded string."),
 });
 export type ExplainReportMultimodalOutput = z.infer<typeof ExplainReportMultimodalOutputSchema>;
 
@@ -116,11 +116,10 @@ const explainReportMultimodalFlow = ai.defineFlow(
     );
 
     const wavBase64 = await toWav(audioBuffer);
-    const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
 
     return {
       explanationText: explanationText,
-      audioDataUri: audioDataUri,
+      audioBase64: wavBase64,
     };
   }
 );

@@ -11,22 +11,29 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export async function uploadFile(formData: FormData) {
-  const file = formData.get('file') as File;
-  if (!file) {
-    return { success: false, message: "No file provided." };
-  }
-
-  try {
-    // Convert file to buffer and then to a Base64 data URI
+export async function uploadFile(formData: FormData | null, base64Data?: string) {
+  let dataUri: string;
+  
+  if (base64Data) {
+    // Handling base64 encoded audio
+    dataUri = `data:audio/wav;base64,${base64Data}`;
+  } else if (formData) {
+    const file = formData.get('file') as File;
+    if (!file) {
+      return { success: false, message: "No file provided in FormData." };
+    }
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const dataUri = `data:${file.type};base64,${buffer.toString('base64')}`;
+    dataUri = `data:${file.type};base64,${buffer.toString('base64')}`;
+  } else {
+     return { success: false, message: "No file or data provided." };
+  }
 
+
+  try {
     // Upload the data URI to Cloudinary
-    // We remove the AI cropping for certificates and signatures to preserve their content.
     const result = await cloudinary.uploader.upload(dataUri, {
-      resource_type: "auto", // Automatically detect if it's an image or other file type like PDF
+      resource_type: "auto", 
     });
     
     // Return both the URL for display and the public_id for future deletion
@@ -34,7 +41,6 @@ export async function uploadFile(formData: FormData) {
 
   } catch (error) {
     console.error("Upload failed", error);
-    // It's helpful to return a more specific error message if possible
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred. This is often due to missing or invalid Cloudinary credentials in the .env file.";
     return { success: false, message: `Upload failed: ${errorMessage}` };
   }
@@ -58,5 +64,3 @@ export async function deleteFile(publicId: string) {
         return { success: false, message: `Deletion failed: ${errorMessage}` };
     }
 }
-
-    
