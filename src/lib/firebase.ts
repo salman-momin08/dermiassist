@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, memoryLocalCache } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -23,7 +23,8 @@ const auth = getAuth(app);
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     // Garbage collection is not enabled by default.
-  })
+  }),
+  ignoreUndefinedProperties: true, // Add this line
 });
 
 
