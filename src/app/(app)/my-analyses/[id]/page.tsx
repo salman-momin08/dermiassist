@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, notFound, useRouter } from 'next/navigation';
-import { useAnalyses, type AnalysisReport } from '@/hooks/use-analyses';
+import { useAnalyses, type AnalysisReport, type Explanation } from '@/hooks/use-analyses';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { db } from '@/lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+
 
 // Check for window object to avoid SSR errors with SpeechRecognition
 const SpeechRecognition =
@@ -51,7 +54,7 @@ type ExplanationMessage = {
 export default function AnalysisDetailPage() {
     const params = useParams();
     const id = params.id as string;
-    const { getAnalysisById } = useAnalyses();
+    const { getAnalysisById, forceAnalysisReload } = useAnalyses();
     const { user, userData, loading: isAuthLoading } = useAuth();
     const router = useRouter();
 
@@ -159,8 +162,13 @@ export default function AnalysisDetailPage() {
     
     const startRecognition = () => {
         if (recognitionRef.current) {
-            recognitionRef.current.start();
-            setIsListening(true);
+            try {
+                recognitionRef.current.start();
+                setIsListening(true);
+            } catch (e) {
+                console.error("Could not start recognition (already started?):", e);
+                setIsListening(false);
+            }
         }
     }
     
@@ -242,7 +250,7 @@ export default function AnalysisDetailPage() {
         if (!progressImage || !analysis) return;
 
         setIsGeneratingVideo(true);
-setError(null);
+        setError(null);
 
         try {
             const result = await generateHealingVideo({
@@ -267,6 +275,28 @@ setError(null);
             setIsGeneratingVideo(false);
         }
     };
+    
+    const saveExplanationToFirestore = async (language: string, explanation: Explanation) => {
+        if (!user || !analysis) return;
+
+        const analysisDocRef = doc(db, 'users', user.uid, 'analyses', analysis.id);
+        const explanationKey = `explanations.${language}`;
+
+        try {
+            await updateDoc(analysisDocRef, {
+                [explanationKey]: explanation
+            });
+            // Force a reload of the analysis data to ensure local state is up-to-date
+            forceAnalysisReload(user.uid, analysis.id);
+        } catch (error) {
+            console.error("Failed to save explanation:", error);
+            toast({
+                title: "Save Failed",
+                description: "Could not save the generated explanation. It will need to be re-generated next time.",
+                variant: "destructive"
+            });
+        }
+    };
 
     const handleGenerateExplanation = async () => {
         if (!analysis) return;
@@ -276,14 +306,33 @@ setError(null);
         setExplanationAudio(null);
         setExplanationError(null);
 
+        // Check for cached explanation first
+        const cachedExplanation = analysis.explanations?.[selectedLanguage];
+        if (cachedExplanation) {
+            setExplanationMessages([{ sender: 'bot', text: cachedExplanation.explanationText }]);
+            setExplanationAudio(cachedExplanation.audioDataUri);
+            setExplanationLoading(false);
+            return;
+        }
+
         try {
             const result = await explainReportMultimodal({
                 reportConditionName: analysis.conditionName,
                 reportRecommendations: analysis.recommendations,
                 targetLanguage: selectedLanguage,
             });
-            setExplanationMessages([{ sender: 'bot', text: result.explanationText }]);
-            setExplanationAudio(result.audioDataUri);
+
+            const newExplanation: Explanation = {
+                explanationText: result.explanationText,
+                audioDataUri: result.audioDataUri
+            };
+            
+            setExplanationMessages([{ sender: 'bot', text: newExplanation.explanationText }]);
+            setExplanationAudio(newExplanation.audioDataUri);
+
+            // Save the newly generated explanation to Firestore
+            await saveExplanationToFirestore(selectedLanguage, newExplanation);
+
         } catch (err) {
             console.error("Explanation generation failed:", err);
             setExplanationError("An unexpected error occurred while generating the explanation. Please try again.");
@@ -649,7 +698,7 @@ setError(null);
                         </CardContent>
                     </Card>
                     
-                    <Dialog open={explanationDialogOpen} onOpenChange={(open) => { setExplanationDialogOpen(open); if(!open) resetExplanationDialog(); }}>
+                     <Dialog open={explanationDialogOpen} onOpenChange={(open) => { setExplanationDialogOpen(open); if(!open) resetExplanationDialog(); }}>
                         <DialogTrigger asChild>
                             <Button className="w-full">
                                 <Languages className="mr-2 h-4 w-4" />
@@ -766,7 +815,7 @@ setError(null);
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={startRecognition}>Continue</AlertDialogAction>
+                                <AlertDialogAction onClick={() => { startRecognition(); setShowPermissionDialog(false); }}>Continue</AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>

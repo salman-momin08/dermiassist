@@ -6,6 +6,12 @@ import { useAuth } from './use-auth';
 import { db } from '@/lib/firebase';
 import { collection, doc, addDoc, getDoc, getDocs, deleteDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 
+
+export interface Explanation {
+    explanationText: string;
+    audioDataUri: string;
+}
+
 // Define the structure of a single analysis report
 export interface AnalysisReport {
     id: string;
@@ -24,12 +30,24 @@ export interface AnalysisReport {
         otherConsiderations?: string;
         proformaAnswers?: { question: string; answer: string }[];
     };
+    explanations?: {
+        [language: string]: Explanation;
+    };
 }
 
 export function useAnalyses() {
     const { user } = useAuth();
     const [analyses, setAnalyses] = useState<AnalysisReport[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    const forceAnalysisReload = useCallback(async (userId: string, analysisId: string) => {
+        const docRef = doc(db, 'users', userId, 'analyses', analysisId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            const updatedAnalysis = { id: docSnap.id, ...docSnap.data() } as AnalysisReport;
+            setAnalyses(prev => prev.map(a => a.id === analysisId ? updatedAnalysis : a));
+        }
+    }, []);
 
     useEffect(() => {
         if (!user) {
@@ -78,6 +96,10 @@ export function useAnalyses() {
     const getAnalysisById = useCallback(async (userId: string, analysisId: string): Promise<AnalysisReport | undefined> => {
         if (!userId || !analysisId) return undefined;
         
+        // Check local state first for speed
+        const localAnalysis = analyses.find(a => a.id === analysisId);
+        if (localAnalysis) return localAnalysis;
+
         try {
             const docRef = doc(db, 'users', userId, 'analyses', analysisId);
             const docSnap = await getDoc(docRef);
@@ -92,7 +114,7 @@ export function useAnalyses() {
             console.error("Error fetching document:", error);
             return undefined;
         }
-    }, []);
+    }, [analyses]);
 
     const deleteAnalysis = useCallback(async (userId: string, id: string) => {
         if (!userId) throw new Error("User not authenticated.");
@@ -101,5 +123,5 @@ export function useAnalyses() {
         // The onSnapshot listener will automatically update the local state
     }, []);
 
-    return { analyses, addAnalysis, getAnalysisById, deleteAnalysis, isLoading };
+    return { analyses, addAnalysis, getAnalysisById, deleteAnalysis, isLoading, forceAnalysisReload };
 }
