@@ -54,7 +54,7 @@ type ExplanationMessage = {
 export default function AnalysisDetailPage() {
     const params = useParams();
     const id = params.id as string;
-    const { getAnalysisById, updateAnalysis } = useAnalyses();
+    const { getAnalysisById, updateAnalysis, forceAnalysisReload } = useAnalyses();
     const { user, userData, loading: isAuthLoading } = useAuth();
     const router = useRouter();
 
@@ -259,7 +259,7 @@ export default function AnalysisDetailPage() {
         if (!progressImage || !analysis) return;
 
         setIsGeneratingVideo(true);
-setError(null);
+        setError(null);
 
         try {
             const result = await generateHealingVideo({
@@ -289,16 +289,18 @@ setError(null);
         if (!user || !analysis) return;
 
         try {
-            const currentAnalysisData = await getAnalysisById(user.uid, analysis.id);
+             const currentAnalysisData = await getAnalysisById(user.uid, analysis.id);
             if (!currentAnalysisData) throw new Error("Analysis not found");
 
             const updatedExplanations = {
                 ...(currentAnalysisData.explanations || {}),
                 [language]: newExplanationState,
             };
-
+            
             await updateAnalysis(user.uid, analysis.id, { explanations: updatedExplanations });
-            setAnalysis(prev => prev ? { ...prev, explanations: updatedExplanations } : null);
+            
+            // Immediately reload the analysis data in the hook to ensure consistency
+            await forceAnalysisReload(analysis.id);
 
         } catch (error) {
             console.error("Failed to save explanation:", error);
@@ -427,8 +429,14 @@ setError(null);
         try {
             const { audioBase64 } = await textToSpeech({ text });
             const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
-            setAudioCache(prev => ({...prev, [text]: audioDataUri}));
-            const audio = new Audio(audioDataUri);
+            
+            const uploadResult = await uploadFile(null, audioBase64);
+             if (!uploadResult.success || !uploadResult.url) {
+                throw new Error(uploadResult.message || "Audio upload failed.");
+            }
+            
+            setAudioCache(prev => ({...prev, [text]: uploadResult.url!}));
+            const audio = new Audio(uploadResult.url);
             setPlayingAudio({ audio, text });
             audio.play();
             audio.onended = () => setPlayingAudio(null);
@@ -904,19 +912,22 @@ setError(null);
                                             </div>
                                         </ScrollArea>
                                         <div className="relative mt-auto pt-4 flex-shrink-0">
-                                            <Input 
-                                                placeholder="Have a doubt? Ask here..." 
+                                            <Input
+                                                placeholder="Have a doubt? Ask here..."
                                                 value={followUpQuestion}
                                                 onChange={(e) => setFollowUpQuestion(e.target.value)}
                                                 onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
                                                 disabled={isAnswering}
+                                                className="pr-20"
                                             />
-                                            <Button size="icon" variant="ghost" className={cn("absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick} disabled={isAnswering}>
-                                                <Mic className="h-4 w-4" />
-                                            </Button>
-                                            <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
-                                                <Send className="h-4 w-4" />
-                                            </Button>
+                                            <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+                                                <Button size="icon" variant="ghost" className={cn("h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick} disabled={isAnswering}>
+                                                    <Mic className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
+                                                    <Send className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
