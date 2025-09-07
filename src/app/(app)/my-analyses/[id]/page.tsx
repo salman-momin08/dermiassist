@@ -37,7 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { textToSpeech } from '@/ai/flows/text-to-speech';
 import { uploadFile } from '@/lib/actions';
 
@@ -284,42 +284,35 @@ export default function AnalysisDetailPage() {
         }
     };
     
-    const updateExplanationState = async (language: string, newExplanationState: Explanation) => {
+     const saveExplanationToFirestore = async (language: string, newExplanationState: Explanation) => {
         if (!user || !analysis) return;
 
-        const analysisDocRef = doc(db, 'users', user.uid, 'analyses', analysis.id);
-
         try {
-            const currentDoc = await getDoc(analysisDocRef);
-            if (!currentDoc.exists()) {
-                 throw new Error("Analysis document not found!");
-            }
-            const currentData = currentDoc.data();
-            const currentExplanations = currentData?.explanations || {};
+            const currentAnalysis = await getAnalysisById(user.uid, analysis.id);
+            if (!currentAnalysis) throw new Error("Analysis not found");
 
             const updatedExplanations = {
-                ...currentExplanations,
+                ...(currentAnalysis.explanations || {}),
                 [language]: newExplanationState,
             };
 
-            await updateDoc(analysisDocRef, {
+            await updateDoc(doc(db, 'users', user.uid, 'analyses', analysis.id), {
                 explanations: updatedExplanations,
             });
             
-            // Force a reload of the analysis data to ensure the local state is up-to-date
             await forceAnalysisReload(user.uid, analysis.id);
-            // Also update the local component state immediately for a smoother UI experience
             setAnalysis(prev => prev ? { ...prev, explanations: updatedExplanations } : null);
 
         } catch (error) {
             console.error("Failed to save explanation:", error);
             toast({
                 title: "Save Failed",
-                description: "Could not save the generated explanation. It will need to be re-generated next time.",
+                description: "Could not save the generated explanation.",
                 variant: "destructive"
             });
         }
     };
+
 
     const handleGenerateExplanation = async () => {
         if (!analysis) return;
@@ -332,11 +325,7 @@ export default function AnalysisDetailPage() {
         const cachedExplanation = analysis.explanations?.[selectedLanguage];
         if (cachedExplanation) {
             setExplanationAudioUrl(cachedExplanation.audioUrl);
-            if (cachedExplanation.chatHistory && cachedExplanation.chatHistory.length > 0) {
-                 setExplanationMessages(cachedExplanation.chatHistory);
-            } else {
-                 setExplanationMessages([{ sender: 'bot', text: cachedExplanation.explanationText }]);
-            }
+            setExplanationMessages(cachedExplanation.chatHistory || [{ sender: 'bot', text: cachedExplanation.explanationText }]);
             setExplanationLoading(false);
             return;
         }
@@ -364,7 +353,7 @@ export default function AnalysisDetailPage() {
             setExplanationMessages([initialMessage]);
             setExplanationAudioUrl(newExplanation.audioUrl);
 
-            await updateExplanationState(selectedLanguage, newExplanation);
+            await saveExplanationToFirestore(selectedLanguage, newExplanation);
 
         } catch (err) {
             console.error("Explanation generation failed:", err);
@@ -403,7 +392,7 @@ export default function AnalysisDetailPage() {
 
             const currentExplanationState = analysis.explanations?.[selectedLanguage];
              if(currentExplanationState) {
-                await updateExplanationState(selectedLanguage, {
+                await saveExplanationToFirestore(selectedLanguage, {
                     ...currentExplanationState,
                     chatHistory: updatedHistory,
                 });
@@ -1015,3 +1004,5 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
+
+    
