@@ -82,6 +82,7 @@ export default function AnalysisDetailPage() {
     const [followUpQuestion, setFollowUpQuestion] = useState("");
     const [isAnswering, setIsAnswering] = useState(false);
     const [playingAudio, setPlayingAudio] = useState<HTMLAudioElement | null>(null);
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
 
 
     // State for speech recognition
@@ -119,6 +120,12 @@ export default function AnalysisDetailPage() {
             router.push('/login');
         }
     }, [id, user, isAuthLoading, getAnalysisById, router]);
+    
+    useEffect(() => {
+        if (scrollAreaRef.current) {
+            scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+        }
+    }, [explanationMessages]);
 
     // Setup Speech Recognition
     useEffect(() => {
@@ -283,6 +290,9 @@ export default function AnalysisDetailPage() {
 
         try {
             const currentDoc = await getDoc(analysisDocRef);
+            if (!currentDoc.exists()) {
+                 throw new Error("Analysis document not found!");
+            }
             const currentData = currentDoc.data();
             const currentExplanations = currentData?.explanations || {};
 
@@ -804,7 +814,7 @@ export default function AnalysisDetailPage() {
                                             <Separator className="my-4"/>
                                         </div>
                                     )}
-                                    <ScrollArea className="flex-grow pr-4 -mr-4">
+                                    <ScrollArea className="flex-grow pr-4 -mr-4" ref={scrollAreaRef}>
                                         <div className="space-y-4">
                                             {explanationMessages.map((msg, index) => (
                                                 <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : '')}>
@@ -993,3 +1003,5 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
+
+    
