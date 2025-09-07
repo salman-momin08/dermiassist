@@ -81,6 +81,7 @@ export default function AnalysisDetailPage() {
     const [followUpQuestion, setFollowUpQuestion] = useState("");
     const [isAnswering, setIsAnswering] = useState(false);
     const [playingAudio, setPlayingAudio] = useState<{ audio: HTMLAudioElement; text: string } | null>(null);
+    const [isAudioLoading, setIsAudioLoading] = useState<string | null>(null); // Store text of the message being loaded
     const [audioCache, setAudioCache] = useState<Record<string, string>>({});
     const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -404,7 +405,7 @@ export default function AnalysisDetailPage() {
         }
     };
 
-     const handlePlayMessageAudio = async (text: string) => {
+    const handlePlayMessageAudio = async (text: string) => {
         // If the clicked message is already playing, stop it.
         if (playingAudio && playingAudio.text === text) {
             playingAudio.audio.pause();
@@ -426,12 +427,11 @@ export default function AnalysisDetailPage() {
             return;
         }
         
+        setIsAudioLoading(text);
         try {
             const { audioBase64 } = await textToSpeech({ text });
-            const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
-            
             const uploadResult = await uploadFile(null, audioBase64);
-             if (!uploadResult.success || !uploadResult.url) {
+            if (!uploadResult.success || !uploadResult.url) {
                 throw new Error(uploadResult.message || "Audio upload failed.");
             }
             
@@ -447,6 +447,8 @@ export default function AnalysisDetailPage() {
                 description: "Could not play the message audio.",
                 variant: "destructive"
             });
+        } finally {
+            setIsAudioLoading(null);
         }
     };
     
@@ -886,8 +888,8 @@ export default function AnalysisDetailPage() {
                                                             <p className="text-sm">{msg.text}</p>
                                                             {msg.sender === 'bot' && index > 0 && (
                                                                 <div className="flex justify-end mt-1">
-                                                                    <Button size="icon" variant="ghost" className={cn("h-6 w-6 shrink-0", playingAudio?.text === msg.text && "text-primary")} onClick={() => handlePlayMessageAudio(msg.text)}>
-                                                                        <Volume2 className="h-4 w-4" />
+                                                                    <Button size="icon" variant="ghost" className={cn("h-6 w-6 shrink-0", playingAudio?.text === msg.text && "text-primary")} onClick={() => handlePlayMessageAudio(msg.text)} disabled={isAudioLoading === msg.text}>
+                                                                        {isAudioLoading === msg.text ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4" />}
                                                                     </Button>
                                                                 </div>
                                                             )}
@@ -918,10 +920,10 @@ export default function AnalysisDetailPage() {
                                                 onChange={(e) => setFollowUpQuestion(e.target.value)}
                                                 onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
                                                 disabled={isAnswering}
-                                                className="pr-20"
+                                                className="pr-24"
                                             />
                                             <div className="absolute inset-y-0 right-0 flex items-center pr-2">
-                                                <Button size="icon" variant="ghost" className={cn("h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick} disabled={isAnswering}>
+                                                <Button size="sm" className="h-8 w-8" variant={isListening ? "destructive" : "default"} onClick={handleMicClick} disabled={isAnswering}>
                                                     <Mic className="h-4 w-4" />
                                                 </Button>
                                                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
