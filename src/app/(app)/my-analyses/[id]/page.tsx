@@ -257,7 +257,7 @@ export default function AnalysisDetailPage() {
         if (!progressImage || !analysis) return;
 
         setIsGeneratingVideo(true);
-        setError(null);
+setError(null);
 
         try {
             const result = await generateHealingVideo({
@@ -764,7 +764,7 @@ export default function AnalysisDetailPage() {
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
-                            <DialogHeader>
+                            <DialogHeader className="flex-shrink-0">
                                 <DialogTitle>Explain Report</DialogTitle>
                                 <DialogDescription>
                                     Get a simplified explanation of your report and ask follow-up questions.
@@ -1038,4 +1038,3 @@ export default function AnalysisDetailPage() {
         </div>
     );
 }
-
