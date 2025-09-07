@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Generates a summary of the AI skin analysis report for doctors.

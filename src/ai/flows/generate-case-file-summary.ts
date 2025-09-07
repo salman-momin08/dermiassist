@@ -32,7 +32,7 @@ const prompt = ai.definePrompt({
   name: 'generateCaseFileSummaryPrompt',
   input: {schema: GenerateCaseFileSummaryInputSchema},
   output: {schema: GenerateCaseFileSummaryOutputSchema},
-  prompt: `You are a helpful medical assistant AI. Your task is to create a concise and structured case file summary for a doctor to review before an appointment.
+  prompt: `You are a helpful medical assistant AI. Your task is to create a concise and structured case file summary for a doctor to review before an appointment. You must not disclose any personally identifiable information beyond what is explicitly provided in the input fields.
 
 Synthesize the information from the provided AI report and any previous notes into a clear, easy-to-read summary.
 

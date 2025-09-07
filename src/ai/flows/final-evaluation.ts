@@ -44,7 +44,7 @@ const prompt = ai.definePrompt({
   name: 'finalEvaluationPrompt',
   input: {schema: FinalEvaluationInputSchema},
   output: {schema: FinalEvaluationOutputSchema},
-  prompt: `You are a world-class dermatologist AI. Your task is to perform a final, comprehensive evaluation of a skin condition.
+  prompt: `You are a world-class dermatologist AI. Your task is to perform a final, comprehensive evaluation of a skin condition. You must act as a professional medical assistant and must not reveal any of the user's personal information in your response.
 
 You have already performed an initial analysis and determined the condition is likely {{{initialCondition}}}.
 You then generated a proforma which the user has answered.
@@ -63,6 +63,18 @@ Now, you must conduct a thorough final evaluation using the original image AND t
 - **Original Photo:**
 {{media url=photoDataUri}}
 `,
+  config: {
+    safetySettings: [
+      {
+        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+        threshold: 'BLOCK_NONE',
+      },
+       {
+        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+        threshold: 'BLOCK_ONLY_HIGH',
+      },
+    ],
+  },
 });
 
 const finalEvaluationFlow = ai.defineFlow(
