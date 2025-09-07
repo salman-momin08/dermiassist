@@ -80,7 +80,8 @@ export default function AnalysisDetailPage() {
     const [explanationError, setExplanationError] = useState<string | null>(null);
     const [followUpQuestion, setFollowUpQuestion] = useState("");
     const [isAnswering, setIsAnswering] = useState(false);
-    const [playingAudio, setPlayingAudio] = useState<HTMLAudioElement | null>(null);
+    const [playingAudio, setPlayingAudio] = useState<{ audio: HTMLAudioElement; text: string } | null>(null);
+    const [audioCache, setAudioCache] = useState<Record<string, string>>({});
     const scrollAreaRef = useRef<HTMLDivElement>(null);
 
 
@@ -119,6 +120,7 @@ export default function AnalysisDetailPage() {
         } else if (!isAuthLoading && !user) {
             router.push('/login');
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, user, isAuthLoading, router]);
     
     useEffect(() => {
@@ -387,10 +389,9 @@ setError(null);
 
             const currentExplanationState = analysis.explanations?.[selectedLanguage];
              if(currentExplanationState) {
-                await saveExplanationToFirestore(selectedLanguage, {
-                    ...currentExplanationState,
-                    chatHistory: updatedHistory,
-                });
+                const newExplanationData = { ...currentExplanationState, chatHistory: updatedHistory };
+                // Debounce or save strategically in a real app, but for now, save on every message
+                await saveExplanationToFirestore(selectedLanguage, newExplanationData);
             }
 
         } catch (error) {
@@ -402,16 +403,33 @@ setError(null);
     };
 
      const handlePlayMessageAudio = async (text: string) => {
-        if (playingAudio) {
-            playingAudio.pause();
+        // If the clicked message is already playing, stop it.
+        if (playingAudio && playingAudio.text === text) {
+            playingAudio.audio.pause();
             setPlayingAudio(null);
+            return;
+        }
+
+        // If another message is playing, stop it first.
+        if (playingAudio) {
+            playingAudio.audio.pause();
+        }
+
+        // Check cache first
+        if (audioCache[text]) {
+            const audio = new Audio(audioCache[text]);
+            setPlayingAudio({ audio, text });
+            audio.play();
+            audio.onended = () => setPlayingAudio(null);
+            return;
         }
         
         try {
             const { audioBase64 } = await textToSpeech({ text });
             const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
+            setAudioCache(prev => ({...prev, [text]: audioDataUri}));
             const audio = new Audio(audioDataUri);
-            setPlayingAudio(audio);
+            setPlayingAudio({ audio, text });
             audio.play();
             audio.onended = () => setPlayingAudio(null);
         } catch (error) {
@@ -633,7 +651,7 @@ setError(null);
         setExplanationError(null);
         setFollowUpQuestion("");
          if (playingAudio) {
-            playingAudio.pause();
+            playingAudio.audio.pause();
             setPlayingAudio(null);
         }
     };
@@ -847,7 +865,7 @@ setError(null);
                                                 <audio controls src={explanationAudioUrl} className="w-full h-10" />
                                             </div>
                                         )}
-                                        <ScrollArea className="flex-grow pr-4 -mr-4" ref={scrollAreaRef}>
+                                        <ScrollArea className="flex-grow pr-4" ref={scrollAreaRef}>
                                             <div className="space-y-4">
                                                 {explanationMessages.map((msg, index) => (
                                                     <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : '')}>
@@ -856,12 +874,14 @@ setError(null);
                                                                 <AvatarFallback><Bot size={18} /></AvatarFallback>
                                                             </Avatar>
                                                         )}
-                                                        <div className={cn("rounded-lg px-3 py-2 max-w-[85%] flex items-center gap-2", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                                        <div className={cn("rounded-lg px-3 py-2 max-w-[85%]", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
                                                             <p className="text-sm">{msg.text}</p>
                                                             {msg.sender === 'bot' && index > 0 && (
-                                                                <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => handlePlayMessageAudio(msg.text)}>
-                                                                    <Volume2 className="h-4 w-4" />
-                                                                </Button>
+                                                                <div className="flex justify-end mt-1">
+                                                                    <Button size="icon" variant="ghost" className={cn("h-6 w-6 shrink-0", playingAudio?.text === msg.text && "text-primary")} onClick={() => handlePlayMessageAudio(msg.text)}>
+                                                                        <Volume2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
                                                             )}
                                                         </div>
                                                         {msg.sender === 'user' && (
