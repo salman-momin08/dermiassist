@@ -305,7 +305,10 @@ export default function AnalysisDetailPage() {
                 explanations: updatedExplanations,
             });
             
-            forceAnalysisReload(user.uid, analysis.id);
+            // Force a reload of the analysis data to ensure the local state is up-to-date
+            await forceAnalysisReload(user.uid, analysis.id);
+            // Also update the local component state immediately for a smoother UI experience
+            setAnalysis(prev => prev ? { ...prev, explanations: updatedExplanations } : null);
 
         } catch (error) {
             console.error("Failed to save explanation:", error);
