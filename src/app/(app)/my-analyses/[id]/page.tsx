@@ -37,13 +37,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { db } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 
 
 // Check for window object to avoid SSR errors with SpeechRecognition
 const SpeechRecognition =
   typeof window !== 'undefined'
-    ? window.SpeechRecognition || (window as any).webkitSpeechRecognition
+    ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     : null;
 
 type ExplanationMessage = {
@@ -136,8 +136,6 @@ export default function AnalysisDetailPage() {
         
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
             console.error('Speech recognition error:', event.error);
-             // The 'no-speech' error simply means the user didn't say anything.
-            // We can ignore it to prevent a confusing error message.
             if (event.error === 'no-speech') {
                 setIsListening(false);
                 return;
@@ -280,14 +278,24 @@ export default function AnalysisDetailPage() {
         if (!user || !analysis) return;
 
         const analysisDocRef = doc(db, 'users', user.uid, 'analyses', analysis.id);
-        const explanationKey = `explanations.${language}`;
 
         try {
+            // To prevent "invalid nested entity" errors, we read the doc, update the map locally, then write it back.
+            const currentDoc = await getDoc(analysisDocRef);
+            const currentData = currentDoc.data();
+            const currentExplanations = currentData?.explanations || {};
+
+            const updatedExplanations = {
+                ...currentExplanations,
+                [language]: explanation,
+            };
+
             await updateDoc(analysisDocRef, {
-                [explanationKey]: explanation
+                explanations: updatedExplanations,
             });
-            // Force a reload of the analysis data to ensure local state is up-to-date
+            
             forceAnalysisReload(user.uid, analysis.id);
+
         } catch (error) {
             console.error("Failed to save explanation:", error);
             toast({
@@ -306,7 +314,6 @@ export default function AnalysisDetailPage() {
         setExplanationAudio(null);
         setExplanationError(null);
 
-        // Check for cached explanation first
         const cachedExplanation = analysis.explanations?.[selectedLanguage];
         if (cachedExplanation) {
             setExplanationMessages([{ sender: 'bot', text: cachedExplanation.explanationText }]);
@@ -330,7 +337,6 @@ export default function AnalysisDetailPage() {
             setExplanationMessages([{ sender: 'bot', text: newExplanation.explanationText }]);
             setExplanationAudio(newExplanation.audioDataUri);
 
-            // Save the newly generated explanation to Firestore
             await saveExplanationToFirestore(selectedLanguage, newExplanation);
 
         } catch (err) {
@@ -374,7 +380,6 @@ export default function AnalysisDetailPage() {
     };
     
     const cleanText = (text: string) => {
-        // Removes markdown-like characters for cleaner PDF output
         return text.replace(/[\*\_#]/g, '');
     };
 
@@ -392,7 +397,6 @@ export default function AnalysisDetailPage() {
             const pageHeight = pdf.internal.pageSize.getHeight();
             const margin = 15;
 
-            // --- Header ---
             pdf.setFontSize(18);
             pdf.setFont('helvetica', 'bold');
             pdf.text('SkinWise AI Skin Analysis Report', pageWidth / 2, margin + 5, { align: 'center' });
@@ -407,7 +411,6 @@ export default function AnalysisDetailPage() {
 
             let yPos = margin + 25;
 
-            // --- Patient Details ---
             pdf.setFontSize(12);
             pdf.setFont('helvetica', 'bold');
             pdf.text('Patient Information', margin, yPos);
@@ -424,7 +427,6 @@ export default function AnalysisDetailPage() {
             pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
             yPos += 7;
 
-            // --- Analysis Details ---
             pdf.setFontSize(12);
             pdf.setFont('helvetica', 'bold');
             pdf.text('Analysis Details', margin, yPos);
@@ -443,7 +445,6 @@ export default function AnalysisDetailPage() {
             pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
             yPos += 7;
 
-            // --- Submitted Photo & Info ---
             pdf.setFont('helvetica', 'bold');
             pdf.text('Submitted Information', margin, yPos);
             yPos += 7;
@@ -491,7 +492,6 @@ export default function AnalysisDetailPage() {
                   }
                 };
 
-                // --- Recommendations ---
                 checkAndSwitchPage(20);
                 pdf.setFontSize(14);
                 pdf.setFont('helvetica', 'bold');
@@ -503,7 +503,6 @@ export default function AnalysisDetailPage() {
                 pdf.text(recommendationsText, margin, yPos);
                 yPos += recommendationsText.length * 4 + 5;
 
-                // --- Do's and Don'ts ---
                 checkAndSwitchPage(20);
                 pdf.setFontSize(12);
                 pdf.setFont('helvetica', 'bold');
@@ -533,7 +532,6 @@ export default function AnalysisDetailPage() {
                     yPos += itemText.length * 4 + 2;
                 });
                 
-                // --- Deeper Analysis ---
                 if (analysis.submittedInfo?.otherConsiderations) {
                     yPos += 5;
                     checkAndSwitchPage(20);
@@ -589,7 +587,6 @@ export default function AnalysisDetailPage() {
     }
     
     if (!analysis) {
-        // notFound() will be called by the useEffect hook if data is not found
         return null;
     }
 
@@ -806,11 +803,11 @@ export default function AnalysisDetailPage() {
                     </Dialog>
                     
                     <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
-                        <AlertDialogContent>
+                         <AlertDialogContent>
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Microphone Access</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    SkinWise needs access to your microphone to enable the speech-to-text feature. Click Continue to allow access.
+                                    SkinWise needs access to your microphone to enable the speech-to-text feature. Click Continue to allow access in the upcoming browser prompt.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
