@@ -800,7 +800,7 @@ export default function AnalysisDetailPage() {
                             </DialogHeader>
                             
                             <div className="flex-grow flex flex-col min-h-0">
-                                {!hasExistingExplanations() && !explanationLoading && (
+                                {(!hasExistingExplanations() && !explanationLoading) && (
                                     <div className="space-y-4 py-2 flex-shrink-0">
                                         <div className="space-y-2">
                                             <Label htmlFor="language-select">Select Language</Label>
@@ -913,22 +913,24 @@ export default function AnalysisDetailPage() {
                                                 )}
                                             </div>
                                         </ScrollArea>
-                                        <div className="relative mt-auto pt-4 flex-shrink-0">
-                                            <Input
-                                                placeholder="Have a doubt? Ask here..."
-                                                value={followUpQuestion}
-                                                onChange={(e) => setFollowUpQuestion(e.target.value)}
-                                                onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
-                                                disabled={isAnswering}
-                                                className="pr-24"
-                                            />
-                                            <div className="absolute inset-y-0 right-0 flex items-center pr-2">
-                                                <Button size="sm" className="h-8 w-8" variant={isListening ? "destructive" : "default"} onClick={handleMicClick} disabled={isAnswering}>
-                                                    <Mic className="h-4 w-4" />
-                                                </Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
-                                                    <Send className="h-4 w-4" />
-                                                </Button>
+                                        <div className="flex w-full items-center space-x-2 mt-auto pt-4 flex-shrink-0">
+                                            <div className="relative flex-grow">
+                                                <Input
+                                                    placeholder="Have a doubt? Ask here..."
+                                                    value={followUpQuestion}
+                                                    onChange={(e) => setFollowUpQuestion(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
+                                                    disabled={isAnswering}
+                                                    className="pr-20"
+                                                />
+                                                <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+                                                    <Button size="icon" variant={isListening ? "destructive" : "ghost"} onClick={handleMicClick} disabled={isAnswering}>
+                                                        <Mic className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button size="icon" variant="ghost" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
+                                                        <Send className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
