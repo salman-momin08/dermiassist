@@ -5,7 +5,7 @@ config();
 import '@/ai/flows/chatbot-faq.ts';
 import '@/ai/flows/generate-ai-report-summary.ts';
 import '@/ai/flows/final-evaluation.ts';
-import '@/ai.flows/generate-proforma.ts';
+import '@/ai/flows/generate-proforma.ts';
 import '@/ai/flows/visual-progress-analysis.ts';
 import '@/ai/flows/generate-healing-video.ts';
 import '@/ai/flows/generate-case-file-summary.ts';

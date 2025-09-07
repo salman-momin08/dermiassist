@@ -35,7 +35,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
 // Check for window object to avoid SSR errors with SpeechRecognition
@@ -891,5 +890,3 @@ setError(null);
         </div>
     );
 }
-
-    
