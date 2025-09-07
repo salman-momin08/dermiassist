@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit, Languages, Mic, Send, Bot, User } from "lucide-react";
+import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit, Languages, Mic, Send, Bot, User, Volume2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { textToSpeech } from '@/ai/flows/text-to-speech';
 
 
 // Check for window object to avoid SSR errors with SpeechRecognition
@@ -80,6 +81,7 @@ export default function AnalysisDetailPage() {
     const [explanationError, setExplanationError] = useState<string | null>(null);
     const [followUpQuestion, setFollowUpQuestion] = useState("");
     const [isAnswering, setIsAnswering] = useState(false);
+    const [playingAudio, setPlayingAudio] = useState<HTMLAudioElement | null>(null);
 
 
     // State for speech recognition
@@ -378,6 +380,28 @@ export default function AnalysisDetailPage() {
             setIsAnswering(false);
         }
     };
+
+     const handlePlayMessageAudio = async (text: string) => {
+        if (playingAudio) {
+            playingAudio.pause();
+            setPlayingAudio(null);
+        }
+        
+        try {
+            const { audioDataUri } = await textToSpeech({ text });
+            const audio = new Audio(audioDataUri);
+            setPlayingAudio(audio);
+            audio.play();
+            audio.onended = () => setPlayingAudio(null);
+        } catch (error) {
+            console.error("Failed to play audio:", error);
+            toast({
+                title: "Audio Error",
+                description: "Could not play the message audio.",
+                variant: "destructive"
+            });
+        }
+    };
     
     const cleanText = (text: string) => {
         return text.replace(/[\*\_#]/g, '');
@@ -575,6 +599,10 @@ export default function AnalysisDetailPage() {
         setExplanationAudio(null);
         setExplanationError(null);
         setFollowUpQuestion("");
+         if (playingAudio) {
+            playingAudio.pause();
+            setPlayingAudio(null);
+        }
     };
 
 
@@ -702,14 +730,14 @@ export default function AnalysisDetailPage() {
                                 Explain My Report
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-lg">
+                        <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
                             <DialogHeader>
                                 <DialogTitle>Explain Report in Another Language</DialogTitle>
                                 <DialogDescription>
                                     Select a language to get a simplified explanation of your report in both text and audio.
                                 </DialogDescription>
                             </DialogHeader>
-                            <div className="space-y-4 py-4">
+                            <div className="space-y-4 py-2 flex-shrink-0">
                                 <div className="space-y-2">
                                     <Label htmlFor="language-select">Language</Label>
                                     <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
@@ -736,72 +764,86 @@ export default function AnalysisDetailPage() {
                                     {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                     Generate Explanation
                                 </Button>
-                                {explanationLoading && (
-                                        <p className="text-sm text-center text-muted-foreground">Generating... this may take a moment.</p>
-                                )}
-                                {explanationError && (
-                                        <Alert variant="destructive">
-                                        <AlertTitle>Error</AlertTitle>
-                                        <AlertDescription>{explanationError}</AlertDescription>
-                                    </Alert>
-                                )}
-                                {explanationMessages.length > 0 && (
-                                    <Card className="mt-4 flex flex-col h-[400px]">
-                                        <CardContent className="pt-6 flex-grow flex flex-col gap-4">
-                                            <ScrollArea className="flex-grow pr-4">
-                                                <div className="space-y-4">
-                                                    {explanationMessages.map((msg, index) => (
-                                                        <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : '')}>
-                                                            {msg.sender === 'bot' && (
-                                                                <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-                                                                    <AvatarFallback><Bot size={18} /></AvatarFallback>
-                                                                </Avatar>
-                                                            )}
-                                                            <div className={cn("rounded-lg px-3 py-2 max-w-[85%]", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                                                <p className="text-sm">{msg.text}</p>
-                                                            </div>
-                                                            {msg.sender === 'user' && (
-                                                                <Avatar className="h-8 w-8">
-                                                                    <AvatarFallback><User size={18} /></AvatarFallback>
-                                                                </Avatar>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    {isAnswering && (
-                                                        <div className="flex items-start gap-3">
-                                                            <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-                                                                <AvatarFallback><Bot size={18} /></AvatarFallback>
-                                                            </Avatar>
-                                                            <div className="rounded-lg px-4 py-2 bg-muted flex items-center">
-                                                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                                                            </div>
-                                                        </div>
+                            </div>
+
+                            {explanationError && (
+                                <Alert variant="destructive" className="flex-shrink-0">
+                                    <AlertTitle>Error</AlertTitle>
+                                    <AlertDescription>{explanationError}</AlertDescription>
+                                </Alert>
+                            )}
+
+                            {explanationLoading && (
+                                <div className="flex justify-center items-center flex-grow">
+                                    <Loader2 className="h-8 w-8 animate-spin" />
+                                </div>
+                            )}
+
+                            {explanationMessages.length > 0 && !explanationLoading && (
+                                <div className="flex flex-col flex-grow min-h-0">
+                                    <Separator className="my-4 flex-shrink-0" />
+                                    {explanationAudio && (
+                                        <div className="flex-shrink-0">
+                                            <p className="text-sm font-medium mb-2">Main Explanation Audio</p>
+                                            <audio controls src={explanationAudio} className="w-full" />
+                                            <Separator className="my-4"/>
+                                        </div>
+                                    )}
+                                    <ScrollArea className="flex-grow pr-4 -mr-4">
+                                        <div className="space-y-4">
+                                            {explanationMessages.map((msg, index) => (
+                                                <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : '')}>
+                                                    {msg.sender === 'bot' && (
+                                                        <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                                                            <AvatarFallback><Bot size={18} /></AvatarFallback>
+                                                        </Avatar>
+                                                    )}
+                                                    <div className={cn("rounded-lg px-3 py-2 max-w-[85%] flex items-center gap-2", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                                        <p className="text-sm">{msg.text}</p>
+                                                        {msg.sender === 'bot' && index > 0 && (
+                                                            <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => handlePlayMessageAudio(msg.text)}>
+                                                                <Volume2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                    {msg.sender === 'user' && (
+                                                        <Avatar className="h-8 w-8">
+                                                            <AvatarFallback><User size={18} /></AvatarFallback>
+                                                        </Avatar>
                                                     )}
                                                 </div>
-                                            </ScrollArea>
-                                            {explanationAudio && <audio controls src={explanationAudio} className="w-full shrink-0 mt-2" />}
-                                            <div className="relative mt-auto shrink-0">
-                                                <Input 
-                                                    placeholder="Have a doubt? Ask here..." 
-                                                    value={followUpQuestion}
-                                                    onChange={(e) => setFollowUpQuestion(e.target.value)}
-                                                    onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
-                                                    disabled={isAnswering}
-                                                />
-                                                <Button size="icon" variant="ghost" className={cn("absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick} disabled={isAnswering}>
-                                                    <Mic className="h-4 w-4" />
-                                                </Button>
-                                                <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
-                                                    <Send className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-                            </div>
+                                            ))}
+                                            {isAnswering && (
+                                                <div className="flex items-start gap-3">
+                                                    <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                                                        <AvatarFallback><Bot size={18} /></AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="rounded-lg px-4 py-2 bg-muted flex items-center">
+                                                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </ScrollArea>
+                                    <div className="relative mt-4 flex-shrink-0">
+                                        <Input 
+                                            placeholder="Have a doubt? Ask here..." 
+                                            value={followUpQuestion}
+                                            onChange={(e) => setFollowUpQuestion(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
+                                            disabled={isAnswering}
+                                        />
+                                        <Button size="icon" variant="ghost" className={cn("absolute right-10 top-1/2 -translate-y-1/2 h-8 w-8", isListening && "text-destructive animate-pulse")} onClick={handleMicClick} disabled={isAnswering}>
+                                            <Mic className="h-4 w-4" />
+                                        </Button>
+                                        <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
+                                            <Send className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </DialogContent>
                     </Dialog>
-                    
                     <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
                          <AlertDialogContent>
                             <AlertDialogHeader>
