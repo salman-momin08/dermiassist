@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Separator } from "@/components/ui/separator";
 import { Logo } from "@/components/logo";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { differenceInMinutes, format, isFuture, isPast } from 'date-fns';
+import { differenceInMinutes, format, isFuture, isPast } from "date-fns";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Image from "next/image";
@@ -133,8 +133,9 @@ export default function AppointmentsPage() {
         }
     };
 
-    const upcomingAppointments = appointments.filter(a => a.status === 'Confirmed' && a.appointmentDate && isFuture(new Date(a.appointmentDate)));
-    const pastAppointments = appointments.filter(a => a.status === 'Completed' || (a.status === 'Confirmed' && a.appointmentDate && isPast(new Date(a.appointmentDate))));
+    // For testing: keep Confirmed appointments in upcoming list.
+    const upcomingAppointments = appointments.filter(a => a.status === 'Confirmed');
+    const pastAppointments = appointments.filter(a => a.status === 'Completed');
     const pendingAppointments = appointments.filter(a => a.status === 'Pending' || a.status === 'Declined');
 
     return (
@@ -428,3 +429,5 @@ export default function AppointmentsPage() {
 
     
 
+
+    
