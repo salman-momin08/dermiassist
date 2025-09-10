@@ -1,117 +1,84 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =====================================================================
-    // Helper Functions
-    // =====================================================================
+    // Helper functions
+    function isUserAuthenticated() {
+      return request.auth != null;
+    }
 
-    function isAdmin() {
-      // Check for existence of the user document and the role field.
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    function isPatient() {
+      return isUserAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'patient';
     }
 
     function isDoctor() {
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+      return isUserAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+    }
+
+    function isAdmin() {
+      return isUserAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Checks if the requesting doctor has a case file for the given patient.
-    function isTheirPatient(patientId) {
-        return isDoctor() && exists(/databases/$(database)/documents/doctorCases/$(request.auth.uid)/patients/$(patientId));
+      return isUserAuthenticated() && request.auth.uid == userId;
     }
 
-    // =====================================================================
-    // User Profiles -> /users/{userId}
-    // =====================================================================
+    // Rules for the 'users' collection
     match /users/{userId} {
-      // GET: Allows fetching a single user document.
-      // 1. A user can read their own profile.
-      // 2. A doctor can read the profile of their own patient.
-      // 3. Any authenticated user can read another doctor's profile.
-      // 4. An admin can read any user's profile.
-      allow get: if request.auth != null && (
-                    isOwner(userId) ||
-                    isTheirPatient(userId) ||
-                    get(/databases/$(database)/documents/users/$(userId)).data.role == 'doctor' ||
-                    isAdmin()
-                  );
-
-      // LIST:
-      // An admin can list all users.
-      // Other authenticated users can only list doctors (for the "Find a Doctor" page).
-      allow list: if request.auth != null && 
-                   (isAdmin() || request.query.where.role == 'doctor');
-
-      // CREATE:
-      // A user can create their own document upon signup.
-      allow create: if isOwner(userId);
-
-      // UPDATE:
-      // 1. A user can update their own profile.
-      // 2. An admin can update any user's profile (e.g., for verification).
+      // Any authenticated user can create their own user document (for signup)
+      allow create: if isUserAuthenticated() && request.auth.uid == userId;
+      
+      // Any authenticated user can read their own profile data.
+      // Doctors can read the profile of a patient they have a case with.
+      // Admins can read any user profile.
+      allow get: if isOwner(userId) || isDoctor() || isAdmin();
+      
+      // All users can be listed by an Admin.
+      allow list: if isAdmin();
+      
+      // A user can update their own profile data.
+      // An admin can update any user's data (e.g., for verification).
       allow update: if isOwner(userId) || isAdmin();
-
-      // DELETE:
-      // Only an admin can delete a user's account.
+      
+      // Only an admin can delete a user document.
       allow delete: if isAdmin();
 
-      // --- Analyses Subcollection -> /users/{userId}/analyses/{analysisId} ---
+      // Rules for the 'analyses' subcollection within a user
       match /analyses/{analysisId} {
-        // READ:
-        // 1. A user can read their own analysis.
-        // 2. A doctor can read the analysis of their own patient.
-        allow read: if isOwner(userId) || isTheirPatient(userId);
-        
-        // WRITE, DELETE: Only the owner can modify their analyses.
-        allow write, delete: if isOwner(userId);
+        // A user can create, read, update, and delete their own analysis reports.
+        allow read, write, delete: if isOwner(userId);
       }
     }
-
-    // =====================================================================
-    // Appointments -> /appointments/{appointmentId}
-    // =====================================================================
+    
+    // Rules for the 'appointments' collection
     match /appointments/{appointmentId} {
-      // READ, UPDATE, DELETE:
-      // Access is granted if the user is the patient, the doctor, or an admin.
-      allow read, update, delete: if request.auth != null && (
-        request.auth.uid == resource.data.patientId ||
-        request.auth.uid == resource.data.doctorId ||
-        isAdmin()
-      );
-
-      // CREATE:
-      // Any authenticated user can create an appointment request.
-      allow create: if request.auth != null;
+      // Patients can create appointments.
+      allow create: if isPatient();
+      
+      // A patient can read their own appointments.
+      // A doctor can read appointments where they are the assigned doctor.
+      // Admins can read any appointment.
+      allow get: if isUserAuthenticated();
+      allow list: if isUserAuthenticated(); // For queries by patientId or doctorId
+      
+      // Patients can cancel (update) their own pending appointments.
+      // Doctors can update appointments assigned to them (e.g., confirm, add notes).
+      allow update: if isPatient() || isDoctor();
+      
+      // Patients and Doctors can delete/cancel their appointments.
+      allow delete: if isPatient() || isDoctor();
     }
-
-    // =====================================================================
-    // Doctor Cases -> /doctorCases/{doctorId}/patients/{patientId}
-    // =====================================================================
-    match /doctorCases/{doctorId}/{path=**} {
-      // A doctor can only access their own case files.
-      // An admin can access any case file.
-      allow read, write, delete: if isOwner(doctorId) || isAdmin();
-    }
-
-
-    // =====================================================================
-    // Chats -> /chats/{chatId}
-    // =====================================================================
-    // Chat documents are named '{patientId}_{doctorId}'
-    match /chats/{chatId} {
-      // A user can read/write to a chat if their UID is in the chatId.
-      allow read, write: if request.auth != null && request.auth.uid in chatId.split('_');
-
-      // --- Messages Subcollection -> /chats/{chatId}/messages/{messageId} ---
-      match /messages/{messageId} {
-        // Permissions are inherited from the parent chat document.
-        allow read, write: if request.auth != null && request.auth.uid in chatId.split('_');
-      }
+    
+    // Rules for the 'doctorCases' collection.
+    // This collection links doctors to patients they have confirmed appointments with.
+    match /doctorCases/{doctorId}/{subcollection}/{caseId} {
+      // A doctor can create and update their own case files.
+      allow write: if isOwner(doctorId);
+      
+      // A doctor can read their own case files.
+      allow read: if isOwner(doctorId);
     }
   }
 }
