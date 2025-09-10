@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -33,11 +32,12 @@ service cloud.firestore {
       // Any authenticated user can read their own profile data.
       // Doctors can read the profile of a patient they have a case with.
       // Admins can read any user profile.
-      allow get: if isOwner(userId) || isDoctor() || isAdmin();
+      // Any authenticated user can read a verified doctor's profile.
+      allow get: if isOwner(userId) || isAdmin() || isDoctor() || (isUserAuthenticated() && get(/databases/$(database)/documents/users/$(userId)).data.verified == true);
       
-      // All users can be listed by an Admin.
-      allow list: if isAdmin();
-      
+      // An admin can list all users. Authenticated users can list verified doctors.
+      allow list: if isAdmin() || (isUserAuthenticated() && request.query.get("where")[0][1] == "role" && request.query.get("where")[0][2] == "doctor" && request.query.get("where")[1][1] == "verified" && request.query.get("where")[1][2] == true);
+
       // A user can update their own profile data.
       // An admin can update any user's data (e.g., for verification).
       allow update: if isOwner(userId) || isAdmin();
