@@ -123,10 +123,13 @@ function Conference(props: {
 }) {
   const { appId, channelName, uid, token } = props;
   const agoraClient = useRTCClient();
-  const { micTrack, isMuted: isMicMuted, isMicrophoneOn, setMicOn } = useLocalMicrophoneTrack();
-  const { cameraTrack, isMuted: isCamMuted, isCameraOn, setCameraOn } = useLocalCameraTrack();
+  const { localMicrophoneTrack: micTrack } = useLocalMicrophoneTrack();
+  const { localCameraTrack: cameraTrack } = useLocalCameraTrack();
   const remoteUsers = useRemoteUsers();
   const router = useRouter();
+
+  const [micOn, setMicOn] = useState(true);
+  const [cameraOn, setCameraOn] = useState(true);
 
   useClientEvent(agoraClient, "user-published", (user) => {
     agoraClient.subscribe(user, "video");
@@ -156,15 +159,26 @@ function Conference(props: {
     router.back();
   }
 
-  const toggleMic = () => setMicOn(!isMicrophoneOn);
-  const toggleCam = () => setCameraOn(!isCameraOn);
+  const toggleMic = () => {
+    if (micTrack) {
+      micTrack.setEnabled(!micOn);
+      setMicOn(!micOn);
+    }
+  };
+  const toggleCam = () => {
+    if (cameraTrack) {
+      cameraTrack.setEnabled(!cameraOn);
+      setCameraOn(!cameraOn);
+    }
+  };
+
 
   return (
     <>
       <div className="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Local User Video */}
         <div className="bg-black rounded-lg relative overflow-hidden">
-            <LocalVideoTrack track={cameraTrack} play={isCameraOn} className="h-full w-full object-cover" />
+            <LocalVideoTrack track={cameraTrack} play={cameraOn} className="h-full w-full object-cover" />
              <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
                 You
             </div>
@@ -183,11 +197,11 @@ function Conference(props: {
       
       {/* Controls */}
       <div className="bg-background/80 p-4 flex justify-center items-center gap-4 border-t">
-        <Button onClick={toggleMic} variant={isMicrophoneOn ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-12 w-12">
-            {isMicrophoneOn ? <Mic /> : <MicOff />}
+        <Button onClick={toggleMic} variant={micOn ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-12 w-12">
+            {micOn ? <Mic /> : <MicOff />}
         </Button>
-        <Button onClick={toggleCam} variant={isCameraOn ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-12 w-12">
-            {isCameraOn ? <Video /> : <VideoOff />}
+        <Button onClick={toggleCam} variant={cameraOn ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-12 w-12">
+            {cameraOn ? <Video /> : <VideoOff />}
         </Button>
         <Button onClick={handleLeave} variant="destructive" size="icon" className="rounded-full h-12 w-12">
             <PhoneOff />
