@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import AgoraRTC, {
   AgoraRTCProvider,
   useRTCClient,
@@ -20,6 +20,32 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import dynamic from 'next/dynamic';
+import { RtcTokenBuilder, RtcRole } from "agora-token";
+
+async function generateToken(channelName: string, uid: string) {
+    'use server';
+    const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID;
+    const appCertificate = process.env.AGORA_APP_CERTIFICATE;
+
+    if (!appId || !appCertificate) {
+        throw new Error("Agora credentials are not configured on the server.");
+    }
+
+    const role = RtcRole.PUBLISHER;
+    const expirationTimeInSeconds = 3600; // 1 hour
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+    const token = RtcTokenBuilder.buildTokenWithUid(
+        appId,
+        appCertificate,
+        channelName,
+        Number(uid), // UID must be a number for token generation
+        role,
+        privilegeExpiredTs
+    );
+    return token;
+}
 
 
 function Conference(props: {
@@ -45,7 +71,6 @@ function Conference(props: {
   
   useEffect(() => {
     const join = async () => {
-      // Wait for tracks to be available before joining and publishing.
       if (!micTrack || !cameraTrack) return;
       
       await agoraClient.join(appId, channelName, token, uid);
@@ -55,16 +80,13 @@ function Conference(props: {
     join();
 
     return () => {
-        // Clean up tracks and leave the channel
         cameraTrack?.close();
         micTrack?.close();
         agoraClient.leave();
     }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [micTrack, cameraTrack]);
+  }, [appId, agoraClient, channelName, token, uid, micTrack, cameraTrack]);
   
-  const handleLeave = async () => {
+  const handleLeave = () => {
     router.back();
   }
 
@@ -85,7 +107,6 @@ function Conference(props: {
   return (
     <>
       <div className="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Local User Video */}
         <div className="bg-black rounded-lg relative overflow-hidden">
             <LocalVideoTrack track={cameraTrack} play={true} className="h-full w-full object-cover" />
              <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
@@ -93,7 +114,6 @@ function Conference(props: {
             </div>
         </div>
 
-        {/* Remote Users Video */}
         {remoteUsers.map((user) => (
           <div key={user.uid} className="bg-black rounded-lg relative overflow-hidden">
             <RemoteUser user={user} playVideo={true} playAudio={true} />
@@ -104,7 +124,6 @@ function Conference(props: {
         ))}
       </div>
       
-      {/* Controls */}
       <div className="bg-background/80 p-4 flex justify-center items-center gap-4 border-t">
         <Button onClick={toggleMic} variant={micOn ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-12 w-12">
             {micOn ? <Mic /> : <MicOff />}
@@ -125,36 +144,53 @@ function VideoCall({ channelName }: { channelName: string }) {
   const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID || "";
   const { toast } = useToast();
   const [hasPermission, setHasPermission] = useState(false);
-  const [isCheckingPermission, setIsCheckingPermission] = useState(true);
+  const [token, setToken] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const checkPermissions = async () => {
+    const setup = async () => {
+      if (!user) return;
       try {
+        // 1. Check for media permissions
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        // We got permission, close the tracks immediately as Agora will re-request them
         stream.getTracks().forEach(track => track.stop());
         setHasPermission(true);
+
+        // 2. Fetch Agora token
+        const fetchedToken = await generateToken(channelName, user.uid);
+        setToken(fetchedToken);
+
       } catch (error) {
-        console.error("Permission denied:", error);
-        toast({
-          title: "Permission Denied",
-          description: "Camera and microphone access is required for video calls. Please enable it in your browser settings.",
-          variant: "destructive",
-          duration: 10000,
-        });
+        console.error("Setup failed:", error);
+        if (error instanceof Error && (error.name === "NotAllowedError" || error.name === "PermissionDeniedError")) {
+             toast({
+              title: "Permission Denied",
+              description: "Camera and microphone access is required. Please enable it in your browser settings and refresh.",
+              variant: "destructive",
+              duration: 10000,
+            });
+        } else {
+             toast({
+              title: "Connection Error",
+              description: "Could not connect to the video service.",
+              variant: "destructive",
+            });
+        }
         setHasPermission(false);
       } finally {
-        setIsCheckingPermission(false);
+        setIsReady(true);
       }
     };
-    checkPermissions();
-  }, [toast]);
+    if (!authLoading) {
+      setup();
+    }
+  }, [channelName, user, toast, authLoading]);
 
-  if (isCheckingPermission || authLoading) {
+  if (!isReady || authLoading) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Checking permissions...</p>
+        <p className="mt-4 text-muted-foreground">Initializing call...</p>
       </div>
     );
   }
@@ -166,20 +202,20 @@ function VideoCall({ channelName }: { channelName: string }) {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Access Denied</AlertTitle>
           <AlertDescription>
-              SkinWise needs access to your camera and microphone to start the video call. Please update your browser permissions and refresh the page.
+              SkinWise needs access to your camera and microphone. Please update your browser permissions and refresh the page.
           </AlertDescription>
         </Alert>
       </div>
     )
   }
 
-  if (!appId) {
+  if (!appId || !token) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4">
         <Alert variant="destructive" className="max-w-md">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Configuration Error</AlertTitle>
-          <AlertDescription>The video service is not correctly configured. Please check your .env file for NEXT_PUBLIC_AGORA_APP_ID.</AlertDescription>
+          <AlertDescription>The video service is not correctly configured or failed to generate a token.</AlertDescription>
         </Alert>
       </div>
     );
@@ -206,7 +242,7 @@ function VideoCall({ channelName }: { channelName: string }) {
           appId={appId}
           channelName={channelName}
           uid={user.uid}
-          token={null} // Using null token for basic setup
+          token={token}
         />
       </div>
     </AgoraRTCProvider>
