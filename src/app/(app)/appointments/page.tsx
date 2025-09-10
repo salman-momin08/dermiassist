@@ -112,24 +112,9 @@ export default function AppointmentsPage() {
     };
     
     const isJoinButtonEnabled = (appointmentDate?: string) => {
-        if (!appointmentDate) return false;
-        const appointmentTime = new Date(appointmentDate);
-        const diff = differenceInMinutes(appointmentTime, now);
-        // Enable from 10 mins before to 10 mins after
-        return diff <= 10 && diff > -10;
+        // Always enabled for testing purposes
+        return true;
     };
-
-    const getJoinTooltipContent = (appointmentDate?: string) => {
-        if (!appointmentDate) return "This appointment has not been scheduled yet.";
-        const appointmentTime = new Date(appointmentDate);
-        if (isPast(appointmentTime) && differenceInMinutes(now, appointmentTime) > 10) {
-             return "The window to join this call has passed.";
-        }
-        if (isFuture(appointmentTime) && differenceInMinutes(appointmentTime, now) > 10) {
-             return `You can join the call 10 minutes before the start time.`;
-        }
-        return "Join your video consultation now.";
-    }
     
     const handleDelete = async (id: string) => {
         try {
@@ -201,22 +186,11 @@ export default function AppointmentsPage() {
                                     <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-2">
                                             {appointment.appointmentMode === "Online" ? (
-                                                 <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="inline-block"> 
-                                                              <Button asChild size="sm" disabled={!isJoinButtonEnabled(appointment.appointmentDate)}>
-                                                                  <Link href={`/video/${appointment.id}`}>
-                                                                    <Video className="mr-2 h-4 w-4" /> Join Call
-                                                                  </Link>
-                                                              </Button>
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p>{getJoinTooltipContent(appointment.appointmentDate)}</p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
+                                                <Button asChild size="sm" disabled={!isJoinButtonEnabled(appointment.appointmentDate)}>
+                                                    <Link href={`/video/${appointment.id}`}>
+                                                        <Video className="mr-2 h-4 w-4" /> Join Call
+                                                    </Link>
+                                                </Button>
                                             ) : (
                                                 <Dialog>
                                                     <DialogTrigger asChild>
@@ -453,3 +427,4 @@ export default function AppointmentsPage() {
     
 
     
+
