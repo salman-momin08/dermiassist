@@ -20,19 +20,57 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 
-function VideoCall({ channelName }: { channelName: string }) {
+function VideoCallWrapper({ channelName }: { channelName: string }) {
   const { user, loading: authLoading } = useAuth();
   const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID || "";
   const { toast } = useToast();
+  const [hasPermission, setHasPermission] = useState(false);
+  const [isCheckingPermission, setIsCheckingPermission] = useState(true);
 
+  useEffect(() => {
+    const checkPermissions = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        // We got permission, close the tracks immediately as Agora will re-request them
+        stream.getTracks().forEach(track => track.stop());
+        setHasPermission(true);
+      } catch (error) {
+        console.error("Permission denied:", error);
+        toast({
+          title: "Permission Denied",
+          description: "Camera and microphone access is required for video calls. Please enable it in your browser settings.",
+          variant: "destructive",
+          duration: 10000,
+        });
+        setHasPermission(false);
+      } finally {
+        setIsCheckingPermission(false);
+      }
+    };
+    checkPermissions();
+  }, [toast]);
 
-  if (authLoading) {
+  if (isCheckingPermission || authLoading) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Joining video call...</p>
+        <p className="mt-4 text-muted-foreground">Checking permissions...</p>
       </div>
     );
+  }
+  
+  if (!hasPermission) {
+    return (
+       <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>
+              SkinWise needs access to your camera and microphone to start the video call. Please update your browser permissions and refresh the page.
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
   }
 
   if (!appId) {
@@ -104,13 +142,15 @@ function Conference(props: {
     }
 
     return () => {
+        // Clean up tracks and leave the channel
+        cameraTrack?.close();
+        micTrack?.close();
         agoraClient.leave();
     }
 
   }, [agoraClient, appId, channelName, uid, token, micTrack, cameraTrack]);
   
   const handleLeave = async () => {
-    await agoraClient.leave();
     router.back();
   }
 
@@ -121,8 +161,8 @@ function Conference(props: {
     <>
       <div className="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Local User Video */}
-        <div className="bg-black rounded-lg relative">
-            <LocalVideoTrack track={cameraTrack} play={isCameraOn} />
+        <div className="bg-black rounded-lg relative overflow-hidden">
+            <LocalVideoTrack track={cameraTrack} play={isCameraOn} className="h-full w-full object-cover" />
              <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
                 You
             </div>
@@ -130,7 +170,7 @@ function Conference(props: {
 
         {/* Remote Users Video */}
         {remoteUsers.map((user) => (
-          <div key={user.uid} className="bg-black rounded-lg">
+          <div key={user.uid} className="bg-black rounded-lg relative overflow-hidden">
             <RemoteUser user={user} playVideo={true} playAudio={true} />
             <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
                 Remote User
@@ -168,5 +208,5 @@ export default function VideoCallPage() {
     )
   }
   
-  return <VideoCall channelName={roomId} />;
+  return <VideoCallWrapper channelName={roomId} />;
 }
