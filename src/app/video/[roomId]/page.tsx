@@ -19,49 +19,18 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
-import { generateAgoraToken } from "@/ai/flows/generate-agora-token";
 
 const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID || "";
 
 function VideoCall({ channelName }: { channelName: string }) {
-  const { user, role, loading: authLoading } = useAuth();
-  const [token, setToken] = useState<string | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const [isJoining, setIsJoining] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
 
   useEffect(() => {
-    if (authLoading || !user || !role) return;
-
-    const getToken = async () => {
-      setError(null);
-      try {
-        const numericUserId = parseInt(user.uid.replace(/[^0-9]/g, '').substring(0, 8) || "0", 10);
-        
-        const { token } = await generateAgoraToken({
-          channelName,
-          userId: numericUserId.toString(),
-          role: "publisher",
-        });
-
-        if (!token) {
-          throw new Error("Received an empty token from the service.");
-        }
-        setToken(token);
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
-        setError(`Could not get an access token. ${errorMessage}`);
-        toast({
-          title: "Video Service Error",
-          description: `Could not get an access token. ${errorMessage}`,
-          variant: "destructive",
-        });
-      } finally {
-        setIsJoining(false);
-      }
-    };
-    getToken();
-  }, [channelName, authLoading, user, role, toast]);
+    if (!authLoading) {
+      setIsJoining(false);
+    }
+  }, [authLoading]);
 
   if (isJoining || authLoading) {
     return (
@@ -72,20 +41,28 @@ function VideoCall({ channelName }: { channelName: string }) {
     );
   }
 
-  if (error) {
+  if (!appId) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4">
+       <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4">
         <Alert variant="destructive" className="max-w-md">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Connection Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertTitle>Configuration Error</AlertTitle>
+          <AlertDescription>The Agora App ID is not configured. Please contact support.</AlertDescription>
         </Alert>
       </div>
     );
   }
 
-  if (!token || !user) {
-    return null;
+  if (!user) {
+     return (
+       <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Authentication Error</AlertTitle>
+          <AlertDescription>You must be logged in to join a video call.</AlertDescription>
+        </Alert>
+      </div>
+    );
   }
   
   const agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
@@ -97,7 +74,6 @@ function VideoCall({ channelName }: { channelName: string }) {
         <Conference
           appId={appId}
           channelName={channelName}
-          token={token}
           uid={numericUserId}
         />
       </div>
@@ -108,10 +84,9 @@ function VideoCall({ channelName }: { channelName: string }) {
 function Conference(props: {
   appId: string;
   channelName: string;
-  token: string | null;
   uid: number;
 }) {
-  const { appId, channelName, token, uid } = props;
+  const { appId, channelName, uid } = props;
   const agoraClient = useRTCClient();
   const { micTrack, isMuted: isMicMuted, isMicrophoneOn, setMicOn } = useLocalMicrophoneTrack();
   const { cameraTrack, isMuted: isCamMuted, isCameraOn, setCameraOn } = useLocalCameraTrack();
@@ -125,11 +100,12 @@ function Conference(props: {
   
   useEffect(() => {
     const join = async () => {
-      await agoraClient.join(appId, channelName, token, uid);
+      // Pass null for the token to join without one
+      await agoraClient.join(appId, channelName, null, uid);
       await agoraClient.publish([micTrack, cameraTrack]);
     };
 
-    if (token && micTrack && cameraTrack) {
+    if (micTrack && cameraTrack) {
         join();
     }
 
@@ -137,7 +113,7 @@ function Conference(props: {
         agoraClient.leave();
     }
 
-  }, [agoraClient, appId, channelName, token, uid, micTrack, cameraTrack]);
+  }, [agoraClient, appId, channelName, uid, micTrack, cameraTrack]);
   
   const handleLeave = async () => {
     await agoraClient.leave();
