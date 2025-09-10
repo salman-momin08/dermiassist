@@ -45,10 +45,11 @@ function Conference(props: {
   
   useEffect(() => {
     const join = async () => {
+      // Wait for tracks to be available before joining and publishing.
+      if (!micTrack || !cameraTrack) return;
+      
       await agoraClient.join(appId, channelName, token, uid);
-      if (micTrack && cameraTrack) {
-        await agoraClient.publish([micTrack, cameraTrack]);
-      }
+      await agoraClient.publish([micTrack, cameraTrack]);
     };
 
     join();
