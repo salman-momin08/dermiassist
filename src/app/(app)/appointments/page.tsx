@@ -426,8 +426,3 @@ export default function AppointmentsPage() {
 }
 
     
-
-    
-
-
-    
