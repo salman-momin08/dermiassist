@@ -19,8 +19,10 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
+import dynamic from 'next/dynamic';
 
-function VideoCallWrapper({ channelName }: { channelName: string }) {
+
+function VideoCall({ channelName }: { channelName: string }) {
   const { user, loading: authLoading } = useAuth();
   const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID || "";
   const { toast } = useToast();
@@ -195,6 +197,21 @@ function Conference(props: {
   );
 }
 
+
+const DynamicVideoCall = dynamic(
+  () => Promise.resolve(VideoCall),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">Loading Video Call...</p>
+      </div>
+    ),
+  }
+);
+
+
 export default function VideoCallPage() {
   const params = useParams();
   const roomId = params?.roomId as string;
@@ -208,5 +225,5 @@ export default function VideoCallPage() {
     )
   }
   
-  return <VideoCallWrapper channelName={roomId} />;
+  return <DynamicVideoCall channelName={roomId} />;
 }
