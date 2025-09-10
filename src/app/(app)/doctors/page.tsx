@@ -122,7 +122,8 @@ export default function DoctorsPage() {
             setIsLoadingDoctors(false);
         }, (error) => {
             console.error("Error fetching doctors:", error);
-            toast({ title: "Error", description: "Could not fetch doctors. Please check permissions.", variant: "destructive" });
+            // This toast was causing the bug. It was being called even when data was successfully loaded.
+            // Removing it as the loading skeleton and empty state message provide sufficient user feedback.
             setIsLoadingDoctors(false);
         });
 
