@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { generate100msToken } from "@/ai/flows/generate-100ms-token";
 
 const Conference = () => {
   const isConnected = useHMSStore(selectIsConnectedToRoom);
@@ -118,30 +119,23 @@ function VideoCallClient({ roomId }: { roomId: string }) {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch('/api/generate-token', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    roomId: roomId,
-                    role: role,
-                    userId: user.uid,
-                })
+            const { token } = await generate100msToken({
+                roomId: roomId,
+                role: role,
+                userId: user.uid,
             });
-
-            const body = await response.json();
-            if (!response.ok) {
-                throw new Error(body.error || "Failed to fetch token");
-            }
             
-            setToken(body.token);
+            if (!token) {
+              throw new Error("Received an empty token from the service.");
+            }
+
+            setToken(token);
 
         } catch (error) {
              const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
              toast({
                 title: "Video Service Error",
-                description: errorMessage,
+                description: `Could not get an access token. ${errorMessage}`,
                 variant: "destructive",
             });
             setError(errorMessage);
