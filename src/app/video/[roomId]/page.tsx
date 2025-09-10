@@ -61,7 +61,8 @@ function Conference(props: {
         agoraClient.leave();
     }
 
-  }, [agoraClient, appId, channelName, uid, token, micTrack, cameraTrack]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micTrack, cameraTrack]);
   
   const handleLeave = async () => {
     router.back();
@@ -86,7 +87,7 @@ function Conference(props: {
       <div className="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Local User Video */}
         <div className="bg-black rounded-lg relative overflow-hidden">
-            <LocalVideoTrack track={cameraTrack} play={cameraOn} className="h-full w-full object-cover" />
+            <LocalVideoTrack track={cameraTrack} play={true} className="h-full w-full object-cover" />
              <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
                 You
             </div>
