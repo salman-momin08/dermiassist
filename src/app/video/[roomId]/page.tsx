@@ -20,11 +20,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 
-const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID || "";
-
 function VideoCall({ channelName }: { channelName: string }) {
   const { user, loading: authLoading } = useAuth();
   const [isJoining, setIsJoining] = useState(true);
+  const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID || "";
 
   useEffect(() => {
     if (!authLoading) {
@@ -47,7 +46,7 @@ function VideoCall({ channelName }: { channelName: string }) {
         <Alert variant="destructive" className="max-w-md">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Configuration Error</AlertTitle>
-          <AlertDescription>The Agora App ID is not configured. Please contact support.</AlertDescription>
+          <AlertDescription>The Agora App ID is not configured. Please check your NEXT_PUBLIC_AGORA_APP_ID in the .env file.</AlertDescription>
         </Alert>
       </div>
     );
