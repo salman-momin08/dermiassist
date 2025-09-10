@@ -22,6 +22,102 @@ import { AlertTriangle } from "lucide-react";
 import dynamic from 'next/dynamic';
 
 
+function Conference(props: {
+  appId: string;
+  channelName: string;
+  uid: string;
+  token: string | null;
+}) {
+  const { appId, channelName, uid, token } = props;
+  const agoraClient = useRTCClient();
+  const { localMicrophoneTrack: micTrack } = useLocalMicrophoneTrack();
+  const { localCameraTrack: cameraTrack } = useLocalCameraTrack();
+  const remoteUsers = useRemoteUsers();
+  const router = useRouter();
+
+  const [micOn, setMicOn] = useState(true);
+  const [cameraOn, setCameraOn] = useState(true);
+
+  useClientEvent(agoraClient, "user-published", (user) => {
+    agoraClient.subscribe(user, "video");
+    agoraClient.subscribe(user, "audio");
+  });
+  
+  useEffect(() => {
+    const join = async () => {
+      await agoraClient.join(appId, channelName, token, uid);
+      if (micTrack && cameraTrack) {
+        await agoraClient.publish([micTrack, cameraTrack]);
+      }
+    };
+
+    join();
+
+    return () => {
+        // Clean up tracks and leave the channel
+        cameraTrack?.close();
+        micTrack?.close();
+        agoraClient.leave();
+    }
+
+  }, [agoraClient, appId, channelName, uid, token, micTrack, cameraTrack]);
+  
+  const handleLeave = async () => {
+    router.back();
+  }
+
+  const toggleMic = () => {
+    if (micTrack) {
+      micTrack.setEnabled(!micOn);
+      setMicOn(!micOn);
+    }
+  };
+  const toggleCam = () => {
+    if (cameraTrack) {
+      cameraTrack.setEnabled(!cameraOn);
+      setCameraOn(!cameraOn);
+    }
+  };
+
+
+  return (
+    <>
+      <div className="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Local User Video */}
+        <div className="bg-black rounded-lg relative overflow-hidden">
+            <LocalVideoTrack track={cameraTrack} play={cameraOn} className="h-full w-full object-cover" />
+             <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
+                You
+            </div>
+        </div>
+
+        {/* Remote Users Video */}
+        {remoteUsers.map((user) => (
+          <div key={user.uid} className="bg-black rounded-lg relative overflow-hidden">
+            <RemoteUser user={user} playVideo={true} playAudio={true} />
+            <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
+                Remote User
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Controls */}
+      <div className="bg-background/80 p-4 flex justify-center items-center gap-4 border-t">
+        <Button onClick={toggleMic} variant={micOn ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-12 w-12">
+            {micOn ? <Mic /> : <MicOff />}
+        </Button>
+        <Button onClick={toggleCam} variant={cameraOn ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-12 w-12">
+            {cameraOn ? <Video /> : <VideoOff />}
+        </Button>
+        <Button onClick={handleLeave} variant="destructive" size="icon" className="rounded-full h-12 w-12">
+            <PhoneOff />
+        </Button>
+      </div>
+    </>
+  );
+}
+
 function VideoCall({ channelName }: { channelName: string }) {
   const { user, loading: authLoading } = useAuth();
   const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID || "";
@@ -112,102 +208,6 @@ function VideoCall({ channelName }: { channelName: string }) {
         />
       </div>
     </AgoraRTCProvider>
-  );
-}
-
-function Conference(props: {
-  appId: string;
-  channelName: string;
-  uid: string;
-  token: string | null;
-}) {
-  const { appId, channelName, uid, token } = props;
-  const agoraClient = useRTCClient();
-  const { localMicrophoneTrack: micTrack } = useLocalMicrophoneTrack();
-  const { localCameraTrack: cameraTrack } = useLocalCameraTrack();
-  const remoteUsers = useRemoteUsers();
-  const router = useRouter();
-
-  const [micOn, setMicOn] = useState(true);
-  const [cameraOn, setCameraOn] = useState(true);
-
-  useClientEvent(agoraClient, "user-published", (user) => {
-    agoraClient.subscribe(user, "video");
-    agoraClient.subscribe(user, "audio");
-  });
-  
-  useEffect(() => {
-    const join = async () => {
-      await agoraClient.join(appId, channelName, token, uid);
-      await agoraClient.publish([micTrack, cameraTrack]);
-    };
-
-    if (micTrack && cameraTrack) {
-        join();
-    }
-
-    return () => {
-        // Clean up tracks and leave the channel
-        cameraTrack?.close();
-        micTrack?.close();
-        agoraClient.leave();
-    }
-
-  }, [agoraClient, appId, channelName, uid, token, micTrack, cameraTrack]);
-  
-  const handleLeave = async () => {
-    router.back();
-  }
-
-  const toggleMic = () => {
-    if (micTrack) {
-      micTrack.setEnabled(!micOn);
-      setMicOn(!micOn);
-    }
-  };
-  const toggleCam = () => {
-    if (cameraTrack) {
-      cameraTrack.setEnabled(!cameraOn);
-      setCameraOn(!cameraOn);
-    }
-  };
-
-
-  return (
-    <>
-      <div className="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Local User Video */}
-        <div className="bg-black rounded-lg relative overflow-hidden">
-            <LocalVideoTrack track={cameraTrack} play={cameraOn} className="h-full w-full object-cover" />
-             <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
-                You
-            </div>
-        </div>
-
-        {/* Remote Users Video */}
-        {remoteUsers.map((user) => (
-          <div key={user.uid} className="bg-black rounded-lg relative overflow-hidden">
-            <RemoteUser user={user} playVideo={true} playAudio={true} />
-            <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
-                Remote User
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {/* Controls */}
-      <div className="bg-background/80 p-4 flex justify-center items-center gap-4 border-t">
-        <Button onClick={toggleMic} variant={micOn ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-12 w-12">
-            {micOn ? <Mic /> : <MicOff />}
-        </Button>
-        <Button onClick={toggleCam} variant={cameraOn ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-12 w-12">
-            {cameraOn ? <Video /> : <VideoOff />}
-        </Button>
-        <Button onClick={handleLeave} variant="destructive" size="icon" className="rounded-full h-12 w-12">
-            <PhoneOff />
-        </Button>
-      </div>
-    </>
   );
 }
 
