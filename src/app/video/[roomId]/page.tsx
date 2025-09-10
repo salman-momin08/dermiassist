@@ -54,8 +54,16 @@ function Conference(props: {
     join();
 
     return () => {
-        cameraTrack?.close();
-        micTrack?.close();
+        // Ensure tracks are stopped and closed
+        if (cameraTrack) {
+            cameraTrack.stop();
+            cameraTrack.close();
+        }
+        if (micTrack) {
+            micTrack.stop();
+            micTrack.close();
+        }
+        // Leave the channel
         agoraClient.leave();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -83,7 +91,7 @@ function Conference(props: {
     <>
       <div className="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-black rounded-lg relative overflow-hidden">
-            <LocalVideoTrack track={cameraTrack} play={true} className="h-full w-full object-cover" />
+            {cameraTrack && <LocalVideoTrack track={cameraTrack} play={true} className="h-full w-full object-cover" />}
              <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
                 You
             </div>
@@ -93,7 +101,7 @@ function Conference(props: {
           <div key={user.uid} className="bg-black rounded-lg relative overflow-hidden">
             <RemoteUser user={user} playVideo={true} playAudio={true} />
             <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
-                Remote User
+                Remote User ({user.uid})
             </div>
           </div>
         ))}
