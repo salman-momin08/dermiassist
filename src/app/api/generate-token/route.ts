@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server';
+import { AccessToken } from '@100mslive/server-sdk';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,16 +8,24 @@ export async function POST(request: Request) {
   try {
     const { roomId, role, userId } = await request.json();
 
-    // The @100mslive/server-sdk package is causing installation issues.
-    // This API route is now a placeholder and will return an error until a stable solution is found.
-    const errorMessage = 'The video service is temporarily unavailable due to a configuration issue with the token generation service.';
-    
-    console.error(errorMessage, { roomId, role, userId });
+    if (!process.env.HMS_ACCESS_KEY || !process.env.HMS_SECRET) {
+        throw new Error('HMS Access Key or Secret is not configured on the server.');
+    }
 
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 503 } // Service Unavailable
+    const accessToken = new AccessToken(
+      process.env.HMS_ACCESS_KEY,
+      process.env.HMS_SECRET
     );
+
+    const token = await accessToken.createToken({
+      roomId: roomId,
+      role: role,
+      userId: userId,
+      // Token is valid for 24 hours
+      expiresIn: 24 * 60 * 60,
+    });
+    
+    return NextResponse.json({ token });
 
   } catch (error) {
     console.error('Error in generate-token endpoint:', error);
