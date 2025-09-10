@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
 import AgoraRTC, {
   AgoraRTCProvider,
   useRTCClient,
@@ -14,38 +14,12 @@ import AgoraRTC, {
   LocalVideoTrack,
 } from "agora-rtc-react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Mic, MicOff, Video, VideoOff, PhoneOff } from "lucide-react";
+import { Loader2, Mic, MicOff, Video, VideoOff, PhoneOff, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
 import dynamic from 'next/dynamic';
-import { RtcTokenBuilder, RtcRole } from "agora-token";
-
-async function generateToken(channelName: string, uid: string) {
-    'use server';
-    const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID;
-    const appCertificate = process.env.AGORA_APP_CERTIFICATE;
-
-    if (!appId || !appCertificate) {
-        throw new Error("Agora credentials are not configured on the server.");
-    }
-
-    const role = RtcRole.PUBLISHER;
-    const expirationTimeInSeconds = 3600; // 1 hour
-    const currentTimestamp = Math.floor(Date.now() / 1000);
-    const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
-
-    const token = RtcTokenBuilder.buildTokenWithUid(
-        appId,
-        appCertificate,
-        channelName,
-        Number(uid), // UID must be a number for token generation
-        role,
-        privilegeExpiredTs
-    );
-    return token;
-}
+import { generateToken } from "@/ai/flows/generate-agora-token";
 
 
 function Conference(props: {
@@ -84,21 +58,22 @@ function Conference(props: {
         micTrack?.close();
         agoraClient.leave();
     }
-  }, [appId, agoraClient, channelName, token, uid, micTrack, cameraTrack]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appId, agoraClient, channelName, token, uid]);
   
   const handleLeave = () => {
     router.back();
   }
 
-  const toggleMic = () => {
+  const toggleMic = async () => {
     if (micTrack) {
-      micTrack.setEnabled(!micOn);
+      await micTrack.setEnabled(!micOn);
       setMicOn(!micOn);
     }
   };
-  const toggleCam = () => {
+  const toggleCam = async () => {
     if (cameraTrack) {
-      cameraTrack.setEnabled(!cameraOn);
+      await cameraTrack.setEnabled(!cameraOn);
       setCameraOn(!cameraOn);
     }
   };
@@ -146,7 +121,7 @@ function VideoCall({ channelName }: { channelName: string }) {
   const [hasPermission, setHasPermission] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
-
+  
   useEffect(() => {
     const setup = async () => {
       if (!user) return;
