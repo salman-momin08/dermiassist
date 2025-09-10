@@ -217,16 +217,16 @@ function VideoCallClient({ roomId }: { roomId: string }) {
   );
 }
 
-// This wrapper component is now a proper client component that provides the HMSRoomProvider
-const VideoCallProvider = ({ children }: { children: React.ReactNode }) => {
-    return <HMSRoomProvider>{children}</HMSRoomProvider>;
+// This wrapper component provides the HMSRoomProvider
+const VideoCallWrapper = ({ roomId }: { roomId: string }) => {
+    return (
+        <HMSRoomProvider>
+            <VideoCallClient roomId={roomId} />
+        </HMSRoomProvider>
+    );
 }
 
-// The page itself is a Server Component that handles params and wraps the client components
-export default async function VideoCallPage({ params }: { params: { roomId: string } }) {
-    return (
-        <VideoCallProvider>
-            <VideoCallClient roomId={params.roomId} />
-        </VideoCallProvider>
-    );
+// The default export is a Server Component that renders the client wrapper
+export default function VideoCallPage({ params }: { params: { roomId: string } }) {
+    return <VideoCallWrapper roomId={params.roomId} />;
 };
