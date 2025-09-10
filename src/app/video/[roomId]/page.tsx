@@ -19,39 +19,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
-import { generateAgoraToken } from "@/ai/flows/generate-agora-token";
 
 function VideoCall({ channelName }: { channelName: string }) {
   const { user, loading: authLoading } = useAuth();
-  const [isJoining, setIsJoining] = useState(true);
-  const [token, setToken] = useState<string | null>(null);
   const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID || "";
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-        toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
-        return;
-    }
 
-    const fetchToken = async () => {
-        try {
-            const { token: fetchedToken } = await generateAgoraToken({ channelName, userId: user.uid });
-            setToken(fetchedToken);
-        } catch (e) {
-            console.error("Failed to fetch Agora token", e);
-            toast({ title: "Connection Error", description: "Could not establish a secure connection.", variant: "destructive"});
-        } finally {
-             setIsJoining(false);
-        }
-    };
-    
-    fetchToken();
-
-  }, [authLoading, user, channelName, toast]);
-
-  if (isJoining || authLoading) {
+  if (authLoading) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -60,13 +35,13 @@ function VideoCall({ channelName }: { channelName: string }) {
     );
   }
 
-  if (!appId || !token) {
+  if (!appId) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4">
         <Alert variant="destructive" className="max-w-md">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Configuration Error</AlertTitle>
-          <AlertDescription>The video service is not correctly configured. Please contact support.</AlertDescription>
+          <AlertDescription>The video service is not correctly configured. Please check your .env file for NEXT_PUBLIC_AGORA_APP_ID.</AlertDescription>
         </Alert>
       </div>
     );
@@ -93,7 +68,7 @@ function VideoCall({ channelName }: { channelName: string }) {
           appId={appId}
           channelName={channelName}
           uid={user.uid}
-          token={token}
+          token={null} // Using null token for basic setup
         />
       </div>
     </AgoraRTCProvider>
