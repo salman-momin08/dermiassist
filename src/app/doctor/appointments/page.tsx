@@ -51,7 +51,7 @@ type Appointment = {
 };
 
 export default function DoctorAppointmentsPage() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [currentNotes, setCurrentNotes] = useState("");
@@ -97,7 +97,7 @@ export default function DoctorAppointmentsPage() {
     
 
     const handleConfirmRequest = async (app: Appointment, usePatientTime: boolean = false) => {
-        if (!user) return;
+        if (!user || !userData) return;
 
         let finalDateTime;
         
@@ -123,8 +123,10 @@ export default function DoctorAppointmentsPage() {
         const appointmentRef = doc(db, 'appointments', app.id);
         const doctorCaseRef = doc(db, 'doctorCases', user.uid, 'patients', app.patientId);
 
+        const streamClient = StreamChat.getInstance(process.env.NEXT_PUBLIC_STREAM_API_KEY!);
+
         try {
-            // Update appointment status in Firestore
+            // Update appointment status in Firestore first
             await updateDoc(appointmentRef, { 
                 status: 'Confirmed',
                 appointmentDate: finalDateTime.toISOString(),
@@ -138,15 +140,22 @@ export default function DoctorAppointmentsPage() {
                 linkedAt: serverTimestamp()
             }, { merge: true });
 
-            // Create chat channel in Stream
-            const streamClient = StreamChat.getInstance(process.env.NEXT_PUBLIC_STREAM_API_KEY!);
-            if (streamClient) {
-                const channel = streamClient.channel('messaging', {
-                    members: [user.uid, app.patientId],
-                    name: `Consultation: Dr. ${user.displayName} & ${app.patientName}`,
-                });
-                await channel.create();
-            }
+            // Now, handle Stream Chat connection and channel creation
+            const tokenResponse = await fetch('/api/stream-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.uid }),
+            });
+            if (!tokenResponse.ok) throw new Error("Failed to get chat token.");
+            const { token } = await tokenResponse.json();
+
+            await streamClient.connectUser({ id: user.uid, name: userData.displayName || 'Doctor' }, token);
+            
+            const channel = streamClient.channel('messaging', {
+                members: [user.uid, app.patientId],
+                name: `Consultation: Dr. ${userData.displayName} & ${app.patientName}`,
+            });
+            await channel.create();
 
              toast({
                 title: `Request Confirmed`,
@@ -155,6 +164,11 @@ export default function DoctorAppointmentsPage() {
         } catch(error) {
             console.error("Error confirming appointment:", error);
             toast({ title: "Error confirming request", description: "Could not confirm the appointment or create the chat channel.", variant: "destructive" });
+        } finally {
+            // Always disconnect the temporary client
+            if (streamClient.userID) {
+                await streamClient.disconnectUser();
+            }
         }
     };
     
