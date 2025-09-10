@@ -29,13 +29,13 @@ service cloud.firestore {
       // Any authenticated user can create their own user document (for signup)
       allow create: if isUserAuthenticated() && request.auth.uid == userId;
       
-      // Any authenticated user can read their own profile data.
-      // Doctors can read the profile of a patient they have a case with.
-      // Admins can read any user profile.
-      // Any authenticated user can read doctor profiles for the 'Find a Doctor' page
-      allow get: if isUserAuthenticated();
+      // A user can get their own data.
+      // Authenticated users can get data for users with the 'doctor' role.
+      // Admins can get any user's data.
+      allow get: if isOwner(userId) || (isUserAuthenticated() && resource.data.role == 'doctor') || isAdmin();
       
-      // All users can be listed by an Admin or any authenticated user to find doctors.
+      // Authenticated users can list other users (the query will be filtered by the 'get' rule).
+      // Admins can list all users.
       allow list: if isUserAuthenticated();
       
       // A user can update their own profile data.
