@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Activity, Stethoscope, FileText, PlusCircle, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart";
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis, ResponsiveContainer } from "recharts"
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, subMonths, startOfMonth } from "date-fns";
@@ -100,7 +100,7 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <div className="flex items-center justify-between space-y-2 mb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0 mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight font-headline">
             Patient Dashboard
@@ -109,8 +109,8 @@ export default function DashboardPage() {
             Welcome back! Here's an overview of your skin health journey.
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button asChild>
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/analyze">
               <PlusCircle className="mr-2 h-4 w-4" />
               Start New Analysis
@@ -152,7 +152,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-7">
+      <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader>
             <CardTitle>Analysis History</CardTitle>
@@ -161,28 +161,28 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            {chartData.length > 0 ? (
-                <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                  <BarChart accessibilityLayer data={chartData}>
-                    <CartesianGrid vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      tickLine={false}
-                      tickMargin={10}
-                      axisLine={false}
-                    />
-                    <ChartTooltip
-                      cursor={false}
-                      content={<ChartTooltipContent hideLabel />}
-                    />
-                    <Bar dataKey="analyses" fill="var(--color-analyses)" radius={8} />
-                  </BarChart>
-                </ChartContainer>
-            ) : (
-                <div className="flex h-[300px] w-full items-center justify-center text-muted-foreground">
-                    No analysis data available. Perform an analysis to see your history.
-                </div>
-            )}
+             <ResponsiveContainer width="100%" height={300}>
+                {chartData.length > 0 ? (
+                    <BarChart accessibilityLayer data={chartData}>
+                        <CartesianGrid vertical={false} />
+                        <XAxis
+                        dataKey="month"
+                        tickLine={false}
+                        tickMargin={10}
+                        axisLine={false}
+                        />
+                        <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent hideLabel />}
+                        />
+                        <Bar dataKey="analyses" fill="var(--color-analyses)" radius={8} />
+                    </BarChart>
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                        No analysis data available. Perform an analysis to see your history.
+                    </div>
+                )}
+            </ResponsiveContainer>
           </CardContent>
         </Card>
         <Card className="lg:col-span-3">

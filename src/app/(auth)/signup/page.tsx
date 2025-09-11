@@ -203,7 +203,7 @@ export default function SignupPage() {
   const RequiredIndicator = () => <span className="text-destructive"> *</span>;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-background/80 p-4 py-12">
       <div className="w-full max-w-lg relative">
          <Button variant="ghost" size="icon" className="absolute top-4 right-4 z-10" asChild>
             <Link href="/"><X className="h-4 w-4" /></Link>

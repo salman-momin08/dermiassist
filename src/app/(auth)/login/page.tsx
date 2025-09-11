@@ -96,7 +96,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background/80 p-4">
       <div className="w-full max-w-sm relative">
         <Button variant="ghost" size="icon" className="absolute top-2 right-2 z-10" asChild>
             <Link href="/"><X className="h-4 w-4" /></Link>
