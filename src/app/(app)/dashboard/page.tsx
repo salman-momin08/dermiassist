@@ -161,7 +161,7 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-             <ResponsiveContainer width="100%" height={300}>
+             <ChartContainer config={chartConfig} className="h-[300px] w-full">
                 {chartData.length > 0 ? (
                     <BarChart accessibilityLayer data={chartData}>
                         <CartesianGrid vertical={false} />
@@ -182,7 +182,7 @@ export default function DashboardPage() {
                         No analysis data available. Perform an analysis to see your history.
                     </div>
                 )}
-            </ResponsiveContainer>
+            </ChartContainer>
           </CardContent>
         </Card>
         <Card className="lg:col-span-3">
