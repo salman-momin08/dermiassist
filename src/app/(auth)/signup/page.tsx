@@ -125,6 +125,16 @@ export default function SignupPage() {
   const role = form.watch("role");
 
   const onSubmit = async (values: z.infer<typeof signupSchema>) => {
+    const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
+    if (!apiKey) {
+      toast({
+        title: "Configuration Error",
+        description: "Chat service is not configured. Please contact support.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       // 1. Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
@@ -138,7 +148,7 @@ export default function SignupPage() {
       // 3. Create user in Stream Chat
       // This part should be on a server, but for simplicity in this prototype, we do it here.
       // In a real app, this would be a server-side call after signup.
-      const streamClient = StreamChat.getInstance(process.env.NEXT_PUBLIC_STREAM_API_KEY!, {
+      const streamClient = StreamChat.getInstance(apiKey, {
           timeout: 6000,
       });
       await streamClient.upsertUser({

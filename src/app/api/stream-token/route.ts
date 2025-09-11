@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     }
 
     const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
-    const apiSecret = process.env.STREAM_SECRET_KEY;
+    const apiSecret = process.env.STREAM_API_SECRET;
 
     if (!apiKey || !apiSecret) {
       return NextResponse.json({ message: 'Stream API key or secret is not configured' }, { status: 500 });
