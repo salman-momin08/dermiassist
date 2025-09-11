@@ -110,16 +110,18 @@ function Conference() {
   // Toggle microphone on/off
   const toggleMic = async () => {
     if (localMicrophoneTrack) {
-      await localMicrophoneTrack.setEnabled(!micOn);
-      setMicOn(!micOn);
+      const newMicState = !micOn;
+      await localMicrophoneTrack.setEnabled(newMicState);
+      setMicOn(newMicState);
     }
   };
 
   // Toggle camera on/off
   const toggleCam = async () => {
     if (localCameraTrack) {
-      await localCameraTrack.setEnabled(!cameraOn);
-      setCameraOn(!cameraOn);
+      const newCamState = !cameraOn;
+      await localCameraTrack.setEnabled(newCamState);
+      setCameraOn(newCamState);
     }
   };
 
