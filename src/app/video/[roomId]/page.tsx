@@ -71,6 +71,7 @@ function Conference() {
 
     const joinChannel = async () => {
         try {
+            setIsJoining(true);
             // Join the channel with the fetched token
             await agoraClient.join(process.env.NEXT_PUBLIC_AGORA_APP_ID!, roomId, token, user.uid);
             
@@ -110,18 +111,16 @@ function Conference() {
   // Toggle microphone on/off
   const toggleMic = async () => {
     if (localMicrophoneTrack) {
-      const newMicState = !micOn;
-      await localMicrophoneTrack.setEnabled(newMicState);
-      setMicOn(newMicState);
+      await localMicrophoneTrack.setEnabled(!micOn);
+      setMicOn(!micOn);
     }
   };
 
   // Toggle camera on/off
   const toggleCam = async () => {
     if (localCameraTrack) {
-      const newCamState = !cameraOn;
-      await localCameraTrack.setEnabled(newCamState);
-      setCameraOn(newCamState);
+      await localCameraTrack.setEnabled(!cameraOn);
+      setCameraOn(!cameraOn);
     }
   };
 
@@ -154,7 +153,7 @@ function Conference() {
           <div key={remoteUser.uid} className="bg-black rounded-lg relative overflow-hidden">
             <RemoteUser user={remoteUser} playVideo={true} playAudio={true} className="h-full w-full object-cover" />
             <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
-                {remoteUser.uid === 'doctor' ? 'Doctor' : 'Patient'}
+                {remoteUser.uid.includes('doctor') ? 'Doctor' : 'Patient'}
             </div>
           </div>
         ))}
