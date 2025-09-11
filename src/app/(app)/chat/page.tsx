@@ -142,7 +142,11 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, userData, authLoading]);
 
-  const filters = { type: 'messaging', members: { $in: [user!.uid] } };
+  if (authLoading || !user) {
+    return <LoadingOverlay isLoading={true} message="Authenticating..." />;
+  }
+
+  const filters = { type: 'messaging', members: { $in: [user.uid] } };
   const sort = { last_message_at: -1 };
 
   return (

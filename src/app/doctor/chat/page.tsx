@@ -141,8 +141,11 @@ export default function DoctorChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, userData, authLoading]);
 
+  if (authLoading || !user) {
+    return <LoadingOverlay isLoading={true} message="Authenticating..." />;
+  }
 
-  const filters = { type: 'messaging', members: { $in: [user!.uid] } };
+  const filters = { type: 'messaging', members: { $in: [user.uid] } };
   const sort = { last_message_at: -1 };
 
   return (
