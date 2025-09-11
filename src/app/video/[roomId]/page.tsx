@@ -65,13 +65,19 @@ function Conference() {
   
   // Main effect to join and leave the channel
   useEffect(() => {
+    if (!token || !user || !localCameraTrack || !localMicrophoneTrack) {
+      return;
+    }
+
     const joinChannel = async () => {
-        if (!token || !user || !localCameraTrack || !localMicrophoneTrack) return;
-        
         try {
+            // Join the channel with the fetched token
             await agoraClient.join(process.env.NEXT_PUBLIC_AGORA_APP_ID!, roomId, token, user.uid);
+            
+            // Publish local tracks
             await agoraClient.publish([localMicrophoneTrack, localCameraTrack]);
-            setIsJoining(false);
+
+            setIsJoining(false); // Update state to show the video feed
         } catch(error) {
              console.error("Agora join/publish error", error);
              toast({
@@ -79,6 +85,7 @@ function Conference() {
                 description: "Failed to join the video call channel.",
                 variant: "destructive"
              });
+             router.back();
         }
     };
     
@@ -86,9 +93,9 @@ function Conference() {
 
     // The cleanup function to leave the channel when the component unmounts
     return () => {
-        localCameraTrack?.close();
-        localMicrophoneTrack?.close();
-        agoraClient.leave();
+      localCameraTrack?.close();
+      localMicrophoneTrack?.close();
+      agoraClient.leave();
     };
   // We only want this effect to run once when the token and tracks are ready.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,9 +103,8 @@ function Conference() {
 
   // Subscribe to remote users when they publish their streams
   const remoteUsers = useRemoteUsers();
-  useClientEvent(agoraClient, "user-published", (publishedUser) => {
-    agoraClient.subscribe(publishedUser, "video");
-    agoraClient.subscribe(publishedUser, "audio");
+  useClientEvent(agoraClient, "user-published", (publishedUser, mediaType) => {
+    agoraClient.subscribe(publishedUser, mediaType);
   });
   
   // Toggle microphone on/off
@@ -131,10 +137,11 @@ function Conference() {
       <div className="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Local user's video feed */}
         <div className="bg-black rounded-lg relative overflow-hidden">
-            {localCameraTrack && cameraOn && (
+            {localCameraTrack && cameraOn ? (
               <LocalVideoTrack track={localCameraTrack} play={true} className="h-full w-full object-cover" />
+            ) : (
+                <div className="h-full w-full bg-black flex items-center justify-center text-white">Camera Off</div>
             )}
-            {!cameraOn && <div className="h-full w-full bg-black flex items-center justify-center text-white">Camera Off</div>}
              <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
                 You
             </div>
@@ -145,10 +152,15 @@ function Conference() {
           <div key={remoteUser.uid} className="bg-black rounded-lg relative overflow-hidden">
             <RemoteUser user={remoteUser} playVideo={true} playAudio={true} className="h-full w-full object-cover" />
             <div className="absolute bottom-2 left-2 bg-background/50 px-2 py-1 rounded text-sm">
-                {remoteUser.uid}
+                {remoteUser.uid === 'doctor' ? 'Doctor' : 'Patient'}
             </div>
           </div>
         ))}
+         {remoteUsers.length === 0 && (
+            <div className="bg-black rounded-lg flex items-center justify-center text-muted-foreground">
+                <p>Waiting for the other participant to join...</p>
+            </div>
+        )}
       </div>
       
       {/* Call controls */}
