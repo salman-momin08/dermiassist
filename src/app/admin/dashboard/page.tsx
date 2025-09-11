@@ -31,8 +31,7 @@ import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-const analyticsData: any[] = [];
+import { format, subMonths, startOfMonth } from "date-fns";
 
 const chartConfig = {
   users: {
@@ -144,6 +143,36 @@ export default function AdminDashboardPage() {
             (doctor.specialization && doctor.specialization.toLowerCase().includes(doctorSearch.toLowerCase()))
         );
     }, [doctorUsers, doctorSearch]);
+
+    const analyticsData = useMemo(() => {
+        if (isLoading || allUsers.length === 0) return [];
+        
+        const monthlyCounts: { [key: string]: number } = {};
+        
+        // Initialize last 6 months
+        for (let i = 0; i < 6; i++) {
+            const month = format(subMonths(new Date(), i), 'MMM yyyy');
+            monthlyCounts[month] = 0;
+        }
+
+        allUsers.forEach(user => {
+            if (user.createdAt) {
+                const joinDate = new Date(user.createdAt);
+                const month = format(joinDate, 'MMM yyyy');
+                if (monthlyCounts.hasOwnProperty(month)) {
+                    monthlyCounts[month]++;
+                }
+            }
+        });
+        
+        return Object.entries(monthlyCounts)
+          .map(([month, count]) => ({
+            month: month.split(' ')[0], // Just get month name
+            users: count,
+            date: startOfMonth(new Date(month))
+          }))
+          .sort((a, b) => a.date.getTime() - b.date.getTime());
+    }, [allUsers, isLoading]);
 
      if (isLoading) {
         return (
@@ -504,3 +533,5 @@ export default function AdminDashboardPage() {
         )
     }
 }
+
+    
