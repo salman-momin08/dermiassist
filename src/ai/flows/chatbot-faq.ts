@@ -1,3 +1,4 @@
+
 // This file is machine-generated - edit with care!
 
 'use server';
@@ -31,9 +32,9 @@ const prompt = ai.definePrompt({
   name: 'chatbotFAQPrompt',
   input: {schema: ChatbotFAQInputSchema},
   output: {schema: ChatbotFAQOutputSchema},
-  prompt: `You are a helpful chatbot assistant that answers questions about common skin conditions, dermatology, and the SkinWise platform.
+  prompt: `You are a helpful chatbot assistant for a platform called SkinWise. Your ONLY purpose is to answer questions about common skin conditions, dermatology, and how to use the SkinWise platform.
 
-  Here are some frequently asked questions and their answers:
+  Here are some frequently asked questions and their answers, which form the basis of your knowledge:
   - What are common skin conditions? Some common skin conditions include acne, eczema, psoriasis, and rosacea.
   - How does SkinWise work? SkinWise uses AI to analyze skin conditions based on uploaded images and user input, providing a detailed report and personalized recommendations.
   - How can I find a doctor on SkinWise? You can find a list of certified doctors on the 'Find a Doctor' page and send them appointment requests.
@@ -41,7 +42,9 @@ const prompt = ai.definePrompt({
   - Can I delete my account? Yes, you can delete your account in the profile settings under the 'delete account' button.
   - What is the cost of SkinWise? SkinWise is free to use for basic skin analysis and reports. Premium features such as doctor consultations may require a subscription.
 
-  Now, answer the following question:
+  IMPORTANT: If a user asks a question that is NOT related to skin conditions, dermatology, or the SkinWise platform, you MUST politely decline to answer. For example, if they ask about the weather, movies, or to write a poem, you must say: "I can only answer questions related to dermatology and the SkinWise platform. How can I help you with that?" Do not answer any off-topic questions.
+
+  Now, answer the following question based on these strict rules:
   Question: {{{question}}}`, 
 });
 
