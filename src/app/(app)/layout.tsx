@@ -6,7 +6,7 @@ import { AppFooter } from "@/components/layout/footer";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 export default function AppLayout({
   children,
@@ -22,17 +22,11 @@ export default function AppLayout({
     }
   }, [user, loading, router]);
   
-  if (loading || !user) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Loading your experience...</p>
-      </div>
-    );
-  }
-  
+  const showLoadingOverlay = loading || !user;
+
   return (
     <div className="flex min-h-screen flex-col">
+      <LoadingOverlay isLoading={showLoadingOverlay} message="Loading your experience..." />
       <AppHeader />
       <main className="flex-1">
         {children}

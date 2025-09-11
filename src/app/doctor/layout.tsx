@@ -6,7 +6,7 @@ import { AppFooter } from "@/components/layout/footer";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 export default function DoctorLayout({
   children,
@@ -27,17 +27,11 @@ export default function DoctorLayout({
     }
   }, [user, loading, role, router]);
 
-  if (loading || !user || role !== 'doctor') {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Verifying access...</p>
-      </div>
-    );
-  }
+  const showLoadingOverlay = loading || !user || role !== 'doctor';
 
   return (
     <div className="flex min-h-screen flex-col">
+      <LoadingOverlay isLoading={showLoadingOverlay} message="Verifying access..." />
       <AppHeader />
       <main className="flex-1 bg-muted/40">
         {children}

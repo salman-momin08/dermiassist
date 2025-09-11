@@ -3,11 +3,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MessageSquare, ArrowLeft } from 'lucide-react';
 import { StreamChat } from 'stream-chat';
-import { Chat, Channel, ChannelList, Window, MessageList, MessageInput, ChannelHeader, LoadingIndicator, useChatContext } from 'stream-chat-react';
+import { Chat, Channel, ChannelList, Window, MessageList, MessageInput, ChannelHeader, LoadingIndicator, useChatContext, useChannelStateContext } from 'stream-chat-react';
 import 'stream-chat-react/dist/css/v2/index.css';
 import { CustomMessage } from '@/components/chat/custom-message';
+import { LoadingOverlay } from '@/components/ui/loading-overlay';
+import { Button } from '@/components/ui/button';
 
 const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
 
@@ -40,20 +42,52 @@ const ChatEventListeners = () => {
     return <MessageList Message={(props) => <CustomMessage {...props} deletedMessages={deletedMessages} />} />;
 };
 
+const EmptyChat = () => {
+    return (
+        <div className="flex flex-col h-full items-center justify-center bg-background">
+            <MessageSquare className="w-16 h-16 text-muted-foreground/50" />
+            <p className="mt-4 text-lg text-muted-foreground">Select a conversation</p>
+            <p className="text-sm text-muted-foreground">Choose a patient conversation from the list to start.</p>
+        </div>
+    );
+};
+
+const CustomChannelHeader = () => {
+    const { channel } = useChannelStateContext();
+    const { client } = useChatContext();
+
+    const goBack = () => {
+        client.setActiveChannel(undefined);
+    };
+
+    return (
+        <div className="str-chat__header-livestream">
+            <div className="flex items-center">
+                 <Button onClick={goBack} variant="ghost" size="icon" className="md:hidden mr-2">
+                    <ArrowLeft />
+                 </Button>
+                <ChannelHeader />
+            </div>
+        </div>
+    );
+};
+
 
 export default function DoctorChatPage() {
-  const { user, userData, loading } = useAuth();
+  const { user, userData, loading: authLoading } = useAuth();
   const [chatClient, setChatClient] = useState<StreamChat | null>(null);
+  const [isConnecting, setIsConnecting] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (loading || !user || !userData) {
+    if (authLoading || !user || !userData) {
       return;
     }
 
     if (!apiKey) {
       console.error("Stream API key is missing.");
       setError("Chat service is not configured. Please contact support.");
+      setIsConnecting(false);
       return;
     }
     
@@ -61,6 +95,8 @@ export default function DoctorChatPage() {
 
     const setupClient = async () => {
       try {
+        await client.disconnectUser(); // Ensure any previous connection is closed
+
         const response = await fetch('/api/stream-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -89,68 +125,59 @@ export default function DoctorChatPage() {
       } catch (err: any) {
         console.error("Error setting up chat client:", err);
         setError(err.message || "An error occurred while connecting to the chat service.");
-        if (chatClient?.user) {
-          await chatClient.disconnectUser();
-        }
+      } finally {
+        setIsConnecting(false);
       }
     };
 
-    if (!chatClient?.user) {
-        setupClient();
-    }
+    setupClient();
     
     return () => {
-      if (chatClient) {
-        chatClient.disconnectUser();
+      if (client) {
+        client.disconnectUser();
         setChatClient(null);
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, userData, loading]);
+  }, [user, userData, authLoading]);
 
-  if (loading || !chatClient) {
-    return (
-      <div className="flex min-h-[80vh] flex-col items-center justify-center">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Connecting to chat...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-     return (
-      <div className="flex min-h-[80vh] flex-col items-center justify-center text-center p-4">
-        <p className="text-destructive font-semibold">Chat Unavailable</p>
-        <p className="text-muted-foreground">{error}</p>
-      </div>
-    );
-  }
 
   const filters = { type: 'messaging', members: { $in: [user!.uid] } };
   const sort = { last_message_at: -1 };
 
   return (
-    <div className="container mx-auto p-4 md:p-8 h-[calc(100vh-128px)] flex flex-col">
+    <div className="container mx-auto p-4 md:p-8 h-[calc(100vh-128px)] flex flex-col relative">
+       <LoadingOverlay isLoading={isConnecting} message="Connecting to chat..." />
        <div className="space-y-2 mb-8">
             <h1 className="text-3xl font-bold tracking-tight font-headline">Patient Chat</h1>
             <p className="text-muted-foreground">Communicate directly and securely with your patients.</p>
         </div>
-      <Chat client={chatClient}>
-        <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-0 flex-grow min-h-0 border rounded-lg shadow-sm">
-            <div className="md:col-span-1 h-full min-h-0 rounded-l-lg">
-                <ChannelList filters={filters} sort={sort} showChannelSearch />
-            </div>
-            <div className="md:col-span-1 h-full min-h-0 border-l">
-                <Channel>
-                    <Window>
-                        <ChannelHeader />
-                        <ChatEventListeners />
-                        <MessageInput />
-                    </Window>
-                </Channel>
-            </div>
+
+      {!isConnecting && error && (
+         <div className="flex flex-grow items-center justify-center text-center p-4">
+            <p className="text-destructive font-semibold">Chat Unavailable</p>
+            <p className="text-muted-foreground">{error}</p>
         </div>
-      </Chat>
+      )}
+      
+      {!isConnecting && !error && chatClient && (
+          <Chat client={chatClient}>
+            <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-0 flex-grow min-h-0 border rounded-lg shadow-sm">
+                <div className="md:col-span-1 h-full min-h-0 rounded-l-lg">
+                    <ChannelList filters={filters} sort={sort} showChannelSearch />
+                </div>
+                <div className="md:col-span-1 h-full min-h-0 border-l">
+                    <Channel EmptyStateIndicator={EmptyChat}>
+                        <Window>
+                            <CustomChannelHeader />
+                            <ChatEventListeners />
+                            <MessageInput />
+                        </Window>
+                    </Channel>
+                </div>
+            </div>
+          </Chat>
+      )}
     </div>
   );
 }

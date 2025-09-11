@@ -12,6 +12,7 @@ import Image from 'next/image';
 import { AppHeader } from '@/components/layout/header';
 import { AppFooter } from '@/components/layout/footer';
 import { Logo } from '@/components/logo';
+import { LoadingOverlay } from '@/components/ui/loading-overlay';
 
 function LandingPageContent() {
   return (
@@ -140,15 +141,11 @@ export default function LandingPage() {
       }
     }
   }, [user, role, loading, router]);
-
-  if (loading || user) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Loading your dashboard...</p>
-      </div>
-    );
-  }
   
-  return <LandingPageContent />;
+  return (
+    <>
+      <LoadingOverlay isLoading={loading || !!user} message="Loading your dashboard..." />
+      <LandingPageContent />
+    </>
+  );
 }
