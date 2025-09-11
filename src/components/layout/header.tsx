@@ -8,7 +8,7 @@ import { UserNav } from './user-nav';
 import { ThemeToggle } from './theme-toggle';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '../ui/skeleton';
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from '../ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '../ui/sheet';
 import { Menu, X } from 'lucide-react';
 import React from 'react';
 
@@ -49,17 +49,6 @@ export function AppHeader() {
     }
   }
 
-  const NavLink = ({ href, children }: { href: string, children: React.ReactNode }) => (
-    <SheetClose asChild>
-      <Link
-        href={href}
-        className="text-lg font-medium text-muted-foreground transition-colors hover:text-foreground"
-      >
-        {children}
-      </Link>
-    </SheetClose>
-  );
-
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
@@ -88,6 +77,9 @@ export function AppHeader() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left">
+                <SheetHeader>
+                    <SheetTitle className="sr-only">Main Menu</SheetTitle>
+                </SheetHeader>
                 <nav className="grid gap-6 text-lg font-medium pt-8">
                    <Link href={getHomeHref()} className="flex items-center gap-2 text-lg font-semibold" onClick={() => setIsSheetOpen(false)}>
                       <Logo />
