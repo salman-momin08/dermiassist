@@ -75,7 +75,12 @@ export default function LoginPage() {
         description: "Welcome back! Redirecting you to your dashboard.",
       });
 
-      const destination = userData.role === 'doctor' ? '/doctor/dashboard' : '/dashboard';
+      let destination = '/dashboard'; // Default for patient
+      if (userData.role === 'doctor') {
+        destination = '/doctor/dashboard';
+      } else if (userData.role === 'admin') {
+        destination = '/admin/dashboard';
+      }
       router.push(destination);
 
     } catch (error: any) {
