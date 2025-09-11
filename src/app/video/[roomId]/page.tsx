@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AgoraRTC, {
   AgoraRTCProvider,
@@ -24,6 +24,11 @@ import { generateToken } from "@/ai/flows/generate-agora-token";
 // This is the core video conference component. It handles all Agora logic.
 function Conference() {
   const { user } = useAuth();
+  const userRef = useRef(user); // Use a ref to avoid re-running the effect
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   const { roomId } = useParams() as { roomId: string };
   const router = useRouter();
   const { toast } = useToast();
@@ -38,69 +43,55 @@ function Conference() {
   // State for media controls and connection
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
-  const [token, setToken] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(true);
-  
-  // Fetch a secure token from our server action
-  useEffect(() => {
-    if (!user || !roomId) return;
-
-    const fetchToken = async () => {
-      try {
-        const fetchedToken = await generateToken(roomId, user.uid);
-        setToken(fetchedToken);
-      } catch (error) {
-        console.error("Failed to fetch Agora token", error);
-        toast({
-          title: "Authentication Error",
-          description: "Could not get a token to join the call. Please ensure your Agora credentials are set.",
-          variant: "destructive",
-        });
-        // Redirect back if token fetching fails
-        router.back();
-      }
-    };
-    fetchToken();
-  }, [user, roomId, toast, router]);
   
   // Main effect to join and leave the channel
   useEffect(() => {
-    if (!token || !user || !localCameraTrack || !localMicrophoneTrack) {
-      return;
-    }
-
+    let isMounted = true;
+    
     const joinChannel = async () => {
-        try {
-            setIsJoining(true);
-            // Join the channel with the fetched token
-            await agoraClient.join(process.env.NEXT_PUBLIC_AGORA_APP_ID!, roomId, token, user.uid);
-            
-            // Publish local tracks
-            await agoraClient.publish([localMicrophoneTrack, localCameraTrack]);
+      try {
+        if (!userRef.current || !roomId) return;
+        
+        const fetchedToken = await generateToken(roomId, userRef.current.uid);
+        if (!isMounted) return;
 
+        // Wait for tracks to be ready
+        if (!localCameraTrack || !localMicrophoneTrack) return;
+        
+        setIsJoining(true);
+        // Join the channel with the fetched token
+        await agoraClient.join(process.env.NEXT_PUBLIC_AGORA_APP_ID!, roomId, fetchedToken, userRef.current.uid);
+        
+        // Publish local tracks
+        await agoraClient.publish([localMicrophoneTrack, localCameraTrack]);
+
+        if (isMounted) {
             setIsJoining(false); // Update state to show the video feed
-        } catch(error) {
-             console.error("Agora join/publish error", error);
-             toast({
-                title: "Connection Error",
-                description: "Failed to join the video call channel.",
-                variant: "destructive"
-             });
-             router.back();
         }
+      } catch(error) {
+        console.error("Agora join/publish error", error);
+        toast({
+           title: "Connection Error",
+           description: "Failed to join the video call channel. Please try again later.",
+           variant: "destructive"
+        });
+        router.back();
+      }
     };
     
     joinChannel();
 
     // The cleanup function to leave the channel when the component unmounts
     return () => {
+      isMounted = false;
       localCameraTrack?.close();
       localMicrophoneTrack?.close();
-      agoraClient.leave();
+      agoraClient.leave().catch(err => console.error("Agora leave error:", err));
     };
-  // We only want this effect to run once when the token and tracks are ready.
+  // We only want this effect to run once when the tracks are ready.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, user, agoraClient, roomId]);
+  }, [agoraClient, roomId, localCameraTrack, localMicrophoneTrack]);
 
   // Subscribe to remote users when they publish their streams
   const remoteUsers = useRemoteUsers();
