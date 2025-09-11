@@ -43,7 +43,7 @@ function LandingPageContent() {
                 </div>
               </div>
               <Image
-                src="https://picsum.photos/seed/skincare-hero/600/400"
+                src="/landing.png"
                 width="600"
                 height="400"
                 alt="Hero"

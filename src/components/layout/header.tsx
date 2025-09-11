@@ -31,6 +31,7 @@ export function AppHeader() {
   ];
   
   const getFilteredLinks = (userRole: typeof role) => {
+    if (!userRole) return [];
     return navLinks.filter(link => link.roles.includes(userRole));
   };
   
@@ -52,57 +53,62 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
-        <div className="mr-4 hidden md:flex">
-          <Link href={getHomeHref()} className="mr-6 flex items-center space-x-2">
-            <Logo />
-          </Link>
-        </div>
-        
-        {authenticated && (
-          <nav className="hidden items-center space-x-6 text-sm font-medium md:flex">
-            {filteredNavLinks.map(link => (
-              <Link key={link.href} href={link.href} className="transition-colors hover:text-foreground/80 text-foreground/60">
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-        )}
-
-        <div className="md:hidden">
-          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-6 w-6" />
-                <span className="sr-only">Open Menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left">
-                <SheetHeader>
-                    <SheetTitle className="sr-only">Main Menu</SheetTitle>
-                </SheetHeader>
-                <nav className="grid gap-6 text-lg font-medium pt-8">
-                   <Link href={getHomeHref()} className="flex items-center gap-2 text-lg font-semibold" onClick={() => setIsSheetOpen(false)}>
-                      <Logo />
-                      <span className="sr-only">SkinWise</span>
-                    </Link>
-                    {filteredNavLinks.map(link => (
-                       <Link key={link.href} href={link.href} className="text-muted-foreground hover:text-foreground" onClick={() => setIsSheetOpen(false)}>
-                          {link.label}
-                       </Link>
-                    ))}
-                </nav>
-            </SheetContent>
-          </Sheet>
-        </div>
-
-        <div className="flex w-full items-center justify-end gap-4 md:w-auto">
-          <div className="flex-1 md:flex-grow-0">
-             <div className="md:hidden flex-1 flex justify-center">
-                <Link href={getHomeHref()} className="flex items-center space-x-2">
-                    <Logo />
-                </Link>
+        <div className="flex-1 flex items-center">
+          {/* Mobile Menu */}
+          {authenticated && (
+            <div className="md:hidden mr-2">
+              <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Menu className="h-6 w-6" />
+                    <span className="sr-only">Open Menu</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left">
+                    <SheetHeader>
+                        <SheetTitle className="sr-only">Main Menu</SheetTitle>
+                    </SheetHeader>
+                    <nav className="grid gap-6 text-lg font-medium pt-8">
+                      <Link href={getHomeHref()} className="flex items-center gap-2 text-lg font-semibold" onClick={() => setIsSheetOpen(false)}>
+                          <Logo />
+                          <span className="sr-only">SkinWise</span>
+                        </Link>
+                        {filteredNavLinks.map(link => (
+                          <Link key={link.href} href={link.href} className="text-muted-foreground hover:text-foreground" onClick={() => setIsSheetOpen(false)}>
+                              {link.label}
+                          </Link>
+                        ))}
+                    </nav>
+                </SheetContent>
+              </Sheet>
             </div>
+          )}
+
+          {/* Desktop Logo & Nav */}
+          <div className="hidden md:flex items-center">
+            <Link href={getHomeHref()} className="mr-6 flex items-center space-x-2">
+              <Logo />
+            </Link>
+            {authenticated && (
+              <nav className="items-center space-x-6 text-sm font-medium flex">
+                {filteredNavLinks.map(link => (
+                  <Link key={link.href} href={link.href} className="transition-colors hover:text-foreground/80 text-foreground/60">
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+            )}
           </div>
+          
+          {/* Mobile Logo (visible when not authenticated) */}
+           <div className="md:hidden">
+              <Link href={getHomeHref()} className="flex items-center space-x-2">
+                  <Logo />
+              </Link>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-4">
           <ThemeToggle />
           {loading ? (
             <Skeleton className="h-8 w-8 rounded-full" />
