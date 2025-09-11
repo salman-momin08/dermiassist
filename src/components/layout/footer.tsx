@@ -1,4 +1,3 @@
-
 import Link from "next/link";
 import { Logo } from "../logo";
 
@@ -14,7 +13,7 @@ export function AppFooter() {
         </div>
         <nav className="flex gap-4 sm:gap-6 text-sm text-muted-foreground">
           <Link href="/project-details" className="hover:text-foreground">Project Details</Link>
-          <Link href="/developer-details" className="hover:text-foreground">Developer Details</Link>
+          <a href="#" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Developer Details</a>
           <Link href="#" className="hover:text-foreground">Terms & Conditions</Link>
           <Link href="#" className="hover:text-foreground">Privacy Policy</Link>
         </nav>
