@@ -68,12 +68,15 @@ export function Chatbot() {
         }
 
         const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
+        recognition.continuous = false; // We want it to stop when the user pauses
+        recognition.interimResults = true; // Show results as they are being recognized
         recognition.lang = 'en-US';
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
-            const transcript = event.results[0][0].transcript;
+            const transcript = Array.from(event.results)
+                .map(result => result[0])
+                .map(result => result.transcript)
+                .join('');
             setInput(transcript);
         };
         
@@ -95,11 +98,15 @@ export function Chatbot() {
         
         recognition.onend = () => {
             setIsListening(false);
+            // Auto-send the message once recognition ends, if there's content
+            if (input.trim()) {
+                handleSend();
+            }
         };
 
         recognitionRef.current = recognition;
 
-    }, [toast]);
+    }, [toast, input]); // Add input to dependency array to re-create `onend` with the latest `input` value
 
 
     const handleSend = async () => {
@@ -130,6 +137,7 @@ export function Chatbot() {
     const startRecognition = () => {
         if (recognitionRef.current) {
             try {
+                setInput(''); // Clear input before starting
                 recognitionRef.current.start();
                 setIsListening(true);
             } catch (e) {
