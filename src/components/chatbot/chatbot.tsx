@@ -50,6 +50,7 @@ export function Chatbot() {
     const [isListening, setIsListening] = useState(false);
     const [permissionDenied, setPermissionDenied] = useState(false);
     const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+    const finalTranscriptRef = useRef('');
 
 
     useEffect(() => {
@@ -73,11 +74,16 @@ export function Chatbot() {
         recognition.lang = 'en-US';
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
-            const transcript = Array.from(event.results)
-                .map(result => result[0])
-                .map(result => result.transcript)
-                .join('');
-            setInput(transcript);
+            let interimTranscript = '';
+            finalTranscriptRef.current = '';
+            for (let i = 0; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscriptRef.current += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+            setInput(finalTranscriptRef.current + interimTranscript);
         };
         
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -99,20 +105,22 @@ export function Chatbot() {
         recognition.onend = () => {
             setIsListening(false);
             // Auto-send the message once recognition ends, if there's content
-            if (input.trim()) {
-                handleSend();
+            if (finalTranscriptRef.current.trim()) {
+                handleSend(finalTranscriptRef.current.trim());
+                finalTranscriptRef.current = ''; // Clear the ref
             }
         };
 
         recognitionRef.current = recognition;
 
-    }, [toast, input]); // Add input to dependency array to re-create `onend` with the latest `input` value
+    }, [toast]);
 
 
-    const handleSend = async () => {
-        if (!input.trim()) return;
+    const handleSend = async (messageToSend?: string) => {
+        const currentInput = messageToSend || input;
+        if (!currentInput.trim()) return;
 
-        const userMessage: Message = { sender: 'user', text: input };
+        const userMessage: Message = { sender: 'user', text: currentInput };
         const newMessages = [...messages, userMessage];
         setMessages(newMessages);
         setInput('');
@@ -121,7 +129,7 @@ export function Chatbot() {
         try {
             const history = newMessages.map(m => `${m.sender === 'bot' ? 'AI' : 'User'}: ${m.text}`).join('\n');
             const response = await chatbotFAQ({ 
-                question: input,
+                question: currentInput,
                 conversationHistory: history,
             });
             const botMessage: Message = { sender: 'bot', text: response.answer };
@@ -138,6 +146,7 @@ export function Chatbot() {
         if (recognitionRef.current) {
             try {
                 setInput(''); // Clear input before starting
+                finalTranscriptRef.current = '';
                 recognitionRef.current.start();
                 setIsListening(true);
             } catch (e) {
@@ -243,7 +252,7 @@ export function Chatbot() {
                             <Mic className="h-4 w-4" />
                             <span className="sr-only">Use Microphone</span>
                         </Button>
-                        <Button size="icon" onClick={handleSend} disabled={isLoading || !input.trim()}>
+                        <Button size="icon" onClick={() => handleSend()} disabled={isLoading || !input.trim()}>
                             <Send className="h-4 w-4" />
                             <span className="sr-only">Send</span>
                         </Button>
