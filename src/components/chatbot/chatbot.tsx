@@ -23,18 +23,33 @@ export function Chatbot() {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+
+    useEffect(() => {
+        if (scrollAreaRef.current) {
+            scrollAreaRef.current.scrollTo({
+                top: scrollAreaRef.current.scrollHeight,
+                behavior: 'smooth',
+            });
+        }
+    }, [messages]);
 
     const handleSend = async () => {
         if (!input.trim()) return;
 
         const userMessage: Message = { sender: 'user', text: input };
-        setMessages(prev => [...prev, userMessage]);
+        const newMessages = [...messages, userMessage];
+        setMessages(newMessages);
         setInput('');
         setIsLoading(true);
 
         try {
-            const response = await chatbotFAQ({ question: input });
+            const history = newMessages.map(m => `${m.sender === 'bot' ? 'AI' : 'User'}: ${m.text}`).join('\n');
+            const response = await chatbotFAQ({ 
+                question: input,
+                conversationHistory: history,
+            });
             const botMessage: Message = { sender: 'bot', text: response.answer };
             setMessages(prev => [...prev, botMessage]);
         } catch (error) {
@@ -66,7 +81,7 @@ export function Chatbot() {
                         Ask me anything about skin conditions or how to use the platform.
                     </SheetDescription>
                 </SheetHeader>
-                <ScrollArea className="flex-grow my-4 pr-4 -mr-6">
+                <ScrollArea className="flex-grow my-4 pr-4 -mr-6" ref={scrollAreaRef}>
                     <div className="space-y-4">
                         {messages.map((message, index) => (
                              <div key={index} className={cn("flex items-start gap-3", message.sender === 'user' ? 'justify-end' : '')}>

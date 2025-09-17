@@ -15,7 +15,8 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const ChatbotFAQInputSchema = z.object({
-  question: z.string().describe('The user question.'),
+  question: z.string().describe('The current user question.'),
+  conversationHistory: z.string().optional().describe('The history of the conversation so far, with "AI:" and "User:" prefixes.')
 });
 export type ChatbotFAQInput = z.infer<typeof ChatbotFAQInputSchema>;
 
@@ -34,6 +35,8 @@ const prompt = ai.definePrompt({
   output: {schema: ChatbotFAQOutputSchema},
   prompt: `You are a helpful chatbot assistant for a platform called DermiAssist-AI. Your ONLY purpose is to answer questions about common skin conditions, dermatology, and how to use the DermiAssist-AI platform, Make sure to avoid hallucinations.
 
+  Consider the previous conversation history to understand the context of the user's question, especially for follow-up questions like "tell me more".
+
   Here are some frequently asked questions and their answers, which form the basis of your knowledge:
   - What are common skin conditions? Some common skin conditions include acne, eczema, psoriasis, and rosacea. Ringworm is another common one, which is a fungal infection that causes a circular rash.
   - How do I log in? You can log in to your account by clicking the 'Sign In' or 'Login' button on the homepage or in the header. You will need to enter the email and password you used to sign up.
@@ -45,8 +48,11 @@ const prompt = ai.definePrompt({
 
   IMPORTANT: If a user asks a question that is NOT related to skin conditions, dermatology, or the DermiAssist-AI platform, you MUST politely decline to answer. For example, if they ask about the weather, movies, or to write a poem, you must say: "I can only answer questions related to dermatology and the DermiAssist-AI platform. How can I help you with that?" Do not answer any off-topic questions.
 
-  Now, answer the following question based on these strict rules:
-  Question: {{{question}}}`, 
+  Conversation History:
+  {{{conversationHistory}}}
+  
+  Now, answer the following question based on the history and your knowledge base:
+  User: {{{question}}}`, 
 });
 
 const chatbotFAQFlow = ai.defineFlow(
