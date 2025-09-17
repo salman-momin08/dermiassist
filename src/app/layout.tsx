@@ -6,7 +6,7 @@ import { Chatbot } from '@/components/chatbot/chatbot';
 import { AuthProvider } from '@/hooks/use-auth';
 
 export const metadata: Metadata = {
-  title: 'SkinWise - Your Personal Dermatology Assistant',
+  title: 'DermiAssist-AI - Your Personal Dermatology Assistant',
   description:
     'AI-powered skin analysis, doctor consultations, and personalized skincare recommendations.',
 };

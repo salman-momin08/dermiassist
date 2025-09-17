@@ -98,7 +98,7 @@ export default function AppointmentsPage() {
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF('p', 'px', [canvas.width, canvas.height]);
             pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-            pdf.save(`SkinWise-Appointment-${appointment.id}.pdf`);
+            pdf.save(`DermiAssist-AI-Appointment-${appointment.id}.pdf`);
         } catch (error) {
             console.error("Failed to generate PDF:", error);
             toast({
@@ -225,7 +225,7 @@ export default function AppointmentsPage() {
                                                                                 <p>Sincerely,</p>
                                                                                 {appointment.doctorSignature && <Image src={appointment.doctorSignature} alt="Doctor's Signature" width={150} height={50} data-ai-hint="signature" />}
                                                                                 <p><strong>{appointment.doctorName}</strong></p>
-                                                                                <p>SkinWise Dermatology</p>
+                                                                                <p>DermiAssist-AI Dermatology</p>
                                                                             </div>
                                                                         </CardContent>
                                                                     </Card>

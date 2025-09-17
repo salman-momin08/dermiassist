@@ -228,7 +228,7 @@ export default function SignupPage() {
                 </div>
                 <CardTitle className="text-2xl font-headline">Create a Secure Account</CardTitle>
                 <CardDescription>
-                Join SkinWise to take control of your skin health.
+                Join DermiAssist-AI to take control of your skin health.
                 </CardDescription>
             </CardHeader>
             <Form {...form}>

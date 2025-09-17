@@ -71,7 +71,7 @@ export function AppHeader() {
                     <nav className="grid gap-6 text-lg font-medium pt-8">
                       <Link href={getHomeHref()} className="flex items-center gap-2 text-lg font-semibold" onClick={() => setIsSheetOpen(false)}>
                           <Logo />
-                          <span className="sr-only">SkinWise</span>
+                          <span className="sr-only">DermiAssist-AI</span>
                         </Link>
                         {filteredNavLinks.map(link => (
                           <Link key={link.href} href={link.href} className="text-muted-foreground hover:text-foreground" onClick={() => setIsSheetOpen(false)}>

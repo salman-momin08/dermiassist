@@ -18,7 +18,7 @@ interface Message {
 
 export function Chatbot() {
     const [messages, setMessages] = useState<Message[]>([
-        { sender: 'bot', text: "Hello! I'm the SkinWise assistant. How can I help you today?" }
+        { sender: 'bot', text: "Hello! I'm the DermiAssist-AI assistant. How can I help you today?" }
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -60,7 +60,7 @@ export function Chatbot() {
                 <SheetHeader>
                     <SheetTitle className="flex items-center gap-2 font-headline">
                         <Bot className="text-primary"/>
-                        SkinWise Assistant
+                        DermiAssist-AI Assistant
                     </SheetTitle>
                     <SheetDescription>
                         Ask me anything about skin conditions or how to use the platform.

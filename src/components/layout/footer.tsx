@@ -11,12 +11,12 @@ export function AppFooter() {
         <div className="flex flex-col items-center gap-4 px-8 md:flex-row md:gap-2 md:px-0">
           <Logo />
           <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
-            © {new Date().getFullYear()} SkinWise. All Rights Reserved.
+            © {new Date().getFullYear()} DermiAssist-AI. All Rights Reserved.
           </p>
         </div>
         <nav className="flex gap-4 sm:gap-6 text-sm text-muted-foreground">
           <Link href="/project-details" className="hover:text-foreground">Project Details</Link>
-          <a href="https://myportfolio-ashen-one-35.vercel.app/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Developer Details</a>
+          <a href="#" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Developer Details</a>
 
           <Link href="/terms" className="hover:text-foreground">Terms & Conditions</Link>
           <Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link>

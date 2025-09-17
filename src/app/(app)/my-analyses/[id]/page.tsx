@@ -472,7 +472,7 @@ export default function AnalysisDetailPage() {
 
             pdf.setFontSize(18);
             pdf.setFont('helvetica', 'bold');
-            pdf.text('SkinWise AI Skin Analysis Report', pageWidth / 2, margin + 5, { align: 'center' });
+            pdf.text('DermiAssist-AI AI Skin Analysis Report', pageWidth / 2, margin + 5, { align: 'center' });
             
             pdf.setFontSize(10);
             pdf.setFont('helvetica', 'normal');
@@ -619,7 +619,7 @@ export default function AnalysisDetailPage() {
                     yPos += otherConsiderationsText.length * 4 + 5;
                 }
 
-                pdf.save(`SkinWise-Report-${analysis.id}.pdf`);
+                pdf.save(`DermiAssist-AI-Report-${analysis.id}.pdf`);
             };
 
         } catch (error) {
@@ -944,7 +944,7 @@ export default function AnalysisDetailPage() {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Microphone Access</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    SkinWise needs access to your microphone to enable the speech-to-text feature. Click Continue to allow access in the upcoming browser prompt.
+                                    DermiAssist-AI needs access to your microphone to enable the speech-to-text feature. Click Continue to allow access in the upcoming browser prompt.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

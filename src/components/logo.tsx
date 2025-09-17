@@ -20,7 +20,7 @@ export function Logo({ className }: { className?: string }) {
           strokeLinejoin="round"
         />
       </svg>
-      <span className="font-bold text-lg font-headline">SkinWise</span>
+      <span className="font-bold text-lg font-headline">DermiAssist-AI</span>
     </div>
   );
 }

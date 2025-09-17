@@ -21,7 +21,7 @@ export default function PrivacyPage() {
                             <ScrollArea className="h-[60vh] pr-6">
                                 <div className="space-y-6 text-sm text-muted-foreground leading-relaxed">
                                     <h3 className="font-semibold text-lg text-foreground">1. Introduction</h3>
-                                    <p>Your privacy is critically important to us. At SkinWise, we have a few fundamental principles: We are thoughtful about the personal information we ask you to provide and the personal information that we collect about you through the operation of our services. We store personal information for only as long as we have a reason to keep it. We aim for full transparency on how we gather, use, and share your personal information.</p>
+                                    <p>Your privacy is critically important to us. At DermiAssist-AI, we have a few fundamental principles: We are thoughtful about the personal information we ask you to provide and the personal information that we collect about you through the operation of our services. We store personal information for only as long as we have a reason to keep it. We aim for full transparency on how we gather, use, and share your personal information.</p>
                                     
                                     <h3 className="font-semibold text-lg text-foreground">2. Information We Collect</h3>
                                     <p>We collect information about you only if we have a reason to do so — for example, to provide our Services, to communicate with you, or to make our Services better.</p>

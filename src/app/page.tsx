@@ -28,7 +28,7 @@ function LandingPageContent() {
                     Intelligent Skin Care, Right at Your Fingertips
                   </h1>
                   <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    SkinWise provides instant AI-powered skin analysis and
+                    DermiAssist-AI provides instant AI-powered skin analysis and
                     connects you with certified dermatologists. Take control of
                     your skin health today.
                   </p>

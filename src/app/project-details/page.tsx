@@ -1,3 +1,4 @@
+
 "use client"
 
 import { AppHeader } from "@/components/layout/header";
@@ -74,7 +75,7 @@ export default function ProjectDetailsPage() {
                             Project Features
                         </h1>
                         <p className="text-xl text-muted-foreground max-w-3xl">
-                           An in-depth look at the cutting-edge features that power the SkinWise intelligent dermatology platform.
+                           An in-depth look at the cutting-edge features that power the DermiAssist-AI intelligent dermatology platform.
                         </p>
                     </div>
 

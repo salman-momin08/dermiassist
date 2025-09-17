@@ -59,7 +59,7 @@ export default function MyAnalysesPage() {
             // --- Header ---
             pdf.setFontSize(18);
             pdf.setFont('helvetica', 'bold');
-            pdf.text('SkinWise AI Skin Analysis Report', pageWidth / 2, margin + 5, { align: 'center' });
+            pdf.text('DermiAssist-AI AI Skin Analysis Report', pageWidth / 2, margin + 5, { align: 'center' });
             
             pdf.setFontSize(10);
             pdf.setFont('helvetica', 'normal');
@@ -214,7 +214,7 @@ export default function MyAnalysesPage() {
                     yPos += otherConsiderationsText.length * 4 + 5;
                 }
 
-                pdf.save(`SkinWise-Report-${analysis.id}.pdf`);
+                pdf.save(`DermiAssist-AI-Report-${analysis.id}.pdf`);
                 setIsDownloading(null);
             };
 
