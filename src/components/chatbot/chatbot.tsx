@@ -23,13 +23,13 @@ export function Chatbot() {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
-    const scrollAreaRef = useRef<HTMLDivElement>(null);
+    const scrollViewportRef = useRef<HTMLDivElement>(null);
 
 
     useEffect(() => {
-        if (scrollAreaRef.current) {
-            scrollAreaRef.current.scrollTo({
-                top: scrollAreaRef.current.scrollHeight,
+        if (scrollViewportRef.current) {
+            scrollViewportRef.current.scrollTo({
+                top: scrollViewportRef.current.scrollHeight,
                 behavior: 'smooth',
             });
         }
@@ -81,7 +81,7 @@ export function Chatbot() {
                         Ask me anything about skin conditions or how to use the platform.
                     </SheetDescription>
                 </SheetHeader>
-                <ScrollArea className="flex-grow my-4 pr-4 -mr-6" ref={scrollAreaRef}>
+                <ScrollArea className="flex-grow my-4 pr-4 -mr-6" viewportRef={scrollViewportRef}>
                     <div className="space-y-4">
                         {messages.map((message, index) => (
                              <div key={index} className={cn("flex items-start gap-3", message.sender === 'user' ? 'justify-end' : '')}>
