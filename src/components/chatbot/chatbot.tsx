@@ -195,6 +195,7 @@ export function Chatbot() {
                  setIsListening(true);
             }
         } catch (err) {
+            // Fallback for browsers that don't support permissions.query
             setInput('');
             finalTranscriptRef.current = '';
             recognitionRef.current?.start();
@@ -331,3 +332,5 @@ export function Chatbot() {
         </Sheet>
     );
 }
+
+    
