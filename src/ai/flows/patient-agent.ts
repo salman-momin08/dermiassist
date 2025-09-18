@@ -139,17 +139,28 @@ const patientAgentFlow = ai.defineFlow(
     outputSchema: PatientAgentOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
-    if (!output) {
+    const modelResponse = await prompt(input);
+
+    if (!modelResponse.output) {
       throw new Error('The agent failed to produce an output.');
     }
+    
+    const output = modelResponse.output;
+
      // If the tool returns a destination, we need to pass the photo through if it exists.
     if (output.action === 'startProforma' && output.destination && input.photoDataUri) {
         output.destination = `/analyze?condition=${encodeURIComponent(output.data.conditionName)}&image=${encodeURIComponent(input.photoDataUri)}`;
         output.response = `Analysis started! I've identified it as possibly being **${output.data.conditionName}**. I'm now taking you to the next step where I'll ask a few more questions.`;
     }
+
+    // This is the bug fix: ensure that if a tool was called and returned data,
+    // that data is correctly placed in the 'data' field of the final output.
+    const toolResponse = modelResponse.toolResponses[0]?.output;
+    if (output.action === 'showAnalyses' && toolResponse) {
+      output.data = toolResponse;
+    }
+    
     return output;
   }
 );
-
     
