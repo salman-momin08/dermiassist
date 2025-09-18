@@ -11,6 +11,7 @@ import { Skeleton } from '../ui/skeleton';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '../ui/sheet';
 import { Menu, X } from 'lucide-react';
 import React from 'react';
+import { PatientAgentDialog } from '../agent/patient-agent-dialog';
 
 export function AppHeader() {
   const { user, role, loading } = useAuth();
@@ -53,8 +54,7 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
-        <div className="flex-1 flex items-center">
-          {/* Mobile Menu */}
+        <div className="mr-4 flex items-center">
           {authenticated && (
             <div className="md:hidden mr-2">
               <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
@@ -83,13 +83,12 @@ export function AppHeader() {
               </Sheet>
             </div>
           )}
-
-          {/* Desktop Logo & Nav */}
-          <div className="hidden md:flex items-center">
-            <Link href={getHomeHref()} className="mr-6 flex items-center space-x-2">
-              <Logo />
-            </Link>
-            {authenticated && (
+          <Link href={getHomeHref()} className="flex items-center space-x-2">
+            <Logo />
+          </Link>
+        </div>
+        <div className="flex-1 items-center space-x-6 text-sm font-medium hidden md:flex">
+             {authenticated && (
               <nav className="items-center space-x-6 text-sm font-medium flex">
                 {filteredNavLinks.map(link => (
                   <Link key={link.href} href={link.href} className="transition-colors hover:text-foreground/80 text-foreground/60">
@@ -98,17 +97,10 @@ export function AppHeader() {
                 ))}
               </nav>
             )}
-          </div>
-          
-          {/* Mobile Logo (visible when not authenticated) */}
-           <div className="md:hidden">
-              <Link href={getHomeHref()} className="flex items-center space-x-2">
-                  <Logo />
-              </Link>
-          </div>
         </div>
 
-        <div className="flex items-center justify-end gap-4">
+        <div className="flex items-center justify-end gap-2">
+          {authenticated && role === 'patient' && <PatientAgentDialog />}
           <ThemeToggle />
           {loading ? (
             <Skeleton className="h-8 w-8 rounded-full" />

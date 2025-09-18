@@ -16,3 +16,4 @@ import '@/ai/flows/proforma-chat.ts';
 import '@/ai/flows/explain-report-multimodal.ts';
 import '@/ai/flows/text-to-speech.ts';
 import '@/ai/flows/generate-agora-token.ts';
+import '@/ai/flows/patient-agent.ts';
