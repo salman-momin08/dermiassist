@@ -148,16 +148,20 @@ const patientAgentFlow = ai.defineFlow(
     
     const output = modelResponse.output;
 
-    if (modelResponse.toolRequest?.name === 'listAnalyses') {
-      const toolResponse = await listAnalysesTool(modelResponse.toolRequest.input);
-      output.data = toolResponse;
-    } else if (modelResponse.toolRequest?.name === 'startAnalysis') {
-      const toolResponse = await startAnalysisTool(modelResponse.toolRequest.input);
-      output.data = toolResponse;
+    // IMPORTANT: Check for a tool request and execute it if present.
+    if (modelResponse.toolRequest) {
+        let toolResponse;
+        if (modelResponse.toolRequest.name === 'listAnalyses') {
+            toolResponse = await listAnalysesTool(modelResponse.toolRequest.input);
+            output.data = toolResponse; // Directly assign the array here
+        } else if (modelResponse.toolRequest.name === 'startAnalysis') {
+            toolResponse = await startAnalysisTool(modelResponse.toolRequest.input);
+            output.data = toolResponse;
+        }
     }
     
      // If the tool returns a destination, we need to pass the photo through if it exists.
-    if (output.action === 'startProforma' && output.destination && input.photoDataUri) {
+    if (output.action === 'startProforma' && output.data?.conditionName && input.photoDataUri) {
         output.destination = `/analyze?condition=${encodeURIComponent(output.data.conditionName)}&image=${encodeURIComponent(input.photoDataUri)}`;
         output.response = `Analysis started! I've identified it as possibly being **${output.data.conditionName}**. I'm now taking you to the next step where I'll ask a few more questions.`;
     }
