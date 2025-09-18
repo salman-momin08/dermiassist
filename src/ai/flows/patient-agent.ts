@@ -32,7 +32,8 @@ const listAnalysesTool = ai.defineTool(
         })),
     },
     async ({ userId }) => {
-        return getAnalysesForUser(userId);
+        const analyses = await getAnalysesForUser(userId);
+        return analyses;
     }
 );
 
@@ -146,12 +147,15 @@ const patientAgentFlow = ai.defineFlow(
     }
     
     const output = modelResponse.output;
-    const toolResponse = modelResponse.toolResponses?.[0]?.output;
 
-    if (toolResponse) {
-        output.data = toolResponse;
+    if (modelResponse.toolRequest?.name === 'listAnalyses') {
+      const toolResponse = await listAnalysesTool(modelResponse.toolRequest.input);
+      output.data = toolResponse;
+    } else if (modelResponse.toolRequest?.name === 'startAnalysis') {
+      const toolResponse = await startAnalysisTool(modelResponse.toolRequest.input);
+      output.data = toolResponse;
     }
-
+    
      // If the tool returns a destination, we need to pass the photo through if it exists.
     if (output.action === 'startProforma' && output.destination && input.photoDataUri) {
         output.destination = `/analyze?condition=${encodeURIComponent(output.data.conditionName)}&image=${encodeURIComponent(input.photoDataUri)}`;
