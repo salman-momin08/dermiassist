@@ -136,8 +136,12 @@ export function PatientAgentDialog() {
         </Button>
       </DialogTrigger>
       <DialogContent className="p-0">
-        <Command shouldFilter={false}>
-          <div className="flex items-center border-b px-3">
+         <DialogHeader className="p-6 pb-0">
+            <DialogTitle>Patient Agent</DialogTitle>
+            <DialogDescription>Use text or voice to command the AI agent to navigate the app or retrieve information for you.</DialogDescription>
+        </DialogHeader>
+        <Command shouldFilter={false} className="p-0">
+          <div className="flex items-center border-b px-3 mx-6">
              <WandSparkles className="mr-2 h-4 w-4 shrink-0 opacity-50" />
              <CommandInput
                 placeholder="Ask the agent to do something... (e.g., 'start a new analysis')"
@@ -153,7 +157,7 @@ export function PatientAgentDialog() {
                 <Mic className="h-4 w-4" />
               </Button>
           </div>
-          <CommandList>
+          <CommandList className="mx-6 mb-4">
             {isLoading && (
               <div className="p-4 flex justify-center items-center">
                 <Loader2 className="h-6 w-6 animate-spin" />
