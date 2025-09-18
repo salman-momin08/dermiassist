@@ -11,7 +11,6 @@ import { Skeleton } from '../ui/skeleton';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '../ui/sheet';
 import { Menu, X } from 'lucide-react';
 import React from 'react';
-import { PatientAgentDialog } from '../agent/patient-agent-dialog';
 
 export function AppHeader() {
   const { user, role, loading } = useAuth();
@@ -100,7 +99,6 @@ export function AppHeader() {
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          {authenticated && role === 'patient' && <PatientAgentDialog />}
           <ThemeToggle />
           {loading ? (
             <Skeleton className="h-8 w-8 rounded-full" />

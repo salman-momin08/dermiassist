@@ -1,14 +1,15 @@
 
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
-import { Bot, Send, User, Loader2, Mic } from 'lucide-react';
+import { Bot, Send, User, Loader2, Mic, Upload } from 'lucide-react';
 import { Input } from '../ui/input';
 import { ScrollArea } from '../ui/scroll-area';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 import { chatbotFAQ } from '@/ai/flows/chatbot-faq';
+import { patientAgent, PatientAgentOutput } from '@/ai/flows/patient-agent';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -21,18 +22,24 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from 'next/navigation';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '../ui/label';
+import { format } from 'date-fns';
 
+
+type ChatMode = 'faq' | 'agent';
 
 interface Message {
     sender: 'user' | 'bot';
     text: string;
+    action?: PatientAgentOutput['action'];
+    data?: any;
+    destination?: string;
 }
 
-// Check for window object to avoid SSR errors with SpeechRecognition
-const SpeechRecognition =
-  typeof window !== 'undefined'
-    ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    : null;
+const SpeechRecognition = typeof window !== "undefined" ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition : null;
 
 
 export function Chatbot() {
@@ -42,14 +49,17 @@ export function Chatbot() {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
+    const [chatMode, setChatMode] = useState<ChatMode>('faq');
+    const [awaitingPhoto, setAwaitingPhoto] = useState(false);
+    
     const scrollViewportRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
+    const { user, loading: authLoading } = useAuth();
+    const router = useRouter();
 
-    // State for speech recognition
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const [isListening, setIsListening] = useState(false);
-    const [permissionDenied, setPermissionDenied] = useState(false);
-    const [showPermissionDialog, setShowPermissionDialog] = useState(false);
     const finalTranscriptRef = useRef('');
 
 
@@ -62,15 +72,12 @@ export function Chatbot() {
         }
     }, [messages]);
     
-    // Setup Speech Recognition
     useEffect(() => {
-        if (!SpeechRecognition) {
-            return;
-        }
+        if (!SpeechRecognition) return;
 
         const recognition = new SpeechRecognition();
-        recognition.continuous = false; // We want it to stop when the user pauses
-        recognition.interimResults = true; // Show results as they are being recognized
+        recognition.continuous = false;
+        recognition.interimResults = true;
         recognition.lang = 'en-US';
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -88,52 +95,77 @@ export function Chatbot() {
         
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
             console.error('Speech recognition error:', event.error);
-            if (event.error === 'no-speech') {
-                setIsListening(false);
-                return;
-            }
-
             if (event.error === 'not-allowed') {
-                 setPermissionDenied(true);
                  toast({ title: "Permission Denied", description: "Please enable microphone access in your browser settings.", variant: "destructive" });
-            } else {
-                toast({ title: "Speech Error", description: `An error occurred: ${event.error}`, variant: "destructive" });
             }
             setIsListening(false);
         };
         
         recognition.onend = () => {
             setIsListening(false);
-            // Auto-send the message once recognition ends, if there's content
             if (finalTranscriptRef.current.trim()) {
                 handleSend(finalTranscriptRef.current.trim());
-                finalTranscriptRef.current = ''; // Clear the ref
+                finalTranscriptRef.current = '';
             }
         };
 
         recognitionRef.current = recognition;
-
     }, [toast]);
 
-
-    const handleSend = async (messageToSend?: string) => {
+    const handleSend = async (messageToSend?: string, photoDataUri?: string) => {
         const currentInput = messageToSend || input;
-        if (!currentInput.trim()) return;
+        if ((!currentInput.trim() && !photoDataUri) || !user) {
+            if (!user && !authLoading) {
+                toast({ title: "Not logged in", description: "Please log in to use the agent.", variant: "destructive"});
+                setIsOpen(false);
+                router.push('/login');
+            }
+            return;
+        }
 
-        const userMessage: Message = { sender: 'user', text: currentInput };
+        const userMessage: Message = { sender: 'user', text: currentInput || "Sent an image for analysis" };
         const newMessages = [...messages, userMessage];
         setMessages(newMessages);
         setInput('');
         setIsLoading(true);
+        setAwaitingPhoto(false);
 
         try {
-            const history = newMessages.map(m => `${m.sender === 'bot' ? 'AI' : 'User'}: ${m.text}`).join('\n');
-            const response = await chatbotFAQ({ 
-                question: currentInput,
-                conversationHistory: history,
-            });
-            const botMessage: Message = { sender: 'bot', text: response.answer };
-            setMessages(prev => [...prev, botMessage]);
+            const historyString = newMessages.map(m => `${m.sender === 'bot' ? 'AI' : 'User'}: ${m.text}`).join('\n');
+            
+            if (chatMode === 'agent') {
+                const result = await patientAgent({ 
+                    userId: user.uid, 
+                    command: currentInput,
+                    conversationHistory: historyString,
+                    photoDataUri: photoDataUri 
+                });
+
+                const botMessage: Message = {
+                    sender: 'bot',
+                    text: result.response,
+                    action: result.action,
+                    data: result.data,
+                    destination: result.destination,
+                };
+                setMessages(prev => [...prev, botMessage]);
+
+                 if (result.action === 'navigate' || result.action === 'startProforma') {
+                    router.push(result.destination!);
+                    setIsOpen(false);
+                } else if (result.action === 'awaiting_photo') {
+                    setAwaitingPhoto(true);
+                }
+
+            } else { // FAQ Mode
+                const response = await chatbotFAQ({ 
+                    question: currentInput,
+                    conversationHistory: historyString,
+                });
+                const botMessage: Message = { sender: 'bot', text: response.answer };
+                setMessages(prev => [...prev, botMessage]);
+            }
+
         } catch (error) {
             const errorMessage: Message = { sender: 'bot', text: "Sorry, I'm having trouble connecting. Please try again later." };
             setMessages(prev => [...prev, errorMessage]);
@@ -142,51 +174,56 @@ export function Chatbot() {
         }
     };
     
-    const startRecognition = () => {
-        if (recognitionRef.current) {
-            try {
-                setInput(''); // Clear input before starting
-                finalTranscriptRef.current = '';
-                recognitionRef.current.start();
-                setIsListening(true);
-            } catch (e) {
-                console.error("Could not start recognition (already started?):", e);
-                setIsListening(false);
-            }
-        }
-    }
-
     const handleMicClick = async () => {
-        if (!recognitionRef.current) {
-            toast({ title: "Unsupported", description: "Speech recognition is not supported in your browser.", variant: "destructive" });
-            return;
+        if (!SpeechRecognition) {
+             toast({ title: "Unsupported", description: "Speech recognition is not supported in your browser.", variant: "destructive" });
+             return;
         }
         if (isListening) {
-            recognitionRef.current.stop();
+            recognitionRef.current?.stop();
             return;
         }
         
         try {
             const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
             if (permissionStatus.state === 'denied') {
-                setPermissionDenied(true);
                 toast({ title: "Permission Denied", description: "Please enable microphone access in your browser settings.", variant: "destructive" });
-                return;
+            } else {
+                 setInput('');
+                 finalTranscriptRef.current = '';
+                 recognitionRef.current?.start();
+                 setIsListening(true);
             }
-            if (permissionStatus.state === 'prompt') {
-                setShowPermissionDialog(true);
-                return;
-            }
-            
-            startRecognition();
-
         } catch (err) {
-            console.error("Error checking microphone permissions:", err);
-            // Fallback for browsers that don't support query
-            startRecognition();
+            setInput('');
+            finalTranscriptRef.current = '';
+            recognitionRef.current?.start();
+            setIsListening(true);
         }
     };
     
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const dataUri = reader.result as string;
+            handleSend("Here is the photo for the analysis.", dataUri);
+          };
+          reader.readAsDataURL(file);
+        }
+    };
+
+    const handleSelectAction = (cb: () => void) => {
+      cb();
+      setIsOpen(false);
+    }
+
+    // Hide chatbot if user is not logged in.
+    if (!user && !authLoading) {
+        return null;
+    }
+
     return (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
@@ -204,33 +241,59 @@ export function Chatbot() {
                         <Bot className="text-primary"/>
                         DermiAssist-AI Assistant
                     </SheetTitle>
-                    <SheetDescription>
-                        Ask me anything about skin conditions or how to use the platform.
-                    </SheetDescription>
+                     <div className="!mt-4 space-y-2">
+                        <Label>Assistant Mode</Label>
+                        <Select value={chatMode} onValueChange={(v) => setChatMode(v as ChatMode)}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a mode" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="faq">FAQ Assistant</SelectItem>
+                                <SelectItem value="agent">Patient Agent (Advanced)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <SheetDescription>
+                            {chatMode === 'faq' 
+                                ? "Ask general questions about dermatology or the platform." 
+                                : "Give commands to navigate the app or perform tasks."
+                            }
+                        </SheetDescription>
+                    </div>
                 </SheetHeader>
                 <ScrollArea className="flex-grow my-4 pr-4 -mr-6" viewportRef={scrollViewportRef}>
                     <div className="space-y-4">
                         {messages.map((message, index) => (
-                             <div key={index} className={cn("flex items-start gap-3", message.sender === 'user' ? 'justify-end' : '')}>
-                                {message.sender === 'bot' && (
-                                    <Avatar className="h-8 w-8">
-                                        <AvatarFallback><Bot /></AvatarFallback>
-                                    </Avatar>
-                                )}
-                                <div className={cn("rounded-lg px-4 py-2 max-w-[80%]", message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                    <p className="text-sm">{message.text}</p>
+                             <div key={index}>
+                                <div className={cn("flex items-start gap-3", message.sender === 'user' ? 'justify-end' : '')}>
+                                    {message.sender === 'bot' && (
+                                        <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                                            <AvatarFallback><Bot size={18} /></AvatarFallback>
+                                        </Avatar>
+                                    )}
+                                    <div className={cn("rounded-lg px-4 py-2 max-w-[80%]", message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                        <p className="text-sm" dangerouslySetInnerHTML={{ __html: message.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                    </div>
+                                    {message.sender === 'user' && (
+                                        <Avatar className="h-8 w-8">
+                                            <AvatarFallback><User size={18} /></AvatarFallback>
+                                        </Avatar>
+                                    )}
                                 </div>
-                                {message.sender === 'user' && (
-                                     <Avatar className="h-8 w-8">
-                                        <AvatarFallback><User /></AvatarFallback>
-                                    </Avatar>
+                                {message.action === 'showAnalyses' && message.data && (
+                                    <div className="space-y-2 mt-2 ml-11">
+                                        {message.data.map((report: any) => (
+                                            <Button key={report.id} variant="outline" size="sm" className="w-full justify-start" onClick={() => handleSelectAction(() => router.push(`/my-analyses/${report.id}`))}>
+                                                View report for {report.conditionName} from {format(new Date(report.date), "MMM d, yyyy")}
+                                            </Button>
+                                        ))}
+                                    </div>
                                 )}
                             </div>
                         ))}
                          {isLoading && (
                             <div className="flex items-start gap-3">
-                                <Avatar className="h-8 w-8">
-                                    <AvatarFallback><Bot /></AvatarFallback>
+                                <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                                    <AvatarFallback><Bot size={18} /></AvatarFallback>
                                 </Avatar>
                                 <div className="rounded-lg px-4 py-2 bg-muted flex items-center">
                                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -242,12 +305,17 @@ export function Chatbot() {
                 <SheetFooter>
                     <div className="flex w-full items-center space-x-2">
                         <Input
-                            placeholder="Type or click the mic to talk..."
+                            placeholder={isListening ? "Listening..." : "Type a message..."}
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                             disabled={isLoading}
                         />
+                         {awaitingPhoto && (
+                            <Button size="icon" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
+                                <Upload className="h-4 w-4" />
+                            </Button>
+                         )}
                          <Button size="icon" variant={isListening ? 'destructive' : 'outline'} onClick={handleMicClick} disabled={isLoading}>
                             <Mic className="h-4 w-4" />
                             <span className="sr-only">Use Microphone</span>
@@ -258,22 +326,7 @@ export function Chatbot() {
                         </Button>
                     </div>
                 </SheetFooter>
-                
-                 <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
-                     <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Microphone Access</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                DermiAssist-AI needs access to your microphone to enable the speech-to-text feature. Click Continue to allow access in the upcoming browser prompt.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => { startRecognition(); setShowPermissionDialog(false); }}>Continue</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-
+                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
             </SheetContent>
         </Sheet>
     );
