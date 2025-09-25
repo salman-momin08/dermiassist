@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './use-auth';
 import { db } from '@/lib/firebase';
-import { collection, doc, addDoc, getDoc, getDocs, deleteDoc, query, orderBy, onSnapshot, updateDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, getDoc, getDocs, deleteDoc, query, orderBy, onSnapshot, updateDoc, writeBatch } from 'firebase/firestore';
 
 
 export interface Explanation {
@@ -88,10 +88,6 @@ export function useAnalyses() {
     const getAnalysisById = useCallback(async (userId: string, analysisId: string): Promise<AnalysisReport | undefined> => {
         if (!userId || !analysisId) return undefined;
         
-        // Check local state first for speed
-        const localAnalysis = analyses.find(a => a.id === analysisId);
-        if (localAnalysis) return localAnalysis;
-
         try {
             const docRef = doc(db, 'users', userId, 'analyses', analysisId);
             const docSnap = await getDoc(docRef);
@@ -106,22 +102,29 @@ export function useAnalyses() {
             console.error("Error fetching document:", error);
             return undefined;
         }
-    }, [analyses]);
+    }, []);
 
     const updateAnalysis = useCallback(async (userId: string, analysisId: string, data: Partial<AnalysisReport>) => {
         if (!userId || !analysisId) return;
         const docRef = doc(db, 'users', userId, 'analyses', analysisId);
         await updateDoc(docRef, data);
-        // The onSnapshot listener will update the state automatically, but we can force a local update for immediate UI response.
-        setAnalyses(prev => prev.map(a => a.id === analysisId ? { ...a, ...data } : a));
+        setAnalyses(prev => prev.map(a => a.id === analysisId ? { ...a, ...data } as AnalysisReport : a));
     }, []);
 
     const deleteAnalysis = useCallback(async (userId: string, id: string) => {
         if (!userId) throw new Error("User not authenticated.");
         const docRef = doc(db, 'users', userId, 'analyses', id);
         await deleteDoc(docRef);
-        // The onSnapshot listener will automatically update the local state
     }, []);
 
-    return { analyses, addAnalysis, getAnalysisById, updateAnalysis, deleteAnalysis, isLoading };
+    // New function added
+    const forceAnalysisReload = useCallback(async (analysisId: string) => {
+        if (!user) return;
+        const freshData = await getAnalysisById(user.uid, analysisId);
+        if (freshData) {
+            setAnalyses(prev => prev.map(a => a.id === analysisId ? freshData : a));
+        }
+    }, [user, getAnalysisById]);
+
+    return { analyses, addAnalysis, getAnalysisById, updateAnalysis, deleteAnalysis, isLoading, forceAnalysisReload };
 }

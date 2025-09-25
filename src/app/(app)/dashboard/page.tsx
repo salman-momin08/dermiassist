@@ -12,6 +12,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, ResponsiveContainer } from "rechar
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, subMonths, startOfMonth } from "date-fns";
+import { motion } from 'framer-motion';
 
 const chartConfig = {
   analyses: {
@@ -98,6 +99,11 @@ export default function DashboardPage() {
     )
   }
 
+  const statCardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
+  };
+
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0 mb-8">
@@ -119,38 +125,49 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Analyses</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.totalAnalyses}</div>
-            <p className="text-xs text-muted-foreground">+{dashboardStats.analysesLastMonth} since last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Appointments</CardTitle>
-            <Stethoscope className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{mockAppointments.total}</div>
-            <p className="text-xs text-muted-foreground">{mockAppointments.upcoming} upcoming</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reports Generated</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.totalAnalyses}</div>
-            <p className="text-xs text-muted-foreground">All reports are downloadable</p>
-          </CardContent>
-        </Card>
-      </div>
+      <motion.div 
+        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8"
+        initial="hidden"
+        animate="visible"
+        variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+      >
+        <motion.div variants={statCardVariants}>
+          <Card className="hover:border-primary/50 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Analyses</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{dashboardStats.totalAnalyses}</div>
+              <p className="text-xs text-muted-foreground">+{dashboardStats.analysesLastMonth} since last month</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <motion.div variants={statCardVariants}>
+          <Card className="hover:border-primary/50 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Appointments</CardTitle>
+              <Stethoscope className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{mockAppointments.total}</div>
+              <p className="text-xs text-muted-foreground">{mockAppointments.upcoming} upcoming</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <motion.div variants={statCardVariants}>
+          <Card className="hover:border-primary/50 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Reports Generated</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{dashboardStats.totalAnalyses}</div>
+              <p className="text-xs text-muted-foreground">All reports are downloadable</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
 
       <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-7">
         <Card className="lg:col-span-4">

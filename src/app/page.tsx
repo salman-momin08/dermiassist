@@ -13,18 +13,33 @@ import { AppHeader } from '@/components/layout/header';
 import { AppFooter } from '@/components/layout/footer';
 import { Logo } from '@/components/logo';
 import { LoadingOverlay } from '@/components/ui/loading-overlay';
+import { motion } from 'framer-motion';
 
 function LandingPageContent() {
+  const featureVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.1 } },
+  };
+
+  const featureItemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
+  };
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader />
       <main className="flex-1">
-        <section className="w-full py-20 md:py-32 lg:py-40 bg-primary/10">
+        <section className="w-full py-20 md:py-32 lg:py-40 bg-background">
           <div className="container px-4 md:px-6">
             <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
-              <div className="flex flex-col justify-center space-y-4">
-                <div className="space-y-2">
-                  <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-headline">
+               <motion.div 
+                className="flex flex-col justify-center space-y-4"
+                initial={{ opacity: 0, x: -50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <div className="space-y-4">
+                  <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-headline">
                     Intelligent Skin Care, Right at Your Fingertips
                   </h1>
                   <p className="max-w-[600px] text-muted-foreground md:text-xl">
@@ -41,24 +56,30 @@ function LandingPageContent() {
                     <Link href="/login">Sign In</Link>
                   </Button>
                 </div>
-              </div>
-              <Image
-                src="/landing.png"
-                width="600"
-                height="400"
-                alt="Hero"
-                data-ai-hint="dermatology technology"
-                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last lg:aspect-square"
-              />
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+              >
+                <Image
+                  src="https://picsum.photos/seed/derm-hero/600/600"
+                  width="600"
+                  height="600"
+                  alt="Hero"
+                  data-ai-hint="dermatology technology"
+                  className="mx-auto aspect-square overflow-hidden rounded-xl object-cover shadow-2xl"
+                />
+              </motion.div>
             </div>
           </div>
         </section>
 
-        <section id="features" className="w-full py-12 md:py-24 lg:py-32">
+        <section id="features" className="w-full py-12 md:py-24 lg:py-32 bg-muted/30">
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center justify-center space-y-4 text-center">
               <div className="space-y-2">
-                <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm">
+                <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm font-semibold">
                   Key Features
                 </div>
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">
@@ -71,36 +92,42 @@ function LandingPageContent() {
                 </p>
               </div>
             </div>
-            <div className="mx-auto grid max-w-5xl items-start gap-8 sm:grid-cols-2 md:gap-12 lg:grid-cols-3 lg:max-w-none mt-12">
-              <div className="grid gap-1 text-center">
+             <motion.div
+              className="mx-auto grid max-w-5xl items-start gap-8 sm:grid-cols-2 md:gap-12 lg:grid-cols-3 lg:max-w-none mt-12"
+              variants={featureVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.2 }}
+            >
+              <motion.div className="grid gap-2 text-center p-4 rounded-lg hover:bg-card transition-colors duration-300" variants={featureItemVariants}>
                 <Bot className="h-10 w-10 mx-auto text-primary" />
                 <h3 className="text-lg font-bold">AI Analysis</h3>
                 <p className="text-sm text-muted-foreground">
                   Get an instant, detailed analysis of your skin condition by
                   uploading a photo.
                 </p>
-              </div>
-              <div className="grid gap-1 text-center">
+              </motion.div>
+              <motion.div className="grid gap-2 text-center p-4 rounded-lg hover:bg-card transition-colors duration-300" variants={featureItemVariants}>
                 <FileText className="h-10 w-10 mx-auto text-primary" />
                 <h3 className="text-lg font-bold">Personalized Reports</h3>
                 <p className="text-sm text-muted-foreground">
                   Receive comprehensive reports with do's, don'ts, and
                   recommendations for your skin.
                 </p>
-              </div>
-              <div className="grid gap-1 text-center">
+              </motion.div>
+              <motion.div className="grid gap-2 text-center p-4 rounded-lg hover:bg-card transition-colors duration-300" variants={featureItemVariants}>
                 <Stethoscope className="h-10 w-10 mx-auto text-primary" />
                 <h3 className="text-lg font-bold">Find a Doctor</h3>
                 <p className="text-sm text-muted-foreground">
                   Connect with certified dermatologists for online or offline
                   consultations.
                 </p>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           </div>
         </section>
 
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+        <section className="w-full py-12 md:py-24 lg:py-32">
           <div className="container grid items-center justify-center gap-4 px-4 text-center md:px-6">
             <div className="space-y-3">
               <h2 className="text-3xl font-bold tracking-tighter md:text-4xl/tight font-headline">
@@ -112,7 +139,7 @@ function LandingPageContent() {
               </p>
             </div>
             <div className="mx-auto w-full max-w-sm space-x-2">
-              <Button asChild>
+              <Button asChild size="lg">
                 <Link href="/signup">Sign Up Now</Link>
               </Button>
             </div>
@@ -145,7 +172,7 @@ export default function LandingPage() {
   return (
     <>
       <LoadingOverlay isLoading={loading || !!user} message="Loading your dashboard..." />
-      <LandingPageContent />
+      {!user && <LandingPageContent />}
     </>
   );
 }

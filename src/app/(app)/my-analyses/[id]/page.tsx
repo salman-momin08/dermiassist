@@ -54,7 +54,7 @@ type ExplanationMessage = {
 export default function AnalysisDetailPage() {
     const params = useParams();
     const id = params.id as string;
-    const { getAnalysisById, updateAnalysis, forceAnalysisReload } = useAnalyses();
+    const { getAnalysisById, updateAnalysis } = useAnalyses();
     const { user, userData, loading: isAuthLoading } = useAuth();
     const router = useRouter();
 
@@ -300,9 +300,6 @@ export default function AnalysisDetailPage() {
             
             await updateAnalysis(user.uid, analysis.id, { explanations: updatedExplanations });
             
-            // Immediately reload the analysis data in the hook to ensure consistency
-            await forceAnalysisReload(analysis.id);
-
         } catch (error) {
             console.error("Failed to save explanation:", error);
             toast({
@@ -470,156 +467,163 @@ export default function AnalysisDetailPage() {
             const pageHeight = pdf.internal.pageSize.getHeight();
             const margin = 15;
 
-            pdf.setFontSize(18);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('DermiAssist-AI AI Skin Analysis Report', pageWidth / 2, margin + 5, { align: 'center' });
-            
-            pdf.setFontSize(10);
-            pdf.setFont('helvetica', 'normal');
-            pdf.text(`Report ID: ${analysis.id}`, pageWidth / 2, margin + 10, { align: 'center' });
+            // Load logo
+            const logoImg = new window.Image();
+            logoImg.src = '/dermilogo.png';
+            logoImg.crossOrigin = "Anonymous";
 
-
-            pdf.setLineWidth(0.5);
-            pdf.line(margin, margin + 15, pageWidth - margin, margin + 15);
-
-            let yPos = margin + 25;
-
-            pdf.setFontSize(12);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('Patient Information', margin, yPos);
-            yPos += 7;
-
-            pdf.setFont('helvetica', 'normal');
-            pdf.text(`Name: ${userData.displayName || 'N/A'}`, margin, yPos);
-            yPos += 7;
-            pdf.text(`Date of Birth: ${userData.dob ? new Date(userData.dob).toLocaleDateString() : 'N/A'}`, margin, yPos);
-            yPos += 7;
-            pdf.text(`Address: ${userData.address || 'N/A'}`, margin, yPos);
-            yPos += 10;
-            
-            pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
-            yPos += 7;
-
-            pdf.setFontSize(12);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('Analysis Details', margin, yPos);
-            yPos += 7;
-            
-            pdf.setFont('helvetica', 'normal');
-            pdf.text(`Analysis Date: ${new Date(analysis.date).toLocaleString()}`, margin, yPos);
-            yPos += 7;
-            pdf.text(`Condition Identified:`, margin, yPos);
-            yPos += 5;
-            pdf.setFont('helvetica', 'bold');
-            const conditionNameText = pdf.splitTextToSize(analysis.conditionName, pageWidth - (margin * 2) - 5);
-            pdf.text(conditionNameText, margin + 5, yPos);
-            yPos += conditionNameText.length * 5 + 5;
-            
-            pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
-            yPos += 7;
-
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('Submitted Information', margin, yPos);
-            yPos += 7;
-
-            const img = new window.Image();
-            img.src = analysis.image;
-            img.crossOrigin = "Anonymous"; 
-            img.onload = () => {
-                const imgProps = pdf.getImageProperties(img);
-                const imgRatio = imgProps.width / imgProps.height;
-                const imgWidth = 60;
-                const imgHeight = imgWidth / imgRatio;
-
-                pdf.addImage(img, 'JPEG', margin, yPos, imgWidth, imgHeight);
-                
-                let textX = margin + imgWidth + 10;
-                let textY = yPos + 5;
-                const textMaxWidth = pageWidth - textX - margin;
-                
-                if (analysis.submittedInfo?.proformaAnswers && analysis.submittedInfo.proformaAnswers.length > 0) {
-                    analysis.submittedInfo.proformaAnswers.forEach(qa => {
-                        pdf.setFont('helvetica', 'bold');
-                        const question = pdf.splitTextToSize(`Q: ${cleanText(qa.question)}`, textMaxWidth);
-                        pdf.text(question, textX, textY);
-                        textY += question.length * 4 + 2;
-                        
-                        pdf.setFont('helvetica', 'normal');
-                        const answer = pdf.splitTextToSize(`A: ${cleanText(qa.answer)}`, textMaxWidth);
-                        pdf.text(answer, textX, textY);
-                        textY += answer.length * 4 + 4;
-                    });
-                } else {
-                     pdf.setFont('helvetica', 'normal');
-                     pdf.text("No additional information was provided for this analysis.", textX, textY);
-                     textY += 10;
-                }
-                
-                let contentBottomY = Math.max(yPos + imgHeight, textY);
-                yPos = contentBottomY + 10;
-
-                const checkAndSwitchPage = (neededHeight: number) => {
-                  if (yPos + neededHeight > pageHeight - margin) {
-                    pdf.addPage();
-                    yPos = margin;
-                  }
-                };
-
-                checkAndSwitchPage(20);
-                pdf.setFontSize(14);
+            logoImg.onload = () => {
+                pdf.addImage(logoImg, 'PNG', margin, margin, 12, 12);
+                pdf.setFontSize(18);
                 pdf.setFont('helvetica', 'bold');
-                pdf.text('Expert Recommendations', margin, yPos);
+                pdf.text('DermiAssist-AI Report', margin + 15, margin + 9);
+                
+                pdf.setFontSize(10);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text(`Report ID: ${analysis.id}`, pageWidth - margin, margin + 9, { align: 'right' });
+
+                pdf.setLineWidth(0.5);
+                pdf.line(margin, margin + 15, pageWidth - margin, margin + 15);
+
+                let yPos = margin + 25;
+
+                pdf.setFontSize(12);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text('Patient Information', margin, yPos);
                 yPos += 7;
-                pdf.setFontSize(10);
-                pdf.setFont('helvetica', 'normal');
-                const recommendationsText = pdf.splitTextToSize(cleanText(analysis.recommendations), pageWidth - (margin * 2));
-                pdf.text(recommendationsText, margin, yPos);
-                yPos += recommendationsText.length * 4 + 5;
 
-                checkAndSwitchPage(20);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text(`Name: ${userData.displayName || 'N/A'}`, margin, yPos);
+                yPos += 7;
+                pdf.text(`Date of Birth: ${userData.dob ? new Date(userData.dob).toLocaleDateString() : 'N/A'}`, margin, yPos);
+                yPos += 7;
+                pdf.text(`Address: ${userData.address || 'N/A'}`, margin, yPos);
+                yPos += 10;
+                
+                pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
+                yPos += 7;
+
                 pdf.setFontSize(12);
                 pdf.setFont('helvetica', 'bold');
-                pdf.text("Do's:", margin, yPos);
-                yPos += 6;
-                pdf.setFontSize(10);
-                pdf.setFont('helvetica', 'normal');
-                analysis.dos.forEach(item => {
-                    checkAndSwitchPage(5);
-                    const itemText = pdf.splitTextToSize(`- ${cleanText(item)}`, pageWidth - (margin * 2) - 5);
-                    pdf.text(itemText, margin + 5, yPos);
-                    yPos += itemText.length * 4 + 2;
-                });
+                pdf.text('Analysis Details', margin, yPos);
+                yPos += 7;
                 
+                pdf.setFont('helvetica', 'normal');
+                pdf.text(`Analysis Date: ${new Date(analysis.date).toLocaleString()}`, margin, yPos);
+                yPos += 7;
+                pdf.text(`Condition Identified:`, margin, yPos);
                 yPos += 5;
-                checkAndSwitchPage(20);
-                pdf.setFontSize(12);
                 pdf.setFont('helvetica', 'bold');
-                pdf.text("Don'ts:", margin, yPos);
-                yPos += 6;
-                pdf.setFontSize(10);
-                pdf.setFont('helvetica', 'normal');
-                analysis.donts.forEach(item => {
-                    checkAndSwitchPage(5);
-                    const itemText = pdf.splitTextToSize(`- ${cleanText(item)}`, pageWidth - (margin * 2) - 5);
-                    pdf.text(itemText, margin + 5, yPos);
-                    yPos += itemText.length * 4 + 2;
-                });
+                const conditionNameText = pdf.splitTextToSize(analysis.conditionName, pageWidth - (margin * 2) - 5);
+                pdf.text(conditionNameText, margin + 5, yPos);
+                yPos += conditionNameText.length * 5 + 5;
                 
-                if (analysis.submittedInfo?.otherConsiderations) {
-                    yPos += 5;
+                pdf.line(margin, yPos-3, pageWidth - margin, yPos-3);
+                yPos += 7;
+
+                pdf.setFont('helvetica', 'bold');
+                pdf.text('Submitted Information', margin, yPos);
+                yPos += 7;
+
+                const submittedImg = new window.Image();
+                submittedImg.src = analysis.image;
+                submittedImg.crossOrigin = "Anonymous"; 
+                submittedImg.onload = () => {
+                    const imgProps = pdf.getImageProperties(submittedImg);
+                    const imgRatio = imgProps.width / imgProps.height;
+                    const imgWidth = 60;
+                    const imgHeight = imgWidth / imgRatio;
+
+                    pdf.addImage(submittedImg, 'JPEG', margin, yPos, imgWidth, imgHeight);
+                    
+                    let textX = margin + imgWidth + 10;
+                    let textY = yPos + 5;
+                    const textMaxWidth = pageWidth - textX - margin;
+                    
+                    if (analysis.submittedInfo?.proformaAnswers && analysis.submittedInfo.proformaAnswers.length > 0) {
+                        analysis.submittedInfo.proformaAnswers.forEach(qa => {
+                            pdf.setFont('helvetica', 'bold');
+                            const question = pdf.splitTextToSize(`Q: ${cleanText(qa.question)}`, textMaxWidth);
+                            pdf.text(question, textX, textY);
+                            textY += question.length * 4 + 2;
+                            
+                            pdf.setFont('helvetica', 'normal');
+                            const answer = pdf.splitTextToSize(`A: ${cleanText(qa.answer)}`, textMaxWidth);
+                            pdf.text(answer, textX, textY);
+                            textY += answer.length * 4 + 4;
+                        });
+                    } else {
+                         pdf.setFont('helvetica', 'normal');
+                         pdf.text("No additional information was provided for this analysis.", textX, textY);
+                         textY += 10;
+                    }
+                    
+                    let contentBottomY = Math.max(yPos + imgHeight, textY);
+                    yPos = contentBottomY + 10;
+
+                    const checkAndSwitchPage = (neededHeight: number) => {
+                      if (yPos + neededHeight > pageHeight - margin) {
+                        pdf.addPage();
+                        yPos = margin;
+                      }
+                    };
+
                     checkAndSwitchPage(20);
                     pdf.setFontSize(14);
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text('Deeper Analysis & Other Considerations', margin, yPos);
+                    pdf.text('Expert Recommendations', margin, yPos);
                     yPos += 7;
                     pdf.setFontSize(10);
                     pdf.setFont('helvetica', 'normal');
-                    const otherConsiderationsText = pdf.splitTextToSize(cleanText(analysis.submittedInfo.otherConsiderations), pageWidth - (margin * 2));
-                    pdf.text(otherConsiderationsText, margin, yPos);
-                    yPos += otherConsiderationsText.length * 4 + 5;
-                }
+                    const recommendationsText = pdf.splitTextToSize(cleanText(analysis.recommendations), pageWidth - (margin * 2));
+                    pdf.text(recommendationsText, margin, yPos);
+                    yPos += recommendationsText.length * 4 + 5;
 
-                pdf.save(`DermiAssist-AI-Report-${analysis.id}.pdf`);
+                    checkAndSwitchPage(20);
+                    pdf.setFontSize(12);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text("Do's:", margin, yPos);
+                    yPos += 6;
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'normal');
+                    analysis.dos.forEach(item => {
+                        checkAndSwitchPage(5);
+                        const itemText = pdf.splitTextToSize(`- ${cleanText(item)}`, pageWidth - (margin * 2) - 5);
+                        pdf.text(itemText, margin + 5, yPos);
+                        yPos += itemText.length * 4 + 2;
+                    });
+                    
+                    yPos += 5;
+                    checkAndSwitchPage(20);
+                    pdf.setFontSize(12);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text("Don'ts:", margin, yPos);
+                    yPos += 6;
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'normal');
+                    analysis.donts.forEach(item => {
+                        checkAndSwitchPage(5);
+                        const itemText = pdf.splitTextToSize(`- ${cleanText(item)}`, pageWidth - (margin * 2) - 5);
+                        pdf.text(itemText, margin + 5, yPos);
+                        yPos += itemText.length * 4 + 2;
+                    });
+                    
+                    if (analysis.submittedInfo?.otherConsiderations) {
+                        yPos += 5;
+                        checkAndSwitchPage(20);
+                        pdf.setFontSize(14);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.text('Deeper Analysis & Other Considerations', margin, yPos);
+                        yPos += 7;
+                        pdf.setFontSize(10);
+                        pdf.setFont('helvetica', 'normal');
+                        const otherConsiderationsText = pdf.splitTextToSize(cleanText(analysis.submittedInfo.otherConsiderations), pageWidth - (margin * 2));
+                        pdf.text(otherConsiderationsText, margin, yPos);
+                        yPos += otherConsiderationsText.length * 4 + 5;
+                    }
+
+                    pdf.save(`DermiAssist-AI-Report-${analysis.id}.pdf`);
+                };
             };
 
         } catch (error) {
