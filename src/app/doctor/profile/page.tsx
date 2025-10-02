@@ -29,6 +29,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from "firebase/auth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 type VerificationStatus = 'Verified' | 'Pending' | 'Not Verified';
@@ -322,7 +323,18 @@ export default function DoctorProfilePage() {
                             </div>
                              <div className="space-y-2">
                                 <Label htmlFor="specialization">Specialization</Label>
-                                <Input id="specialization" value={formState.specialization} onChange={(e) => handleProfileInputChange('specialization', e.target.value)} />
+                                <Select value={formState.specialization} onValueChange={(v) => handleProfileInputChange('specialization', v)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select your specialization" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="General Dermatology">General Dermatology</SelectItem>
+                                        <SelectItem value="Cosmetic Dermatology">Cosmetic Dermatology</SelectItem>
+                                        <SelectItem value="Pediatric Dermatology">Pediatric Dermatology</SelectItem>
+                                        <SelectItem value="Dermatopathology">Dermatopathology</SelectItem>
+                                        <SelectItem value="Mohs Surgery">Mohs Surgery</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="space-y-2">
@@ -518,5 +530,3 @@ export default function DoctorProfilePage() {
         </div>
     );
 }
-
-    

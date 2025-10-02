@@ -339,11 +339,11 @@ export default function SignupPage() {
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                                         <FormControl><SelectTrigger><SelectValue placeholder="Select your specialization" /></SelectTrigger></FormControl>
                                         <SelectContent>
-                                            <SelectItem value="general-dermatology">General Dermatology</SelectItem>
-                                            <SelectItem value="cosmetic-dermatology">Cosmetic Dermatology</SelectItem>
-                                            <SelectItem value="pediatric-dermatology">Pediatric Dermatology</SelectItem>
-                                            <SelectItem value="dermatopathology">Dermatopathology</SelectItem>
-                                            <SelectItem value="mohs-surgery">Mohs Surgery</SelectItem>
+                                            <SelectItem value="General Dermatology">General Dermatology</SelectItem>
+                                            <SelectItem value="Cosmetic Dermatology">Cosmetic Dermatology</SelectItem>
+                                            <SelectItem value="Pediatric Dermatology">Pediatric Dermatology</SelectItem>
+                                            <SelectItem value="Dermatopathology">Dermatopathology</SelectItem>
+                                            <SelectItem value="Mohs Surgery">Mohs Surgery</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />
