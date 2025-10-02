@@ -102,10 +102,10 @@ export default function LoginPage() {
   };
   
   const containerVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, scale: 0.95 },
     visible: {
       opacity: 1,
-      y: 0,
+      scale: 1,
       transition: {
         delay: 0.1,
         when: "beforeChildren",
@@ -217,5 +217,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    

@@ -119,7 +119,7 @@ export default function SignupPage() {
       password: "",
       confirmPassword: "",
       medicalId: "",
-      specialization: "general-dermatology",
+      specialization: "General Dermatology",
       acceptTerms: false,
       acceptPrivacy: false,
     },
@@ -174,7 +174,7 @@ export default function SignupPage() {
       };
 
       if (values.role === 'doctor') {
-        userData.specialization = "General Dermatology"; // Default value for now
+        userData.specialization = values.specialization;
         userData.medicalId = values.medicalId;
         userData.verified = false;
       }
@@ -214,10 +214,10 @@ export default function SignupPage() {
   const RequiredIndicator = () => <span className="text-destructive"> *</span>;
   
   const containerVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, scale: 0.95 },
     visible: {
       opacity: 1,
-      y: 0,
+      scale: 1,
       transition: {
         delay: 0.1,
         when: "beforeChildren",
@@ -363,11 +363,11 @@ export default function SignupPage() {
                                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                                       <FormControl><SelectTrigger><SelectValue placeholder="Select your specialization" /></SelectTrigger></FormControl>
                                       <SelectContent>
-                                          <SelectItem value="general-dermatology">General Dermatology</SelectItem>
-                                          <SelectItem value="cosmetic-dermatology">Cosmetic Dermatology</SelectItem>
-                                          <SelectItem value="pediatric-dermatology">Pediatric Dermatology</SelectItem>
-                                          <SelectItem value="dermatopathology">Dermatopathology</SelectItem>
-                                          <SelectItem value="mohs-surgery">Mohs Surgery</SelectItem>
+                                          <SelectItem value="General Dermatology">General Dermatology</SelectItem>
+                                          <SelectItem value="Cosmetic Dermatology">Cosmetic Dermatology</SelectItem>
+                                          <SelectItem value="Pediatric Dermatology">Pediatric Dermatology</SelectItem>
+                                          <SelectItem value="Dermatopathology">Dermatopathology</SelectItem>
+                                          <SelectItem value="Mohs Surgery">Mohs Surgery</SelectItem>
                                       </SelectContent>
                                   </Select>
                                   <FormMessage />
@@ -457,5 +457,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
-    
