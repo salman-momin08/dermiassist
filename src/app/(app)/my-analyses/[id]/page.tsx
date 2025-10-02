@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit, Languages, Mic, Send, Bot, User, Volume2 } from "lucide-react";
+import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit, Languages, Mic, Send, Bot, User, Volume2, Stethoscope, MapPin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -25,7 +25,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { textToSpeech } from '@/ai/flows/text-to-speech';
 import { uploadFile } from '@/lib/actions';
+import { recommendDoctors, RecommendDoctorsOutput } from '@/ai/flows/recommend-doctors';
 
 
 // Check for window object to avoid SSR errors with SpeechRecognition
@@ -84,6 +85,10 @@ export default function AnalysisDetailPage() {
     const [isAudioLoading, setIsAudioLoading] = useState<string | null>(null); // Store text of the message being loaded
     const [audioCache, setAudioCache] = useState<Record<string, string>>({});
     const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+    // State for doctor recommendations
+    const [isRecommending, setIsRecommending] = useState(false);
+    const [recommendationResult, setRecommendationResult] = useState<RecommendDoctorsOutput | null>(null);
 
 
     // State for speech recognition
@@ -669,6 +674,25 @@ export default function AnalysisDetailPage() {
             setPlayingAudio(null);
         }
     };
+    
+    const handleFindSpecialist = async () => {
+        if (!analysis) return;
+        setIsRecommending(true);
+        setRecommendationResult(null);
+        try {
+            const result = await recommendDoctors({ conditionName: analysis.conditionName });
+            setRecommendationResult(result);
+        } catch (error) {
+            console.error("Failed to get recommendations:", error);
+            toast({
+                title: "Recommendation Failed",
+                description: "Could not fetch doctor recommendations at this time.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsRecommending(false);
+        }
+    };
 
 
     if (isLoading) {
@@ -788,6 +812,63 @@ export default function AnalysisDetailPage() {
                         </CardContent>
                     </Card>
                     
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button className="w-full" onClick={handleFindSpecialist}>
+                                {isRecommending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Stethoscope className="mr-2 h-4 w-4" />}
+                                Find a Specialist
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                             <DialogHeader>
+                                <DialogTitle>Recommended Doctors</DialogTitle>
+                                <DialogDescription>
+                                    Based on your analysis for {analysis.conditionName}, here are some recommended specialists.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="py-4">
+                                {isRecommending ? (
+                                    <div className="flex justify-center items-center h-24">
+                                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                    </div>
+                                ) : recommendationResult ? (
+                                    <div className="space-y-4">
+                                         <Alert>
+                                            <Sparkles className="h-4 w-4" />
+                                            <AlertTitle>Recommendation</AlertTitle>
+                                            <AlertDescription>
+                                                {recommendationResult.recommendationReason}
+                                            </AlertDescription>
+                                        </Alert>
+                                        {recommendationResult.doctors.length > 0 ? (
+                                            <ul className="space-y-3">
+                                                {recommendationResult.doctors.map(doc => (
+                                                    <li key={doc.id} className="flex items-center justify-between p-2 rounded-md border hover:bg-muted/50">
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar>
+                                                                <AvatarImage src={doc.avatar} alt={doc.name} data-ai-hint="doctor portrait" />
+                                                                <AvatarFallback>{doc.name.charAt(0)}</AvatarFallback>
+                                                            </Avatar>
+                                                            <div>
+                                                                <p className="font-semibold">{doc.name}</p>
+                                                                <p className="text-sm text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" /> {doc.location}</p>
+                                                            </div>
+                                                        </div>
+                                                        <Button size="sm" asChild><Link href={`/doctors`}>Book</Link></Button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                             <p className="text-center text-muted-foreground py-4">No doctors found matching the recommended specialization.</p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-center text-muted-foreground py-4">Click "Find a Specialist" to get recommendations.</p>
+                                )}
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+
                      <Dialog open={explanationDialogOpen} onOpenChange={(open) => { setExplanationDialogOpen(open); if(!open) resetExplanationDialog(); }}>
                         <DialogTrigger asChild>
                             <Button className="w-full" onClick={onExplanationModalOpen}>

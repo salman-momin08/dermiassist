@@ -17,3 +17,5 @@ import '@/ai/flows/explain-report-multimodal.ts';
 import '@/ai/flows/text-to-speech.ts';
 import '@/ai/flows/generate-agora-token.ts';
 import '@/ai/flows/patient-agent.ts';
+import '@/ai/flows/recommend-doctors.ts';
+

@@ -23,3 +23,30 @@ export async function getAnalysesForUser(userId: string) {
     
     return reports;
 }
+
+
+export async function getVerifiedDoctorsBySpecialization(specialization: string) {
+    const doctorsRef = collection(db, "users");
+    const q = query(
+        doctorsRef, 
+        where("role", "==", "doctor"),
+        where("verified", "==", true),
+        where("specialization", "==", specialization)
+    );
+
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) {
+        return [];
+    }
+
+    return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            name: data.displayName || "Dr. Anonymous",
+            specialization: data.specialization || "N/A",
+            location: data.location || "N/A",
+            avatar: data.photoURL || `https://placehold.co/100x100.png?text=${(data.displayName || 'D').charAt(0)}`,
+        };
+    });
+}
