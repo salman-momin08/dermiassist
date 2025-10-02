@@ -110,7 +110,7 @@ const prompt = ai.definePrompt({
     5.  **Start New Analysis:**
         - If the user says "start a new analysis" or "check my skin," and **no photo is provided** in the input, you MUST ask them for one. Set the \`action\` to "awaiting_photo" and the \`response\` to "Of course. Please provide a clear photo of the skin area you want to analyze."
         - If the user provides a command and a photo at the same time, or if they provide a photo after you've asked for one, use the \`startAnalysisTool\` with the photo.
-        - After the \`startAnalysisTool\` returns the initial condition name, set the \`action\` to "startProforma", the \`destination\` to \`/analyze?condition={conditionName}&image={photoDataUri}\`, and the \`response\` to "Analysis started! I've identified it as {conditionName}. I'm taking you to the next step to answer a few questions."
+        - After the \`startAnalysisTool\` returns the initial condition name, set the \`action\` to "startProforma". The \`destination\` should be set to \`/analyze?condition={conditionName}&image={photoDataUri}\`. Your \`response\` MUST be "Analysis started! I've identified it as possibly being **{conditionName}**. I'm now taking you to the next step where I'll ask a few more questions."
     6.  **Unsupported Commands:** If the command is unclear or you don't support it (like "change my password" or "what's the weather"), set \`action\` to "unsupported" and respond politely explaining your limitations.
     7.  **General Conversation:** If the user is just chatting, set the \`action\` to "respond" and provide a friendly, helpful reply.
     8.  **Use History:** Pay attention to the conversation history to understand context.
@@ -140,30 +140,38 @@ const patientAgentFlow = ai.defineFlow(
     outputSchema: PatientAgentOutputSchema,
   },
   async (input) => {
+    // The prompt will determine if a tool needs to be called
     const modelResponse = await prompt(input);
 
-    if (!modelResponse.output) {
-      throw new Error('The agent failed to produce an output.');
+    // If no tool is requested, just return the model's output
+    if (!modelResponse.toolRequest) {
+        if (!modelResponse.output) throw new Error("Agent failed to return an output.");
+        return modelResponse.output;
     }
     
-    const output = modelResponse.output;
+    // Execute the requested tool
+    let toolResult;
+    if (modelResponse.toolRequest.name === 'listAnalyses') {
+        toolResult = await listAnalysesTool(modelResponse.toolRequest.input);
+    } else if (modelResponse.toolRequest.name === 'startAnalysis') {
+        toolResult = await startAnalysisTool(modelResponse.toolRequest.input);
+    } else {
+        throw new Error(`Unsupported tool: ${modelResponse.toolRequest.name}`);
+    }
 
-    // IMPORTANT: Check for a tool request and execute it if present.
-    if (modelResponse.toolRequest) {
-        let toolResponse;
-        if (modelResponse.toolRequest.name === 'listAnalyses') {
-            toolResponse = await listAnalysesTool(modelResponse.toolRequest.input);
-            output.data = toolResponse; // Directly assign the array here
-        } else if (modelResponse.toolRequest.name === 'startAnalysis') {
-            toolResponse = await startAnalysisTool(modelResponse.toolRequest.input);
-            output.data = toolResponse;
-        }
+    // Send the tool's result back to the model to get the final response
+    const finalResponse = await prompt(input, { toolResult });
+
+    if (!finalResponse.output) {
+      throw new Error('The agent failed to produce a final output after tool execution.');
     }
     
-     // If the tool returns a destination, we need to pass the photo through if it exists.
-    if (output.action === 'startProforma' && output.data?.conditionName && input.photoDataUri) {
-        output.destination = `/analyze?condition=${encodeURIComponent(output.data.conditionName)}&image=${encodeURIComponent(input.photoDataUri)}`;
-        output.response = `Analysis started! I've identified it as possibly being **${output.data.conditionName}**. I'm now taking you to the next step where I'll ask a few more questions.`;
+    const output = finalResponse.output;
+
+    // Post-processing: If starting a proforma, construct the final destination URL
+    if (output.action === 'startProforma' && toolResult && 'conditionName' in toolResult && input.photoDataUri) {
+        output.destination = `/analyze?condition=${encodeURIComponent(toolResult.conditionName)}&image=${encodeURIComponent(input.photoDataUri)}`;
+        output.response = `Analysis started! I've identified it as possibly being **${toolResult.conditionName}**. I'm now taking you to the next step where I'll ask a few more questions.`;
     }
     
     return output;

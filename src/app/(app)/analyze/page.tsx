@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -42,6 +43,9 @@ type ChatMessage = { sender: 'ai' | 'user'; text: string };
 const MAX_QUESTIONS = 5;
 
 export default function AnalyzePage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -57,9 +61,20 @@ export default function AnalyzePage() {
   const { toast } = useToast();
   const { addAnalysis } = useAnalyses();
   const { user, userData } = useAuth();
-  const router = useRouter();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+
+  useEffect(() => {
+    const prefilledCondition = searchParams.get('condition');
+    const prefilledImage = searchParams.get('image');
+
+    if (prefilledCondition && prefilledImage) {
+        setDetectedCondition(prefilledCondition);
+        setPreview(prefilledImage);
+        setStep('proforma');
+        startProforma(prefilledCondition);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -209,21 +224,26 @@ export default function AnalyzePage() {
 
 
   const resetState = () => {
-    setStep('upload');
-    setFile(null);
-    setPreview(null);
-    setDetectedCondition(null);
-    setChatHistory([]);
-    setQuestionCount(0);
-    setError(null);
-    setLoadingMessage("");
+    // If we came here from the agent, go back to dashboard. Otherwise, just reset the page.
+    if (searchParams.get('condition')) {
+        router.push('/dashboard');
+    } else {
+        setStep('upload');
+        setFile(null);
+        setPreview(null);
+        setDetectedCondition(null);
+        setChatHistory([]);
+        setQuestionCount(0);
+        setError(null);
+        setLoadingMessage("");
+    }
   };
   
   const renderBackButton = () => (
      <div className="mb-6">
         <Button variant="outline" onClick={resetState}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Start Over
+            {searchParams.get('condition') ? "Back to Dashboard" : "Start Over"}
         </Button>
     </div>
   );
