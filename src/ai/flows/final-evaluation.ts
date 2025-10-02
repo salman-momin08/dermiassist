@@ -63,18 +63,6 @@ Now, you must conduct a thorough final evaluation using the original image AND t
 - **Original Photo:**
 {{media url=photoDataUri}}
 `,
-  config: {
-    safetySettings: [
-      {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE',
-      },
-       {
-        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_ONLY_HIGH',
-      },
-    ],
-  },
 });
 
 const finalEvaluationFlow = ai.defineFlow(
