@@ -1,5 +1,4 @@
-
-'use server'
+'use server';
 
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { db } from "./firebase";
@@ -33,20 +32,27 @@ export async function getVerifiedDoctorsBySpecialization(specialization: string)
         where("verified", "==", true),
         where("specialization", "==", specialization)
     );
+    
+    try {
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.empty) {
+            return [];
+        }
 
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) {
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                name: data.displayName || "Dr. Anonymous",
+                specialization: data.specialization || "N/A",
+                location: data.location || "N/A",
+                avatar: data.photoURL || `https://placehold.co/100x100.png?text=${(data.displayName || 'D').charAt(0)}`,
+            };
+        });
+    } catch (serverError) {
+        console.error("Firestore Error in getVerifiedDoctorsBySpecialization: ", serverError);
+        // In a server action, we can't emit to the client.
+        // We'll log the error and return an empty array to prevent crashing the UI.
         return [];
     }
-
-    return querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            name: data.displayName || "Dr. Anonymous",
-            specialization: data.specialization || "N/A",
-            location: data.location || "N/A",
-            avatar: data.photoURL || `https://placehold.co/100x100.png?text=${(data.displayName || 'D').charAt(0)}`,
-        };
-    });
 }

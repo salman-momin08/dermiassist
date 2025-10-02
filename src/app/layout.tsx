@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { Chatbot } from '@/components/chatbot/chatbot';
 import { AuthProvider } from '@/hooks/use-auth';
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 export const metadata: Metadata = {
   title: 'DermiAssist-AI - Your Personal Dermatology Assistant',
@@ -41,6 +42,7 @@ export default function RootLayout({
             {children}
             <Chatbot />
             <Toaster />
+            <FirebaseErrorListener />
           </ThemeProvider>
         </AuthProvider>
       </body>
