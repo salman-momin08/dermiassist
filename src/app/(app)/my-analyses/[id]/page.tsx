@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
@@ -1041,7 +1040,7 @@ export default function AnalysisDetailPage() {
 
                     <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if(!open) resetProgressDialog(); }}>
                         <DialogTrigger asChild>
-                            <Button className="w-full" variant="secondary">
+                            <Button className="w-full">
                                 <LineChart className="mr-2 h-4 w-4" />
                                 Track Progress
                             </Button>
@@ -1122,7 +1121,7 @@ export default function AnalysisDetailPage() {
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <div className="w-full">
-                                            <Button onClick={handleGenerateVideo} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full" variant="secondary">
+                                            <Button onClick={handleGenerateVideo} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full">
                                                 {isGeneratingVideo ? (
                                                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
                                                 ) : (
