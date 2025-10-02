@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -30,12 +31,12 @@ service cloud.firestore {
       allow create: if isUserAuthenticated() && request.auth.uid == userId;
       
       // A user can get their own data.
-      // Authenticated users can get data for users with the 'doctor' role.
+      // Any authenticated user can get data for users with the 'doctor' role.
       // Admins can get any user's data.
       allow get: if isOwner(userId) || (isUserAuthenticated() && resource.data.role == 'doctor') || isAdmin();
       
       // Authenticated users can list other users (the query will be filtered by the 'get' rule).
-      // Admins can list all users.
+      // This allows querying for doctors.
       allow list: if isUserAuthenticated();
       
       // A user can update their own profile data.
@@ -60,7 +61,7 @@ service cloud.firestore {
       // A patient can read their own appointments.
       // A doctor can read appointments where they are the assigned doctor.
       // Admins can read any appointment.
-      allow get: if isUserAuthenticated();
+      allow get: if isUserAuthenticated() && (isOwner(resource.data.patientId) || isOwner(resource.data.doctorId) || isAdmin());
       allow list: if isUserAuthenticated(); // For queries by patientId or doctorId
       
       // Patients can cancel (update) their own pending appointments.
