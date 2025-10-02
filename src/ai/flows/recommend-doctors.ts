@@ -76,9 +76,10 @@ const prompt = ai.definePrompt({
     prompt: `You are an intelligent medical assistant. Your task is to recommend the best type of dermatologist for a patient diagnosed with '{{{conditionName}}}'.
 
     1.  First, determine the most appropriate specialization for this condition from the following options: General Dermatology, Cosmetic Dermatology, Pediatric Dermatology, Dermatopathology, Mohs Surgery.
-    2.  Provide a brief, one-sentence reason why this specialization is the best fit.
-    3.  Then, use the 'findDoctorsBySpecialization' tool to find verified doctors with that specialization.
-    4.  Return the list of doctors and your reason. If no doctors are found, return an empty list but still provide the reason.
+    2.  If you cannot determine a clear specialization from the list for the given condition, you **MUST** default to recommending 'General Dermatology'.
+    3.  Provide a brief, one-sentence reason why this specialization is the best fit.
+    4.  Then, use the 'findDoctorsBySpecialization' tool to find verified doctors with that specialization.
+    5.  Return the list of doctors and your reason. If no doctors are found for the chosen specialization, return an empty list but still provide the reason.
     `,
 });
 
