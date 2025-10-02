@@ -68,18 +68,18 @@ export async function recommendDoctors(input: RecommendDoctorsInput): Promise<Re
 }
 
 
-const prompt = ai.definePrompt({
-    name: 'recommendDoctorsPrompt',
+const specializationPrompt = ai.definePrompt({
+    name: 'specializationPrompt',
     input: { schema: RecommendDoctorsInputSchema },
-    output: { schema: RecommendDoctorsOutputSchema },
-    tools: [findDoctorsTool],
-    prompt: `You are an intelligent medical assistant. Your task is to recommend the best type of dermatologist for a patient diagnosed with '{{{conditionName}}}'.
+    output: { schema: z.object({
+        specialization: z.string().describe("The determined specialization."),
+        recommendationReason: z.string().describe("The reason for the recommendation.")
+    }) },
+    prompt: `You are an intelligent medical assistant. Your task is to determine the best type of dermatologist for a patient diagnosed with '{{{conditionName}}}'.
 
     1.  First, determine the most appropriate specialization for this condition from the following options: General Dermatology, Cosmetic Dermatology, Pediatric Dermatology, Dermatopathology, Mohs Surgery.
     2.  If you cannot determine a clear specialization from the list for the given condition, you **MUST** default to recommending 'General Dermatology'.
-    3.  Provide a brief, one-sentence reason why this specialization is the best fit.
-    4.  Then, use the 'findDoctorsBySpecialization' tool to find verified doctors with that specialization.
-    5.  Return the list of doctors and your reason. If no doctors are found for the chosen specialization, return an empty list but still provide the reason.
+    3.  Provide a brief, one-sentence reason why this specialization is the best fit for the patient's condition.
     `,
 });
 
@@ -91,10 +91,22 @@ const recommendDoctorsFlow = ai.defineFlow(
     outputSchema: RecommendDoctorsOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
-    if (!output) {
-      throw new Error('The model failed to produce a recommendation.');
+    // Step 1: Determine the best specialization and the reason.
+    const { output: specializationResult } = await specializationPrompt(input);
+    
+    if (!specializationResult) {
+        throw new Error("Could not determine a specialization.");
     }
-    return output;
+
+    // Step 2: Use the determined specialization to find doctors.
+    const doctors = await findDoctorsTool({
+      specialization: specializationResult.specialization,
+    });
+
+    // Step 3: Combine the results into the final output.
+    return {
+      doctors: doctors,
+      recommendationReason: specializationResult.recommendationReason,
+    };
   }
 );
