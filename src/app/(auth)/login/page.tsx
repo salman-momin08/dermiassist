@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { motion } from "framer-motion";
 
 function GoogleIcon() {
     return (
@@ -44,7 +45,7 @@ function FacebookIcon() {
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(1, { message: "Password is required." }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters." }),
 });
 
 
@@ -99,59 +100,87 @@ export default function LoginPage() {
       });
     }
   };
+  
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        delay: 0.1,
+        when: "beforeChildren",
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15 },
+    visible: { opacity: 1, y: 0 },
+  };
+
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background/80 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-sm relative">
         <Button variant="ghost" size="icon" className="absolute top-2 right-2 z-10" asChild>
             <Link href="/"><X className="h-4 w-4" /></Link>
         </Button>
+        <motion.div variants={containerVariants} initial="hidden" animate="visible">
         <Card>
           <CardHeader className="text-center">
-            <div className="mb-4 flex justify-center">
+            <motion.div variants={itemVariants} className="mb-4 flex justify-center">
                 <Link href="/">
                     <Logo />
                 </Link>
-            </div>
-            <CardTitle className="text-2xl font-headline">Welcome Back</CardTitle>
-            <CardDescription>
-              Enter your email below to login to your account.
-            </CardDescription>
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <CardTitle className="text-2xl font-headline">Welcome Back</CardTitle>
+              <CardDescription>
+                Enter your email below to login to your account.
+              </CardDescription>
+            </motion.div>
           </CardHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <CardContent className="grid gap-4">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem className="grid gap-2">
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="m@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem className="grid gap-2">
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                 <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Login
-                </Button>
-                <div className="relative">
+                  <motion.div variants={itemVariants}>
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem className="grid gap-2">
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="m@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </motion.div>
+                  <motion.div variants={itemVariants}>
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem className="grid gap-2">
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </motion.div>
+                 <motion.div variants={itemVariants}>
+                    <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                      {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Login
+                    </Button>
+                 </motion.div>
+                <motion.div variants={itemVariants} className="relative">
                     <div className="absolute inset-0 flex items-center">
                         <span className="w-full border-t" />
                     </div>
@@ -160,8 +189,8 @@ export default function LoginPage() {
                         Or continue with
                         </span>
                     </div>
-                </div>
-                 <div className="grid grid-cols-2 gap-2">
+                </motion.div>
+                 <motion.div variants={itemVariants} className="grid grid-cols-2 gap-2">
                     <Button variant="outline" className="w-full">
                       <GoogleIcon />
                       Google
@@ -170,20 +199,23 @@ export default function LoginPage() {
                       <FacebookIcon />
                       Facebook
                     </Button>
-                </div>
+                </motion.div>
               </CardContent>
             </form>
           </Form>
           <CardFooter className="text-sm">
-            <p className="w-full text-center text-muted-foreground">
+            <motion.p variants={itemVariants} className="w-full text-center text-muted-foreground">
               Don't have an account?{' '}
               <Link href="/signup" className="font-semibold text-primary underline-offset-4 hover:underline">
                 Sign up
               </Link>
-            </p>
+            </motion.p>
           </CardFooter>
         </Card>
+        </motion.div>
       </div>
     </div>
   );
 }
+
+    

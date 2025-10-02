@@ -40,6 +40,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { StreamChat } from 'stream-chat';
+import { motion } from "framer-motion";
+import { isFuture, parseISO } from "date-fns";
 
 
 function GoogleIcon() {
@@ -64,14 +66,15 @@ const signupSchema = z.object({
   role: z.enum(["patient", "doctor"], { required_error: "You must select a role."}),
   firstName: z.string().min(1, { message: "First name is required." }),
   lastName: z.string().min(1, { message: "Last name is required." }),
-  dob: z.string().min(1, { message: "Date of birth is required." }).regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format."),
+  dob: z.string().min(1, { message: "Date of birth is required." }).regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format.")
+    .refine(dateStr => !isFuture(parseISO(dateStr)), { message: "Date of birth cannot be in the future."}),
   gender: z.string().optional(),
   email: z.string().email({ message: "Invalid email address." }),
-  mobile: z.string().min(10, { message: "Please enter a valid mobile number."}),
+  mobile: z.string().regex(/^\d{10}$/, { message: "Please enter a valid 10-digit mobile number."}),
   password: z.string().min(8, { message: "Password must be at least 8 characters." })
-      .refine((password) => /[A-Z]/.test(password), { message: "Password must contain at least one uppercase letter."})
-      .refine((password) => /[0-9]/.test(password), { message: "Password must contain at least one number."})
-      .refine((password) => /[^A-Za-z0-9]/.test(password), { message: "Password must contain at least one special character."}),
+      .refine((password) => /[A-Z]/.test(password), { message: "Must contain at least one uppercase letter."})
+      .refine((password) => /[0-9]/.test(password), { message: "Must contain at least one number."})
+      .refine((password) => /[^A-Za-z0-9]/.test(password), { message: "Must contain at least one special character."}),
   confirmPassword: z.string(),
   medicalId: z.string().optional(),
   specialization: z.string().optional(),
@@ -116,7 +119,7 @@ export default function SignupPage() {
       password: "",
       confirmPassword: "",
       medicalId: "",
-      specialization: "",
+      specialization: "general-dermatology",
       acceptTerms: false,
       acceptPrivacy: false,
     },
@@ -146,8 +149,6 @@ export default function SignupPage() {
       });
 
       // 3. Create user in Stream Chat
-      // This part should be on a server, but for simplicity in this prototype, we do it here.
-      // In a real app, this would be a server-side call after signup.
       const streamClient = StreamChat.getInstance(apiKey, {
           timeout: 6000,
       });
@@ -169,13 +170,13 @@ export default function SignupPage() {
           gender: values.gender,
           role: values.role,
           createdAt: new Date().toISOString(),
-          subscriptionPlan: 'Free', // Assign Free plan by default
+          subscriptionPlan: 'Free',
       };
 
       if (values.role === 'doctor') {
-        userData.specialization = values.specialization;
+        userData.specialization = "General Dermatology"; // Default value for now
         userData.medicalId = values.medicalId;
-        userData.verified = false; // Doctors start as unverified
+        userData.verified = false;
       }
       
       // 5. Write user data to Firestore
@@ -211,208 +212,234 @@ export default function SignupPage() {
   };
   
   const RequiredIndicator = () => <span className="text-destructive"> *</span>;
+  
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        delay: 0.1,
+        when: "beforeChildren",
+        staggerChildren: 0.05,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15 },
+    visible: { opacity: 1, y: 0 },
+  };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background/80 p-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4 py-12">
       <div className="w-full max-w-lg relative">
          <Button variant="ghost" size="icon" className="absolute top-4 right-4 z-10" asChild>
             <Link href="/"><X className="h-4 w-4" /></Link>
         </Button>
         <AlertDialog open={isRoleChangeDialogOpen} onOpenChange={setIsRoleChangeDialogOpen}>
+            <motion.div variants={containerVariants} initial="hidden" animate="visible">
             <Card>
             <CardHeader className="text-center">
-                <div className="mb-4 flex justify-center">
+                <motion.div variants={itemVariants} className="mb-4 flex justify-center">
                     <Link href="/">
                         <Logo />
                     </Link>
-                </div>
-                <CardTitle className="text-2xl font-headline">Create a Secure Account</CardTitle>
-                <CardDescription>
-                Join DermiAssist-AI to take control of your skin health.
-                </CardDescription>
+                </motion.div>
+                <motion.div variants={itemVariants}>
+                  <CardTitle className="text-2xl font-headline">Create a Secure Account</CardTitle>
+                  <CardDescription>
+                  Join DermiAssist-AI to take control of your skin health.
+                  </CardDescription>
+                </motion.div>
             </CardHeader>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)}>
                 <CardContent className="space-y-6">
+                  <motion.div variants={itemVariants}>
                     <FormField
-                    control={form.control}
-                    name="role"
-                    render={({ field }) => (
-                        <FormItem className="space-y-3">
-                        <FormLabel>I am a...<RequiredIndicator /></FormLabel>
-                        <FormControl>
-                            <RadioGroup
-                            onValueChange={(value) => {
-                                if (value === 'doctor') {
-                                    setIsRoleChangeDialogOpen(true);
-                                } else {
-                                    field.onChange(value);
-                                }
-                            }}
-                            value={field.value}
-                            className="flex space-x-4"
-                            >
-                            <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                <RadioGroupItem value="patient" />
-                                </FormControl>
-                                <FormLabel className="font-normal">
-                                Patient
-                                </FormLabel>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                <RadioGroupItem value="doctor" />
-                                </FormControl>
-                                <FormLabel className="font-normal">
-                                Doctor
-                                </FormLabel>
-                            </FormItem>
-                            </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
+                      control={form.control}
+                      name="role"
+                      render={({ field }) => (
+                          <FormItem className="space-y-3">
+                          <FormLabel>I am a...<RequiredIndicator /></FormLabel>
+                          <FormControl>
+                              <RadioGroup
+                              onValueChange={(value) => {
+                                  if (value === 'doctor') {
+                                      setIsRoleChangeDialogOpen(true);
+                                  } else {
+                                      field.onChange(value);
+                                  }
+                              }}
+                              value={field.value}
+                              className="flex space-x-4"
+                              >
+                              <FormItem className="flex items-center space-x-2 space-y-0">
+                                  <FormControl>
+                                  <RadioGroupItem value="patient" />
+                                  </FormControl>
+                                  <FormLabel className="font-normal">
+                                  Patient
+                                  </FormLabel>
+                              </FormItem>
+                              <FormItem className="flex items-center space-x-2 space-y-0">
+                                  <FormControl>
+                                  <RadioGroupItem value="doctor" />
+                                  </FormControl>
+                                  <FormLabel className="font-normal">
+                                  Doctor
+                                  </FormLabel>
+                              </FormItem>
+                              </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
                     />
+                  </motion.div>
                     
-                    <Separator />
+                  <motion.div variants={itemVariants}><Separator /></motion.div>
                     
-                    <div className="grid sm:grid-cols-2 gap-4">
-                        <FormField control={form.control} name="firstName" render={({ field }) => (
-                            <FormItem><FormLabel>First Name<RequiredIndicator /></FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="lastName" render={({ field }) => (
-                            <FormItem><FormLabel>Last Name<RequiredIndicator /></FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                    </div>
+                  <motion.div variants={itemVariants} className="grid sm:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="firstName" render={({ field }) => (
+                          <FormItem><FormLabel>First Name<RequiredIndicator /></FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name="lastName" render={({ field }) => (
+                          <FormItem><FormLabel>Last Name<RequiredIndicator /></FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                  </motion.div>
                     
-                    <div className="grid sm:grid-cols-2 gap-4">
-                        <FormField control={form.control} name="dob" render={({ field }) => (
-                            <FormItem><FormLabel>Date of Birth<RequiredIndicator /></FormLabel><FormControl><Input placeholder="YYYY-MM-DD" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="gender" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Gender</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Select a gender" /></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="male">Male</SelectItem>
-                                        <SelectItem value="female">Female</SelectItem>
-                                        <SelectItem value="other">Other</SelectItem>
-                                        <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                    </div>
+                  <motion.div variants={itemVariants} className="grid sm:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="dob" render={({ field }) => (
+                          <FormItem><FormLabel>Date of Birth<RequiredIndicator /></FormLabel><FormControl><Input type="date" placeholder="YYYY-MM-DD" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name="gender" render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Gender</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl><SelectTrigger><SelectValue placeholder="Select a gender" /></SelectTrigger></FormControl>
+                                  <SelectContent>
+                                      <SelectItem value="male">Male</SelectItem>
+                                      <SelectItem value="female">Female</SelectItem>
+                                      <SelectItem value="other">Other</SelectItem>
+                                      <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                              <FormMessage />
+                          </FormItem>
+                      )} />
+                  </motion.div>
 
-                    <div className="grid sm:grid-cols-2 gap-4">
-                        <FormField control={form.control} name="email" render={({ field }) => (
-                            <FormItem><FormLabel>Email Address<RequiredIndicator /></FormLabel><FormControl><Input type="email" placeholder="m@example.com" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="mobile" render={({ field }) => (
-                            <FormItem><FormLabel>Mobile Number<RequiredIndicator /></FormLabel><FormControl><Input placeholder="e.g. +1 123 456 7890" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                    </div>
+                  <motion.div variants={itemVariants} className="grid sm:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="email" render={({ field }) => (
+                          <FormItem><FormLabel>Email Address<RequiredIndicator /></FormLabel><FormControl><Input type="email" placeholder="m@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name="mobile" render={({ field }) => (
+                          <FormItem><FormLabel>Mobile Number<RequiredIndicator /></FormLabel><FormControl><Input placeholder="10-digit number" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                  </motion.div>
 
-                    <div className="grid sm:grid-cols-2 gap-4">
-                        <FormField control={form.control} name="password" render={({ field }) => (
-                            <FormItem><FormLabel>Password<RequiredIndicator /></FormLabel><FormControl><Input type="password" placeholder="********" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="confirmPassword" render={({ field }) => (
-                            <FormItem><FormLabel>Confirm Password<RequiredIndicator /></FormLabel><FormControl><Input type="password" placeholder="********" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                    </div>
+                  <motion.div variants={itemVariants} className="grid sm:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="password" render={({ field }) => (
+                          <FormItem><FormLabel>Password<RequiredIndicator /></FormLabel><FormControl><Input type="password" placeholder="********" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name="confirmPassword" render={({ field }) => (
+                          <FormItem><FormLabel>Confirm Password<RequiredIndicator /></FormLabel><FormControl><Input type="password" placeholder="********" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                  </motion.div>
                     
-                    {role === 'doctor' && (
-                    <>
-                        <Separator />
-                        <div className="space-y-4 rounded-md border p-4">
-                            <p className="text-sm font-medium">Doctor Verification</p>
-                            <FormField control={form.control} name="medicalId" render={({ field }) => (
-                                <FormItem><FormLabel>Medical Registration Number<RequiredIndicator /></FormLabel><FormControl><Input placeholder="Your medical ID" {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <FormField control={form.control} name="specialization" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Specialization<RequiredIndicator /></FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Select your specialization" /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="General Dermatology">General Dermatology</SelectItem>
-                                            <SelectItem value="Cosmetic Dermatology">Cosmetic Dermatology</SelectItem>
-                                            <SelectItem value="Pediatric Dermatology">Pediatric Dermatology</SelectItem>
-                                            <SelectItem value="Dermatopathology">Dermatopathology</SelectItem>
-                                            <SelectItem value="Mohs Surgery">Mohs Surgery</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
-                    </>
-                    )}
+                  {role === 'doctor' && (
+                  <>
+                      <motion.div variants={itemVariants}><Separator /></motion.div>
+                      <motion.div variants={itemVariants} className="space-y-4 rounded-md border p-4 bg-secondary/50">
+                          <p className="text-sm font-medium">Doctor Verification</p>
+                          <FormField control={form.control} name="medicalId" render={({ field }) => (
+                              <FormItem><FormLabel>Medical Registration Number<RequiredIndicator /></FormLabel><FormControl><Input placeholder="Your medical ID" {...field} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                          <FormField control={form.control} name="specialization" render={({ field }) => (
+                              <FormItem>
+                                  <FormLabel>Specialization<RequiredIndicator /></FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <FormControl><SelectTrigger><SelectValue placeholder="Select your specialization" /></SelectTrigger></FormControl>
+                                      <SelectContent>
+                                          <SelectItem value="general-dermatology">General Dermatology</SelectItem>
+                                          <SelectItem value="cosmetic-dermatology">Cosmetic Dermatology</SelectItem>
+                                          <SelectItem value="pediatric-dermatology">Pediatric Dermatology</SelectItem>
+                                          <SelectItem value="dermatopathology">Dermatopathology</SelectItem>
+                                          <SelectItem value="mohs-surgery">Mohs Surgery</SelectItem>
+                                      </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                              </FormItem>
+                          )} />
+                      </motion.div>
+                  </>
+                  )}
                     
-                    <Separator />
+                  <motion.div variants={itemVariants}><Separator /></motion.div>
 
-                    <div className="space-y-4">
-                        <FormField control={form.control} name="acceptTerms" render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                                <div className="space-y-1 leading-none">
-                                    <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Terms & Conditions</Link>.<RequiredIndicator /></FormLabel>
-                                    <FormMessage />
-                                </div>
-                            </FormItem>
-                        )} />
-                        <FormField control={form.control} name="acceptPrivacy" render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                                <div className="space-y-1 leading-none">
-                                    <FormLabel>I agree to the <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>.<RequiredIndicator /></FormLabel>
-                                    <FormMessage />
-                                </div>
-                            </FormItem>
-                        )} />
-                    </div>
+                  <motion.div variants={itemVariants} className="space-y-4">
+                      <FormField control={form.control} name="acceptTerms" render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                              <div className="space-y-1 leading-none">
+                                  <FormLabel>I agree to the <Link href="/terms" target="_blank" className="text-primary hover:underline">Terms & Conditions</Link>.<RequiredIndicator /></FormLabel>
+                                  <FormMessage />
+                              </div>
+                          </FormItem>
+                      )} />
+                      <FormField control={form.control} name="acceptPrivacy" render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                              <div className="space-y-1 leading-none">
+                                  <FormLabel>I agree to the <Link href="/privacy" target="_blank" className="text-primary hover:underline">Privacy Policy</Link>.<RequiredIndicator /></FormLabel>
+                                  <FormMessage />
+                              </div>
+                          </FormItem>
+                      )} />
+                  </motion.div>
 
 
+                  <motion.div variants={itemVariants}>
                     <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Create Account
+                      {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Create Account
                     </Button>
-                    <div className="relative">
-                        <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-card px-2 text-muted-foreground">
-                            Or sign up with
-                            </span>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button variant="outline" className="w-full">
-                        <GoogleIcon />
-                        Google
-                        </Button>
-                        <Button variant="outline" className="w-full">
-                        <FacebookIcon />
-                        Facebook
-                        </Button>
-                    </div>
+                  </motion.div>
+                  <motion.div variants={itemVariants} className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                          <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-card px-2 text-muted-foreground">
+                          Or sign up with
+                          </span>
+                      </div>
+                  </motion.div>
+                  <motion.div variants={itemVariants} className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" className="w-full">
+                      <GoogleIcon />
+                      Google
+                      </Button>
+                      <Button variant="outline" className="w-full">
+                      <FacebookIcon />
+                      Facebook
+                      </Button>
+                  </motion.div>
                 </CardContent>
                 </form>
             </Form>
             <CardFooter className="text-sm">
-                <p className="w-full text-center text-muted-foreground">
+                <motion.p variants={itemVariants} className="w-full text-center text-muted-foreground">
                 Already have an account?{' '}
                 <Link href="/login" className="font-semibold text-primary underline-offset-4 hover:underline">
                     Login
                 </Link>
-                </p>
+                </motion.p>
             </CardFooter>
             </Card>
+            </motion.div>
              <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Confirm Role Selection</AlertDialogTitle>
@@ -430,3 +457,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
+    
