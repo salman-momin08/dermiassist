@@ -99,14 +99,24 @@ const recommendDoctorsFlow = ai.defineFlow(
     }
 
     // Step 2: Use the determined specialization to find doctors.
-    const doctors = await findDoctorsTool({
+    let doctors = await findDoctorsTool({
       specialization: specializationResult.specialization,
     });
+    
+    let finalReason = specializationResult.recommendationReason;
 
-    // Step 3: Combine the results into the final output.
+    // Step 3: If no doctors are found, fall back to General Dermatology.
+    if (doctors.length === 0 && specializationResult.specialization !== 'General Dermatology') {
+        doctors = await findDoctorsTool({
+            specialization: 'General Dermatology',
+        });
+        finalReason = `While no specialists for ${specializationResult.specialization} were found, here are some excellent General Dermatologists who can assist with ${input.conditionName}.`;
+    }
+
+    // Step 4: Combine the results into the final output.
     return {
       doctors: doctors,
-      recommendationReason: specializationResult.recommendationReason,
+      recommendationReason: finalReason,
     };
   }
 );
