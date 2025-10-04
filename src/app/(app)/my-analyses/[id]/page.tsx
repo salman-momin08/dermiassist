@@ -811,351 +811,359 @@ export default function AnalysisDetailPage() {
                         </CardContent>
                     </Card>
                     
-                    <div className="grid grid-cols-2 gap-4">
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <Button className="w-full" onClick={handleFindSpecialist}>
-                                    {isRecommending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Stethoscope className="mr-2 h-4 w-4" />}
-                                    Find a Specialist
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-md">
-                                <DialogHeader>
-                                    <DialogTitle>Recommended Doctors</DialogTitle>
-                                    <DialogDescription>
-                                        Based on your analysis for {analysis.conditionName}, here are some recommended specialists.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="py-4">
-                                    {isRecommending ? (
-                                        <div className="flex justify-center items-center h-24">
-                                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                        </div>
-                                    ) : recommendationResult ? (
-                                        <div className="space-y-4">
-                                            <Alert>
-                                                <Sparkles className="h-4 w-4" />
-                                                <AlertTitle>Recommendation</AlertTitle>
-                                                <AlertDescription>
-                                                    {recommendationResult.recommendationReason}
-                                                </AlertDescription>
-                                            </Alert>
-                                            {recommendationResult.doctors.length > 0 ? (
-                                                <ul className="space-y-3">
-                                                    {recommendationResult.doctors.map(doc => (
-                                                        <li key={doc.id} className="flex items-center justify-between p-2 rounded-md border hover:bg-muted/50">
-                                                            <div className="flex items-center gap-3">
-                                                                <Avatar>
-                                                                    <AvatarImage src={doc.avatar} alt={doc.name} data-ai-hint="doctor portrait" />
-                                                                    <AvatarFallback>{doc.name.charAt(0)}</AvatarFallback>
-                                                                </Avatar>
-                                                                <div>
-                                                                    <p className="font-semibold">{doc.name}</p>
-                                                                    <p className="text-sm text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" /> {doc.location}</p>
-                                                                </div>
-                                                            </div>
-                                                            <Button size="sm" asChild><Link href={`/doctors`}>Book</Link></Button>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            ) : (
-                                                <p className="text-center text-muted-foreground py-4">No doctors found matching the recommended specialization.</p>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <p className="text-center text-muted-foreground py-4">Click "Find a Specialist" to get recommendations.</p>
-                                    )}
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-
-                        <Dialog open={explanationDialogOpen} onOpenChange={(open) => { setExplanationDialogOpen(open); if(!open) resetExplanationDialog(); }}>
-                            <DialogTrigger asChild>
-                                <Button className="w-full" onClick={onExplanationModalOpen}>
-                                    <Languages className="mr-2 h-4 w-4" />
-                                    Explain My Report
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-lg flex flex-col h-[90vh] max-h-[700px]">
-                                <DialogHeader className="flex-shrink-0">
-                                    <DialogTitle>Explain Report</DialogTitle>
-                                    <DialogDescription>
-                                        Get a simplified explanation of your report and ask follow-up questions.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                
-                                <div className="flex-grow flex flex-col min-h-0">
-                                    {(!hasExistingExplanations() && !explanationLoading) && (
-                                        <div className="space-y-4 py-2 flex-shrink-0">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="language-select">Select Language</Label>
-                                                <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                                                    <SelectTrigger id="language-select">
-                                                        <SelectValue placeholder="Select a language" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {/* Language List */}
-                                                        <SelectItem value="English">English</SelectItem>
-                                                        <SelectItem value="Hindi">Hindi</SelectItem>
-                                                        <SelectItem value="Bengali">Bengali</SelectItem>
-                                                        <SelectItem value="Telugu">Telugu</SelectItem>
-                                                        <SelectItem value="Marathi">Marathi</SelectItem>
-                                                        <SelectItem value="Tamil">Tamil</SelectItem>
-                                                        <SelectItem value="Urdu">Urdu</SelectItem>
-                                                        <SelectItem value="Gujarati">Gujarati</SelectItem>
-                                                        <SelectItem value="Kannada">Kannada</SelectItem>
-                                                        <SelectItem value="Odia">Odia</SelectItem>
-                                                        <SelectItem value="Malayalam">Malayalam</SelectItem>
-                                                        <SelectItem value="Punjabi">Punjabi</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <Button onClick={() => handleExplanationRequest(selectedLanguage)} disabled={explanationLoading} className="w-full">
-                                                {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                                Generate Explanation
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                    {explanationError && (
-                                        <Alert variant="destructive" className="flex-shrink-0">
-                                            <AlertTitle>Error</AlertTitle>
-                                            <AlertDescription>{explanationError}</AlertDescription>
-                                        </Alert>
-                                    )}
-
-                                    {explanationLoading && (
-                                        <div className="flex justify-center items-center flex-grow py-8">
-                                            <Loader2 className="h-8 w-8 animate-spin" />
-                                        </div>
-                                    )}
-
-                                    {explanationMessages.length > 0 && !explanationLoading && (
-                                        <div className="flex flex-col flex-grow min-h-0 space-y-4">
-                                            <div className="space-y-2 flex-shrink-0">
-                                                <Label htmlFor="language-select-active">Language</Label>
-                                                <Select value={selectedLanguage} onValueChange={handleExplanationRequest}>
-                                                    <SelectTrigger id="language-select-active">
-                                                        <SelectValue placeholder="Select a language" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="English">English</SelectItem>
-                                                        <SelectItem value="Hindi">Hindi</SelectItem>
-                                                        <SelectItem value="Bengali">Bengali</SelectItem>
-                                                        <SelectItem value="Telugu">Telugu</SelectItem>
-                                                        <SelectItem value="Marathi">Marathi</SelectItem>
-                                                        <SelectItem value="Tamil">Tamil</SelectItem>
-                                                        <SelectItem value="Urdu">Urdu</SelectItem>
-                                                        <SelectItem value="Gujarati">Gujarati</SelectItem>
-                                                        <SelectItem value="Kannada">Kannada</SelectItem>
-                                                        <SelectItem value="Odia">Odia</SelectItem>
-                                                        <SelectItem value="Malayalam">Malayalam</SelectItem>
-                                                        <SelectItem value="Punjabi">Punjabi</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            {explanationAudioUrl && (
-                                                <div className="flex-shrink-0">
-                                                    <p className="text-sm font-medium mb-2">Main Explanation Audio</p>
-                                                    <audio controls src={explanationAudioUrl} className="w-full h-10" />
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Actions</CardTitle>
+                            <CardDescription>Use these tools to manage your report and track progress.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-2 gap-4">
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button className="w-full" onClick={handleFindSpecialist}>
+                                            {isRecommending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Stethoscope className="mr-2 h-4 w-4" />}
+                                            Find a Specialist
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-md">
+                                        <DialogHeader>
+                                            <DialogTitle>Recommended Doctors</DialogTitle>
+                                            <DialogDescription>
+                                                Based on your analysis for {analysis.conditionName}, here are some recommended specialists.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="py-4">
+                                            {isRecommending ? (
+                                                <div className="flex justify-center items-center h-24">
+                                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                                 </div>
-                                            )}
-                                            <ScrollArea className="flex-grow pr-4" ref={scrollAreaRef}>
+                                            ) : recommendationResult ? (
                                                 <div className="space-y-4">
-                                                    {explanationMessages.map((msg, index) => (
-                                                        <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : '')}>
-                                                            {msg.sender === 'bot' && (
-                                                                <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-                                                                    <AvatarFallback><Bot size={18} /></AvatarFallback>
-                                                                </Avatar>
-                                                            )}
-                                                            <div className={cn("rounded-lg px-3 py-2 max-w-[85%]", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                                                <p className="text-sm">{msg.text}</p>
-                                                                {msg.sender === 'bot' && index > 0 && (
-                                                                    <div className="flex justify-end mt-1">
-                                                                        <Button size="icon" variant="ghost" className={cn("h-6 w-6 shrink-0", playingAudio?.text === msg.text && "text-primary")} onClick={() => handlePlayMessageAudio(msg.text)} disabled={isAudioLoading === msg.text}>
-                                                                            {isAudioLoading === msg.text ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4" />}
-                                                                        </Button>
+                                                    <Alert>
+                                                        <Sparkles className="h-4 w-4" />
+                                                        <AlertTitle>Recommendation</AlertTitle>
+                                                        <AlertDescription>
+                                                            {recommendationResult.recommendationReason}
+                                                        </AlertDescription>
+                                                    </Alert>
+                                                    {recommendationResult.doctors.length > 0 ? (
+                                                        <ul className="space-y-3">
+                                                            {recommendationResult.doctors.map(doc => (
+                                                                <li key={doc.id} className="flex items-center justify-between p-2 rounded-md border hover:bg-muted/50">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <Avatar>
+                                                                            <AvatarImage src={doc.avatar} alt={doc.name} data-ai-hint="doctor portrait" />
+                                                                            <AvatarFallback>{doc.name.charAt(0)}</AvatarFallback>
+                                                                        </Avatar>
+                                                                        <div>
+                                                                            <p className="font-semibold">{doc.name}</p>
+                                                                            <p className="text-sm text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" /> {doc.location}</p>
+                                                                        </div>
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                            {msg.sender === 'user' && (
-                                                                <Avatar className="h-8 w-8">
-                                                                    <AvatarFallback><User size={18} /></AvatarFallback>
-                                                                </Avatar>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    {isAnswering && (
-                                                        <div className="flex items-start gap-3">
-                                                            <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-                                                                <AvatarFallback><Bot size={18} /></AvatarFallback>
-                                                            </Avatar>
-                                                            <div className="rounded-lg px-4 py-2 bg-muted flex items-center">
-                                                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                                                            </div>
-                                                        </div>
+                                                                    <Button size="sm" asChild><Link href={`/doctors`}>Book</Link></Button>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    ) : (
+                                                        <p className="text-center text-muted-foreground py-4">No doctors found matching the recommended specialization.</p>
                                                     )}
                                                 </div>
-                                            </ScrollArea>
-                                            <div className="flex w-full items-center space-x-2 mt-auto pt-4 flex-shrink-0">
-                                                <div className="relative flex-grow">
-                                                    <Input
-                                                        placeholder="Have a doubt? Ask here..."
-                                                        value={followUpQuestion}
-                                                        onChange={(e) => setFollowUpQuestion(e.target.value)}
-                                                        onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
-                                                        disabled={isAnswering}
-                                                        className="pr-20"
-                                                    />
-                                                    <div className="absolute inset-y-0 right-0 flex items-center pr-2">
-                                                        <Button size="icon" variant={isListening ? "destructive" : "ghost"} onClick={handleMicClick} disabled={isAnswering}>
-                                                            <Mic className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button size="icon" variant="ghost" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
-                                                            <Send className="h-4 w-4" />
-                                                        </Button>
+                                            ) : (
+                                                <p className="text-center text-muted-foreground py-4">Click "Find a Specialist" to get recommendations.</p>
+                                            )}
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+
+                                <Dialog open={explanationDialogOpen} onOpenChange={(open) => { setExplanationDialogOpen(open); if(!open) resetExplanationDialog(); }}>
+                                    <DialogTrigger asChild>
+                                        <Button className="w-full" onClick={onExplanationModalOpen}>
+                                            <Languages className="mr-2 h-4 w-4" />
+                                            Explain Report
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-lg flex flex-col h-[90vh] max-h-[700px]">
+                                        <DialogHeader className="flex-shrink-0">
+                                            <DialogTitle>Explain Report</DialogTitle>
+                                            <DialogDescription>
+                                                Get a simplified explanation of your report and ask follow-up questions.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        
+                                        <div className="flex-grow flex flex-col min-h-0">
+                                            {(!hasExistingExplanations() && !explanationLoading) && (
+                                                <div className="space-y-4 py-2 flex-shrink-0">
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="language-select">Select Language</Label>
+                                                        <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                                                            <SelectTrigger id="language-select">
+                                                                <SelectValue placeholder="Select a language" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {/* Language List */}
+                                                                <SelectItem value="English">English</SelectItem>
+                                                                <SelectItem value="Hindi">Hindi</SelectItem>
+                                                                <SelectItem value="Bengali">Bengali</SelectItem>
+                                                                <SelectItem value="Telugu">Telugu</SelectItem>
+                                                                <SelectItem value="Marathi">Marathi</SelectItem>
+                                                                <SelectItem value="Tamil">Tamil</SelectItem>
+                                                                <SelectItem value="Urdu">Urdu</SelectItem>
+                                                                <SelectItem value="Gujarati">Gujarati</SelectItem>
+                                                                <SelectItem value="Kannada">Kannada</SelectItem>
+                                                                <SelectItem value="Odia">Odia</SelectItem>
+                                                                <SelectItem value="Malayalam">Malayalam</SelectItem>
+                                                                <SelectItem value="Punjabi">Punjabi</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <Button onClick={() => handleExplanationRequest(selectedLanguage)} disabled={explanationLoading} className="w-full">
+                                                        {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                                        Generate Explanation
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            {explanationError && (
+                                                <Alert variant="destructive" className="flex-shrink-0">
+                                                    <AlertTitle>Error</AlertTitle>
+                                                    <AlertDescription>{explanationError}</AlertDescription>
+                                                </Alert>
+                                            )}
+
+                                            {explanationLoading && (
+                                                <div className="flex justify-center items-center flex-grow py-8">
+                                                    <Loader2 className="h-8 w-8 animate-spin" />
+                                                </div>
+                                            )}
+
+                                            {explanationMessages.length > 0 && !explanationLoading && (
+                                                <div className="flex flex-col flex-grow min-h-0 space-y-4">
+                                                    <div className="space-y-2 flex-shrink-0">
+                                                        <Label htmlFor="language-select-active">Language</Label>
+                                                        <Select value={selectedLanguage} onValueChange={handleExplanationRequest}>
+                                                            <SelectTrigger id="language-select-active">
+                                                                <SelectValue placeholder="Select a language" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="English">English</SelectItem>
+                                                                <SelectItem value="Hindi">Hindi</SelectItem>
+                                                                <SelectItem value="Bengali">Bengali</SelectItem>
+                                                                <SelectItem value="Telugu">Telugu</SelectItem>
+                                                                <SelectItem value="Marathi">Marathi</SelectItem>
+                                                                <SelectItem value="Tamil">Tamil</SelectItem>
+                                                                <SelectItem value="Urdu">Urdu</SelectItem>
+                                                                <SelectItem value="Gujarati">Gujarati</SelectItem>
+                                                                <SelectItem value="Kannada">Kannada</SelectItem>
+                                                                <SelectItem value="Odia">Odia</SelectItem>
+                                                                <SelectItem value="Malayalam">Malayalam</SelectItem>
+                                                                <SelectItem value="Punjabi">Punjabi</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    {explanationAudioUrl && (
+                                                        <div className="flex-shrink-0">
+                                                            <p className="text-sm font-medium mb-2">Main Explanation Audio</p>
+                                                            <audio controls src={explanationAudioUrl} className="w-full h-10" />
+                                                        </div>
+                                                    )}
+                                                    <ScrollArea className="flex-grow pr-4" ref={scrollAreaRef}>
+                                                        <div className="space-y-4">
+                                                            {explanationMessages.map((msg, index) => (
+                                                                <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : '')}>
+                                                                    {msg.sender === 'bot' && (
+                                                                        <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                                                                            <AvatarFallback><Bot size={18} /></AvatarFallback>
+                                                                        </Avatar>
+                                                                    )}
+                                                                    <div className={cn("rounded-lg px-3 py-2 max-w-[85%]", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                                                        <p className="text-sm">{msg.text}</p>
+                                                                        {msg.sender === 'bot' && index > 0 && (
+                                                                            <div className="flex justify-end mt-1">
+                                                                                <Button size="icon" variant="ghost" className={cn("h-6 w-6 shrink-0", playingAudio?.text === msg.text && "text-primary")} onClick={() => handlePlayMessageAudio(msg.text)} disabled={isAudioLoading === msg.text}>
+                                                                                    {isAudioLoading === msg.text ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4" />}
+                                                                                </Button>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    {msg.sender === 'user' && (
+                                                                        <Avatar className="h-8 w-8">
+                                                                            <AvatarFallback><User size={18} /></AvatarFallback>
+                                                                        </Avatar>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                            {isAnswering && (
+                                                                <div className="flex items-start gap-3">
+                                                                    <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                                                                        <AvatarFallback><Bot size={18} /></AvatarFallback>
+                                                                    </Avatar>
+                                                                    <div className="rounded-lg px-4 py-2 bg-muted flex items-center">
+                                                                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </ScrollArea>
+                                                    <div className="flex w-full items-center space-x-2 mt-auto pt-4 flex-shrink-0">
+                                                        <div className="relative flex-grow">
+                                                            <Input
+                                                                placeholder="Have a doubt? Ask here..."
+                                                                value={followUpQuestion}
+                                                                onChange={(e) => setFollowUpQuestion(e.target.value)}
+                                                                onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleSendFollowUp()}
+                                                                disabled={isAnswering}
+                                                                className="pr-20"
+                                                            />
+                                                            <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+                                                                <Button size="icon" variant={isListening ? "destructive" : "ghost"} onClick={handleMicClick} disabled={isAnswering}>
+                                                                    <Mic className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button size="icon" variant="ghost" onClick={handleSendFollowUp} disabled={isAnswering || !followUpQuestion.trim()}>
+                                                                    <Send className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    )}
-                               </div>
-                            </DialogContent>
-                        </Dialog>
-                    </div>
+                                            )}
+                                    </div>
+                                    </DialogContent>
+                                </Dialog>
 
-                    <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
-                         <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Microphone Access</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    DermiAssist-AI needs access to your microphone to enable the speech-to-text feature. Click Continue to allow access in the upcoming browser prompt.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => { startRecognition(); setShowPermissionDialog(false); }}>Continue</AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-
-                    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if(!open) resetProgressDialog(); }}>
-                        <DialogTrigger asChild>
-                            <Button className="w-full">
-                                <LineChart className="mr-2 h-4 w-4" />
-                                Track Progress
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md">
-                            <DialogHeader>
-                                <DialogTitle>Track Your Progress</DialogTitle>
-                                <DialogDescription>
-                                    Upload a new photo to get an AI-powered comparison and see how your skin is changing.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                 <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                    {progressImage ? (
-                                        <Image
-                                            src={progressImage}
-                                            alt="New progress photo"
-                                            width={200}
-                                            height={200}
-                                            className="mx-auto rounded-lg"
-                                        />
-                                    ) : (
-                                        <div className="space-y-2 text-muted-foreground">
-                                            <Upload className="mx-auto h-10 w-10" />
-                                            <p className="text-sm">Click to upload a new photo</p>
-                                        </div>
-                                    )}
-                                     <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        className="hidden"
-                                        accept="image/*"
-                                        onChange={handleFileChange}
-                                      />
-                                </div>
-                                {progressSummary && (
-                                     <Alert className="border-primary/50 bg-primary/10">
-                                        <Sparkles className="h-4 w-4 text-primary" />
-                                        <AlertTitle className="text-primary">AI Progress Report</AlertTitle>
-                                        <AlertDescription className="text-primary/90">
-                                            {progressSummary}
-                                        </AlertDescription>
-                                    </Alert>
-                                )}
-                                {videoUri && (
-                                    <div className="mt-4">
-                                        <video src={videoUri} controls className="w-full rounded-lg" />
-                                    </div>
-                                )}
-                                {isComparing && !progressSummary && (
-                                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        <span>Analyzing progress...</span>
-                                    </div>
-                                )}
-                                {isGeneratingVideo && (
-                                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        <span>Generating video... This may take a moment.</span>
-                                    </div>
-                                )}
-                                 {error && (
-                                    <Alert variant="destructive">
-                                        <AlertTitle>Error</AlertTitle>
-                                        <AlertDescription>{error}</AlertDescription>
-                                    </Alert>
-                                )}
-                            </div>
-                            <DialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <Button onClick={handleCompare} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full">
-                                    {isComparing ? (
-                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Comparing...</>
-                                    ) : (
-                                        <><Sparkles className="mr-2 h-4 w-4" />Analyze Progress</>
-                                    )}
-                                </Button>
-                                <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div className="w-full">
-                                            <Button onClick={handleGenerateVideo} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full">
-                                                {isGeneratingVideo ? (
-                                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
+                                <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if(!open) resetProgressDialog(); }}>
+                                    <DialogTrigger asChild>
+                                        <Button variant="secondary" className="w-full">
+                                            <LineChart className="mr-2 h-4 w-4" />
+                                            Track Progress
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-md">
+                                        <DialogHeader>
+                                            <DialogTitle>Track Your Progress</DialogTitle>
+                                            <DialogDescription>
+                                                Upload a new photo to get an AI-powered comparison and see how your skin is changing.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="space-y-4 py-4">
+                                            <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                                                {progressImage ? (
+                                                    <Image
+                                                        src={progressImage}
+                                                        alt="New progress photo"
+                                                        width={200}
+                                                        height={200}
+                                                        className="mx-auto rounded-lg"
+                                                    />
                                                 ) : (
-                                                    <><Video className="mr-2 h-4 w-4" />Generate Healing Video</>
+                                                    <div className="space-y-2 text-muted-foreground">
+                                                        <Upload className="mx-auto h-10 w-10" />
+                                                        <p className="text-sm">Click to upload a new photo</p>
+                                                    </div>
+                                                )}
+                                                <input
+                                                    ref={fileInputRef}
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept="image/*"
+                                                    onChange={handleFileChange}
+                                                    />
+                                            </div>
+                                            {progressSummary && (
+                                                <Alert className="border-primary/50 bg-primary/10">
+                                                    <Sparkles className="h-4 w-4 text-primary" />
+                                                    <AlertTitle className="text-primary">AI Progress Report</AlertTitle>
+                                                    <AlertDescription className="text-primary/90">
+                                                        {progressSummary}
+                                                    </AlertDescription>
+                                                </Alert>
+                                            )}
+                                            {videoUri && (
+                                                <div className="mt-4">
+                                                    <video src={videoUri} controls className="w-full rounded-lg" />
+                                                </div>
+                                            )}
+                                            {isComparing && !progressSummary && (
+                                                <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    <span>Analyzing progress...</span>
+                                                </div>
+                                            )}
+                                            {isGeneratingVideo && (
+                                                <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    <span>Generating video... This may take a moment.</span>
+                                                </div>
+                                            )}
+                                            {error && (
+                                                <Alert variant="destructive">
+                                                    <AlertTitle>Error</AlertTitle>
+                                                    <AlertDescription>{error}</AlertDescription>
+                                                </Alert>
+                                            )}
+                                        </div>
+                                        <DialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <Button onClick={handleCompare} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full">
+                                                {isComparing ? (
+                                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Comparing...</>
+                                                ) : (
+                                                    <><Sparkles className="mr-2 h-4 w-4" />Analyze Progress</>
                                                 )}
                                             </Button>
-                                        </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Premium feature. Requires GCP billing to be enabled.</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                    
-                    <Button className="w-full" onClick={handleDownloadPdf} disabled={isDownloading}>
-                        {isDownloading ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Downloading...
-                            </>
-                        ) : (
-                             <>
-                                <FileText className="mr-2 h-4 w-4" />
-                                Download Report (PDF)
-                            </>
-                        )}
-                    </Button>
+                                            <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <div className="w-full">
+                                                        <Button variant="default" onClick={handleGenerateVideo} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full">
+                                                            {isGeneratingVideo ? (
+                                                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
+                                                            ) : (
+                                                                <><Video className="mr-2 h-4 w-4" />Generate Healing Video</>
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Premium feature. Requires GCP billing to be enabled.</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                                
+                                <Button className="w-full" variant="secondary" onClick={handleDownloadPdf} disabled={isDownloading}>
+                                    {isDownloading ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Downloading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FileText className="mr-2 h-4 w-4" />
+                                            Download Report
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
+
+            <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
+                    <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Microphone Access</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            DermiAssist-AI needs access to your microphone to enable the speech-to-text feature. Click Continue to allow access in the upcoming browser prompt.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => { startRecognition(); setShowPermissionDialog(false); }}>Continue</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
