@@ -16,7 +16,7 @@ export function AppFooter() {
         </div>
         <nav className="flex gap-4 sm:gap-6 text-sm text-muted-foreground">
           <Link href="/project-details" className="hover:text-foreground">Project Details</Link>
-          <a href="salmanmomin.me" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Developer Details</a>
+          <a href="www.salmanmomin.me" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Developer Details</a>
 
           <Link href="/terms" className="hover:text-foreground">Terms & Conditions</Link>
           <Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link>

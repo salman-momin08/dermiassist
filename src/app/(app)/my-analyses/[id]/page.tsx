@@ -1032,7 +1032,7 @@ export default function AnalysisDetailPage() {
 
                                 <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if(!open) resetProgressDialog(); }}>
                                     <DialogTrigger asChild>
-                                        <Button variant="secondary" className="w-full">
+                                        <Button className="w-full">
                                             <LineChart className="mr-2 h-4 w-4" />
                                             Track Progress
                                         </Button>
@@ -1131,7 +1131,7 @@ export default function AnalysisDetailPage() {
                                     </DialogContent>
                                 </Dialog>
                                 
-                                <Button className="w-full" variant="secondary" onClick={handleDownloadPdf} disabled={isDownloading}>
+                                <Button className="w-full" onClick={handleDownloadPdf} disabled={isDownloading}>
                                     {isDownloading ? (
                                         <>
                                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
