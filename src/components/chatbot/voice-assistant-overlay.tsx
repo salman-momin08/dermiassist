@@ -260,3 +260,5 @@ function Blob({ status }: { status: AssistantStatus }) {
         </motion.div>
     );
 }
+
+    
