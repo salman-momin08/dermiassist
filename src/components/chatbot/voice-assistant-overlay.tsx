@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { dermiAssistant } from '@/ai/flows/dermi-assistant';
 import { textToSpeech } from '@/ai/flows/text-to-speech';
 import { uploadFile } from '@/lib/actions';
+import { Button } from '@/components/ui/button';
 
 const SpeechRecognition = typeof window !== "undefined" ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition : null;
 
@@ -243,4 +244,3 @@ function Blob({ status }: { status: AssistantStatus }) {
         </motion.div>
     );
 }
-
