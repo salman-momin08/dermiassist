@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
-import { Bot, Send, User, Loader2, Mic, Upload } from 'lucide-react';
+import { Bot, Send, User, Loader2, Mic, Upload, Volume2, VolumeX } from 'lucide-react';
 import { Input } from '../ui/input';
 import { ScrollArea } from '../ui/scroll-area';
 import { Avatar, AvatarFallback } from '../ui/avatar';
@@ -14,6 +14,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
+import { textToSpeech } from '@/ai/flows/text-to-speech';
+import { uploadFile } from '@/lib/actions';
+import { Switch } from '../ui/switch';
+import { Label } from '../ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 
 interface Message {
@@ -42,9 +47,16 @@ export function Chatbot() {
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
 
+    // Speech Recognition state
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const [isListening, setIsListening] = useState(false);
     const finalTranscriptRef = useRef('');
+
+    // Text-to-Speech & Speech Mode state
+    const [speechMode, setSpeechMode] = useState(false);
+    const [playingAudio, setPlayingAudio] = useState<{ audio: HTMLAudioElement; text: string } | null>(null);
+    const [isAudioLoading, setIsAudioLoading] = useState<string | null>(null);
+    const [audioCache, setAudioCache] = useState<Record<string, string>>({});
 
 
     useEffect(() => {
@@ -95,6 +107,16 @@ export function Chatbot() {
 
         recognitionRef.current = recognition;
     }, [toast]);
+    
+    // Effect to automatically play new bot messages in speech mode
+    useEffect(() => {
+        if (speechMode && messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            if (lastMessage.sender === 'bot' && !isLoading) {
+                handlePlayMessageAudio(lastMessage.text);
+            }
+        }
+    }, [messages, speechMode, isLoading]);
 
     const handleSend = async (messageToSend?: string, photoDataUri?: string) => {
         const currentInput = messageToSend || input;
@@ -153,6 +175,10 @@ export function Chatbot() {
              toast({ title: "Unsupported", description: "Speech recognition is not supported in your browser.", variant: "destructive" });
              return;
         }
+        
+        // Turn on speech mode when mic is used for the first time
+        if (!speechMode) setSpeechMode(true);
+
         if (isListening) {
             recognitionRef.current?.stop();
             return;
@@ -179,7 +205,7 @@ export function Chatbot() {
             recognitionRef.current?.start();
             setIsListening(true);
         }
-    }, [isListening, toast]);
+    }, [isListening, toast, speechMode]);
     
      const handleOpenAndListen = useCallback(() => {
         setIsOpen(true);
@@ -224,6 +250,46 @@ export function Chatbot() {
       cb();
       setIsOpen(false);
     }
+    
+    const handlePlayMessageAudio = useCallback(async (text: string) => {
+        if (playingAudio && playingAudio.text === text) {
+            playingAudio.audio.pause();
+            setPlayingAudio(null);
+            return;
+        }
+        if (playingAudio) {
+            playingAudio.audio.pause();
+        }
+
+        const onEnded = () => setPlayingAudio(null);
+
+        if (audioCache[text]) {
+            const audio = new Audio(audioCache[text]);
+            setPlayingAudio({ audio, text });
+            audio.play();
+            audio.onended = onEnded;
+            return;
+        }
+
+        setIsAudioLoading(text);
+        try {
+            const { audioBase64 } = await textToSpeech({ text });
+            const uploadResult = await uploadFile(null, audioBase64);
+            if (!uploadResult.success || !uploadResult.url) {
+                throw new Error(uploadResult.message || "Audio upload failed.");
+            }
+            setAudioCache(prev => ({...prev, [text]: uploadResult.url!}));
+            const audio = new Audio(uploadResult.url);
+            setPlayingAudio({ audio, text });
+            audio.play();
+            audio.onended = onEnded;
+        } catch (error) {
+            console.error("Failed to play audio:", error);
+            toast({ title: "Audio Error", description: "Could not play the message audio.", variant: "destructive" });
+        } finally {
+            setIsAudioLoading(null);
+        }
+    }, [audioCache, playingAudio, toast]);
 
     // Hide chatbot if user is not logged in.
     if (!user && !authLoading) {
@@ -243,12 +309,33 @@ export function Chatbot() {
             </SheetTrigger>
             <SheetContent className="flex flex-col">
                 <SheetHeader>
-                    <SheetTitle className="flex items-center gap-2 font-headline">
-                        <Bot className="text-primary"/>
-                        DermiAssistant
+                    <SheetTitle className="flex items-center justify-between font-headline">
+                         <div className="flex items-center gap-2">
+                             <Bot className="text-primary"/>
+                             DermiAssistant
+                         </div>
+                         <div className="flex items-center space-x-2">
+                            <TooltipProvider>
+                               <Tooltip>
+                                  <TooltipTrigger asChild>
+                                     <Label htmlFor="speech-mode" className="flex items-center gap-2 cursor-pointer">
+                                        <Volume2 className="h-4 w-4" />
+                                     </Label>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                     <p>Enable Speech Mode to hear AI responses automatically.</p>
+                                  </TooltipContent>
+                               </Tooltip>
+                            </TooltipProvider>
+                            <Switch
+                               id="speech-mode"
+                               checked={speechMode}
+                               onCheckedChange={setSpeechMode}
+                            />
+                         </div>
                     </SheetTitle>
                     <SheetDescription>
-                        Your personal AI assistant for navigating the app and answering questions.
+                        Your personal AI assistant. Press Ctrl+M to toggle.
                     </SheetDescription>
                 </SheetHeader>
                 <ScrollArea className="flex-grow my-4 pr-4 -mr-6" viewportRef={scrollViewportRef}>
@@ -263,6 +350,13 @@ export function Chatbot() {
                                     )}
                                     <div className={cn("rounded-lg px-4 py-2 max-w-[80%]", message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
                                         <p className="text-sm" dangerouslySetInnerHTML={{ __html: message.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                         {message.sender === 'bot' && (
+                                          <div className="flex justify-end mt-1">
+                                              <Button size="icon" variant="ghost" className={cn("h-6 w-6 shrink-0", playingAudio?.text === message.text && "text-primary")} onClick={() => handlePlayMessageAudio(message.text)} disabled={isAudioLoading === message.text}>
+                                                  {isAudioLoading === message.text ? <Loader2 className="h-4 w-4 animate-spin"/> : playingAudio?.text === message.text ? <VolumeX className="h-4 w-4"/> : <Volume2 className="h-4 w-4" />}
+                                              </Button>
+                                          </div>
+                                        )}
                                     </div>
                                     {message.sender === 'user' && (
                                         <Avatar className="h-8 w-8">
@@ -322,3 +416,5 @@ export function Chatbot() {
         </Sheet>
     );
 }
+
+    
