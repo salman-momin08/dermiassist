@@ -8,33 +8,18 @@ import { Bot, Send, User, Loader2, Mic, Upload } from 'lucide-react';
 import { Input } from '../ui/input';
 import { ScrollArea } from '../ui/scroll-area';
 import { Avatar, AvatarFallback } from '../ui/avatar';
-import { chatbotFAQ } from '@/ai/flows/chatbot-faq';
-import { patientAgent, PatientAgentOutput } from '@/ai/flows/patient-agent';
+import { dermiAssistant, DermiAssistantOutput } from '@/ai/flows/dermi-assistant';
 import { cn } from '@/lib/utils';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '../ui/label';
 import { format } from 'date-fns';
 
-
-type ChatMode = 'faq' | 'agent';
 
 interface Message {
     sender: 'user' | 'bot';
     text: string;
-    action?: PatientAgentOutput['action'];
+    action?: DermiAssistantOutput['action'];
     data?: any;
     destination?: string;
 }
@@ -44,12 +29,11 @@ const SpeechRecognition = typeof window !== "undefined" ? (window as any).Speech
 
 export function Chatbot() {
     const [messages, setMessages] = useState<Message[]>([
-        { sender: 'bot', text: "Hello! I'm the DermiAssist-AI assistant. How can I help you today?" }
+        { sender: 'bot', text: "Hello! I'm Dermi, your personal AI assistant. How can I help you today?" }
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
-    const [chatMode, setChatMode] = useState<ChatMode>('faq');
     const [awaitingPhoto, setAwaitingPhoto] = useState(false);
     
     const scrollViewportRef = useRef<HTMLDivElement>(null);
@@ -116,7 +100,7 @@ export function Chatbot() {
         const currentInput = messageToSend || input;
         if ((!currentInput.trim() && !photoDataUri) || !user) {
             if (!user && !authLoading) {
-                toast({ title: "Not logged in", description: "Please log in to use the agent.", variant: "destructive"});
+                toast({ title: "Not logged in", description: "Please log in to use the assistant.", variant: "destructive"});
                 setIsOpen(false);
                 router.push('/login');
             }
@@ -131,39 +115,29 @@ export function Chatbot() {
         setAwaitingPhoto(false);
 
         try {
-            const historyString = newMessages.map(m => `${m.sender === 'bot' ? 'AI' : 'User'}: ${m.text}`).join('\n');
+            const historyString = newMessages.map(m => `${m.sender === 'bot' ? 'Assistant' : 'User'}: ${m.text}`).join('\n');
             
-            if (chatMode === 'agent') {
-                const result = await patientAgent({ 
-                    userId: user.uid, 
-                    command: currentInput,
-                    conversationHistory: historyString,
-                    photoDataUri: photoDataUri 
-                });
+            const result = await dermiAssistant({ 
+                userId: user.uid, 
+                command: currentInput,
+                conversationHistory: historyString,
+                photoDataUri: photoDataUri 
+            });
 
-                const botMessage: Message = {
-                    sender: 'bot',
-                    text: result.response,
-                    action: result.action,
-                    data: result.data,
-                    destination: result.destination,
-                };
-                setMessages(prev => [...prev, botMessage]);
+            const botMessage: Message = {
+                sender: 'bot',
+                text: result.response,
+                action: result.action,
+                data: result.data,
+                destination: result.destination,
+            };
+            setMessages(prev => [...prev, botMessage]);
 
-                 if (result.action === 'navigate' || result.action === 'startProforma') {
-                    router.push(result.destination!);
-                    setIsOpen(false);
-                } else if (result.action === 'awaiting_photo') {
-                    setAwaitingPhoto(true);
-                }
-
-            } else { // FAQ Mode
-                const response = await chatbotFAQ({ 
-                    question: currentInput,
-                    conversationHistory: historyString,
-                });
-                const botMessage: Message = { sender: 'bot', text: response.answer };
-                setMessages(prev => [...prev, botMessage]);
+             if (result.action === 'navigate' || result.action === 'startProforma') {
+                router.push(result.destination!);
+                setIsOpen(false);
+            } else if (result.action === 'awaiting_photo') {
+                setAwaitingPhoto(true);
             }
 
         } catch (error) {
@@ -233,33 +207,18 @@ export function Chatbot() {
                     size="icon"
                 >
                     <Bot className="h-8 w-8" />
-                    <span className="sr-only">Open Chatbot</span>
+                    <span className="sr-only">Open Assistant</span>
                 </Button>
             </SheetTrigger>
             <SheetContent className="flex flex-col">
                 <SheetHeader>
                     <SheetTitle className="flex items-center gap-2 font-headline">
                         <Bot className="text-primary"/>
-                        DermiAssist-AI Assistant
+                        DermiAssistant
                     </SheetTitle>
-                     <div className="!mt-4 space-y-2">
-                        <Label>Assistant Mode</Label>
-                        <Select value={chatMode} onValueChange={(v) => setChatMode(v as ChatMode)}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a mode" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="faq">FAQ Assistant</SelectItem>
-                                <SelectItem value="agent">Patient Agent (Advanced)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <SheetDescription>
-                            {chatMode === 'faq' 
-                                ? "Ask general questions about dermatology or the platform." 
-                                : "Give commands to navigate the app or perform tasks."
-                            }
-                        </SheetDescription>
-                    </div>
+                    <SheetDescription>
+                        Your personal AI assistant for navigating the app and answering questions.
+                    </SheetDescription>
                 </SheetHeader>
                 <ScrollArea className="flex-grow my-4 pr-4 -mr-6" viewportRef={scrollViewportRef}>
                     <div className="space-y-4">
@@ -306,7 +265,7 @@ export function Chatbot() {
                 <SheetFooter>
                     <div className="flex w-full items-center space-x-2">
                         <Input
-                            placeholder={isListening ? "Listening..." : "Type a message..."}
+                            placeholder={isListening ? "Listening..." : "Type a message or command..."}
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
@@ -332,5 +291,3 @@ export function Chatbot() {
         </Sheet>
     );
 }
-
-    
