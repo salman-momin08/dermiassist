@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
@@ -26,7 +26,7 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const audioQueueRef = useRef<HTMLAudioElement[]>([]);
     const isPlayingRef = useRef(false);
-    const audioCacheRef = useRef<Record<string, string>>({}); // Use a ref for cache to persist across renders without causing re-renders
+    const audioCacheRef = useRef<Record<string, string>>({});
 
     const processAudioQueue = useCallback(() => {
         if (isPlayingRef.current || audioQueueRef.current.length === 0) {
@@ -40,7 +40,6 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
             audio.onended = () => {
                 isPlayingRef.current = false;
                 if (audioQueueRef.current.length === 0) {
-                     // After speaking, go back to listening
                     startListening();
                 } else {
                     processAudioQueue();
@@ -50,7 +49,6 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
     }, []);
 
     const speak = useCallback(async (text: string) => {
-        // Check cache first
         if (audioCacheRef.current[text]) {
             const audio = new Audio(audioCacheRef.current[text]);
             audioQueueRef.current.push(audio);
@@ -65,7 +63,6 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
                 throw new Error(uploadResult.message || "Audio upload failed.");
             }
             
-            // Store in cache
             audioCacheRef.current[text] = uploadResult.url;
 
             const audio = new Audio(uploadResult.url);
@@ -73,11 +70,9 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
             processAudioQueue();
         } catch (error) {
             console.error("TTS Error:", error);
-            // Don't toast for rate limit errors, just fail gracefully
             if (!(error instanceof Error && error.message.includes('429'))) {
               toast({ title: "Speech Error", description: "Could not generate audio response.", variant: "destructive" });
             }
-            // If TTS fails, go back to listening
             startListening();
         }
     }, [processAudioQueue, toast]);
@@ -102,11 +97,10 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
             return;
         }
 
-        // Greet the user on open
         speak("Hello! Dermi is here. How can I assist you?");
 
         const recognition = new SpeechRecognition();
-        recognition.continuous = false; // We want to process after each phrase
+        recognition.continuous = false;
         recognition.interimResults = false;
         recognition.lang = 'en-US';
 
@@ -137,7 +131,7 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
                 
                 if(result.action === 'navigate' || result.action === 'startProforma') {
                     router.push(result.destination!);
-                    onOpenChange(false); // Close the overlay on navigation
+                    onOpenChange(false);
                 }
 
             } catch (err) {
@@ -150,13 +144,11 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
             if (event.error !== 'no-speech' && event.error !== 'aborted') {
                 console.error('Speech recognition error:', event.error);
             }
-            // After an error, restart listening
             startListening();
         };
         
         recognition.onend = () => {
              if (status === 'listening') {
-                // If it ends while still supposed to be listening, restart it
                 startListening();
             }
         };
@@ -165,7 +157,9 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
         startListening();
 
         return () => {
-            recognition.stop();
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+            }
             audioQueueRef.current.forEach(audio => audio.pause());
             audioQueueRef.current = [];
         };
@@ -188,10 +182,7 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
                         exit={{ scale: 0.5, opacity: 0 }}
                         className="relative"
                     >
-                        <Blob status={status} />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <Mic className="h-16 w-16 text-white" />
-                        </div>
+                        <AnimatedCharacter status={status} />
                     </motion.div>
 
                     <motion.div 
@@ -219,46 +210,53 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
     );
 }
 
+const AnimatedCharacter = ({ status }: { status: AssistantStatus }) => {
+    const isListening = status === 'listening';
+    const isSpeaking = status === 'speaking';
 
-function Blob({ status }: { status: AssistantStatus }) {
-    const scale = status === 'listening' || status === 'speaking' ? 1.1 : 1;
-    const opacity = status === 'listening' || status === 'speaking' ? 1 : 0.8;
-    const duration = status === 'listening' ? 1.5 : 0.5;
+    const bodyPath = isSpeaking 
+        ? "M 206.83,30.34 C 229.43,36.56 250.77,56.57 266.2,74.55 C 282.9,94.29 293.71,111.99 303.49,134.75 C 313.27,157.51 322.02,185.34 311.95,208.5 C 301.88,231.66 273.0,250.15 249.52,261.56 C 226.04,272.97 207.96,277.3 184.28,276.08 C 160.6,274.86 131.32,268.09 109.79,252.68 C 88.26,237.27 74.48,213.22 66.62,187.9 C 58.76,162.58 56.83,135.99 64.92,111.43 C 73.01,86.87 91.12,64.34 111.43,51.83 C 131.74,39.32 154.24,36.83 176.71,34.02 C 199.18,31.21 184.23,24.12 206.83,30.34 Z"
+        : "M 210.43,26.79 C 238.16,35.48 248.83,57.17 266.2,74.55 C 285.34,93.69 313.17,105.73 318.52,134.75 C 323.87,163.77 306.74,189.73 293.43,215.17 C 278.4,243.43 267.19,271.17 243.43,284.48 C 219.68,297.79 183.38,296.67 155.22,286.43 C 127.06,276.19 107.04,256.83 89.28,235.21 C 69.76,211.83 52.49,186.2 52.49,157.06 C 52.49,127.92 69.76,95.66 85.72,71.14 C 101.68,46.62 116.32,29.84 140.28,21.7 C 164.24,13.56 182.7,18.1 210.43,26.79 Z";
+
+    const eyeScale = isListening ? 1.2 : 1;
+    const eyePupilY = isListening ? -3 : 0;
 
     return (
         <motion.div
-            animate={{ scale, opacity }}
-            transition={{ type: 'spring', stiffness: 100, damping: 10 }}
+            animate={{ scale: isListening ? 1.05 : 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 10 }}
         >
-            <svg
-                viewBox="0 0 400 400"
-                className="h-64 w-64 md:h-80 md:w-80"
-                xmlns="http://www.w3.org/2000/svg"
-            >
+            <svg viewBox="0 0 400 400" className="h-64 w-64 md:h-80 md:w-80" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                     <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style={{ stopColor: '#c026d3', stopOpacity: 1 }} />
-                        <stop offset="100%" style={{ stopColor: '#a855f7', stopOpacity: 1 }} />
+                        <stop offset="0%" style={{ stopColor: 'hsl(var(--primary))', stopOpacity: 0.8 }} />
+                        <stop offset="100%" style={{ stopColor: 'hsl(var(--accent))', stopOpacity: 1 }} />
                     </linearGradient>
                 </defs>
+                
+                {/* Body Animation */}
                 <motion.path
                     fill="url(#gradient)"
-                    d="M 210.43,26.79 C 238.16,35.48 248.83,57.17 266.2,74.55 C 285.34,93.69 313.17,105.73 318.52,134.75 C 323.87,163.77 306.74,189.73 293.43,215.17 C 278.4,243.43 267.19,271.17 243.43,284.48 C 219.68,297.79 183.38,296.67 155.22,286.43 C 127.06,276.19 107.04,256.83 89.28,235.21 C 69.76,211.83 52.49,186.2 52.49,157.06 C 52.49,127.92 69.76,95.66 85.72,71.14 C 101.68,46.62 116.32,29.84 140.28,21.7 C 164.24,13.56 182.7,18.1 210.43,26.79 Z"
-                >
-                    <animate
-                        attributeName="d"
-                        dur={`${duration}s`}
-                        repeatCount="indefinite"
-                        values={
-                            status === 'listening' ?
-                            "M 210.43,26.79 C 238.16,35.48 248.83,57.17 266.2,74.55 C 285.34,93.69 313.17,105.73 318.52,134.75 C 323.87,163.77 306.74,189.73 293.43,215.17 C 278.4,243.43 267.19,271.17 243.43,284.48 C 219.68,297.79 183.38,296.67 155.22,286.43 C 127.06,276.19 107.04,256.83 89.28,235.21 C 69.76,211.83 52.49,186.2 52.49,157.06 C 52.49,127.92 69.76,95.66 85.72,71.14 C 101.68,46.62 116.32,29.84 140.28,21.7 C 164.24,13.56 182.7,18.1 210.43,26.79 Z;M 206.83,30.34 C 229.43,36.56 250.77,56.57 266.2,74.55 C 282.9,94.29 293.71,111.99 303.49,134.75 C 313.27,157.51 322.02,185.34 311.95,208.5 C 301.88,231.66 273.0,250.15 249.52,261.56 C 226.04,272.97 207.96,277.3 184.28,276.08 C 160.6,274.86 131.32,268.09 109.79,252.68 C 88.26,237.27 74.48,213.22 66.62,187.9 C 58.76,162.58 56.83,135.99 64.92,111.43 C 73.01,86.87 91.12,64.34 111.43,51.83 C 131.74,39.32 154.24,36.83 176.71,34.02 C 199.18,31.21 184.23,24.12 206.83,30.34 Z;M 210.43,26.79 C 238.16,35.48 248.83,57.17 266.2,74.55 C 285.34,93.69 313.17,105.73 318.52,134.75 C 323.87,163.77 306.74,189.73 293.43,215.17 C 278.4,243.43 267.19,271.17 243.43,284.48 C 219.68,297.79 183.38,296.67 155.22,286.43 C 127.06,276.19 107.04,256.83 89.28,235.21 C 69.76,211.83 52.49,186.2 52.49,157.06 C 52.49,127.92 69.76,95.66 85.72,71.14 C 101.68,46.62 116.32,29.84 140.28,21.7 C 164.24,13.56 182.7,18.1 210.43,26.79 Z"
-                            : "M 210.43,26.79 C 238.16,35.48 248.83,57.17 266.2,74.55 C 285.34,93.69 313.17,105.73 318.52,134.75 C 323.87,163.77 306.74,189.73 293.43,215.17 C 278.4,243.43 267.19,271.17 243.43,284.48 C 219.68,297.79 183.38,296.67 155.22,286.43 C 127.06,276.19 107.04,256.83 89.28,235.21 C 69.76,211.83 52.49,186.2 52.49,157.06 C 52.49,127.92 69.76,95.66 85.72,71.14 C 101.68,46.62 116.32,29.84 140.28,21.7 C 164.24,13.56 182.7,18.1 210.43,26.79 Z"
-                        }
-                    />
-                </motion.path>
+                    animate={{ d: bodyPath }}
+                    transition={{ repeat: Infinity, duration: isSpeaking ? 1.5 : 3, ease: 'easeInOut', repeatType: 'reverse' }}
+                />
+
+                {/* Eyes */}
+                <g transform="translate(140, 160)">
+                    <motion.g animate={{ scale: eyeScale }} transition={{ type: 'spring', stiffness: 300, damping: 15 }}>
+                        {/* Left Eye */}
+                        <circle cx="0" cy="0" r="20" fill="white" />
+                        <motion.circle cx="0" cy={eyePupilY} r="8" fill="black" />
+                    </motion.g>
+                </g>
+                <g transform="translate(260, 160)">
+                    <motion.g animate={{ scale: eyeScale }} transition={{ type: 'spring', stiffness: 300, damping: 15 }}>
+                        {/* Right Eye */}
+                        <circle cx="0" cy="0" r="20" fill="white" />
+                        <motion.circle cx="0" cy={eyePupilY} r="8" fill="black" />
+                    </motion.g>
+                </g>
             </svg>
         </motion.div>
     );
-}
-
-    
+};
