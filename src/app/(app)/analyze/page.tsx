@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { textToSpeech } from "@/ai/flows/text-to-speech";
 import { uploadFile } from "@/lib/actions";
+import { Switch } from "@/components/ui/switch";
 
 type Step = 'upload' | 'proforma' | 'analyzing' | 'error';
 type ChatMessage = { sender: 'ai' | 'user'; text: string };
@@ -75,6 +76,8 @@ export default function AnalyzePage() {
   const [playingAudio, setPlayingAudio] = useState<{ audio: HTMLAudioElement; text: string } | null>(null);
   const [isAudioLoading, setIsAudioLoading] = useState<string | null>(null);
   const [audioCache, setAudioCache] = useState<Record<string, string>>({});
+  const [isSpeechMode, setIsSpeechMode] = useState(false);
+  const isAutoPlaying = useRef(false);
 
 
   useEffect(() => {
@@ -117,6 +120,17 @@ export default function AnalyzePage() {
     recognition.onend = () => setIsListening(false);
     recognitionRef.current = recognition;
   }, [toast]);
+  
+  // Effect to handle auto-playing AI messages in speech mode
+  useEffect(() => {
+    if (isSpeechMode && chatHistory.length > 0) {
+      const lastMessage = chatHistory[chatHistory.length - 1];
+      if (lastMessage.sender === 'ai' && !isLoading && !isAutoPlaying.current) {
+        handlePlayMessageAudio(lastMessage.text, true);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatHistory, isSpeechMode, isLoading]);
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,8 +196,12 @@ export default function AnalyzePage() {
       }
   };
 
-  const handleUserResponse = () => {
+  const handleUserResponse = (isVoiceInput = false) => {
     if (!userResponse.trim() || !detectedCondition) return;
+
+    if (isVoiceInput && !isSpeechMode) {
+      setIsSpeechMode(true);
+    }
 
     const newHistory = [...chatHistory, { sender: 'user' as const, text: userResponse }];
     setChatHistory(newHistory);
@@ -211,6 +229,7 @@ export default function AnalyzePage() {
     setIsLoading(true);
     setLoadingMessage("Performing final evaluation...");
     setError(null);
+    setIsSpeechMode(false); // Turn off speech mode during final analysis
 
      try {
       const answersString = chatHistory.map(a => `${a.sender === 'ai' ? 'Q' : 'A'}: ${a.text}`).join('\n\n');
@@ -266,21 +285,34 @@ export default function AnalyzePage() {
     }
   };
 
-  const handlePlayMessageAudio = async (text: string) => {
+  const handlePlayMessageAudio = async (text: string, isAutoPlay = false) => {
+    if (isAutoPlay) {
+      if (isAutoPlaying.current) return;
+      isAutoPlaying.current = true;
+    }
+
     if (playingAudio && playingAudio.text === text) {
       playingAudio.audio.pause();
       setPlayingAudio(null);
+      isAutoPlaying.current = false;
       return;
     }
     if (playingAudio) {
       playingAudio.audio.pause();
     }
 
+    const onEnded = () => {
+      setPlayingAudio(null);
+      if (isAutoPlay) {
+        isAutoPlaying.current = false;
+      }
+    };
+
     if (audioCache[text]) {
       const audio = new Audio(audioCache[text]);
       setPlayingAudio({ audio, text });
       audio.play();
-      audio.onended = () => setPlayingAudio(null);
+      audio.onended = onEnded;
       return;
     }
     
@@ -295,10 +327,11 @@ export default function AnalyzePage() {
       const audio = new Audio(uploadResult.url);
       setPlayingAudio({ audio, text });
       audio.play();
-      audio.onended = () => setPlayingAudio(null);
+      audio.onended = onEnded;
     } catch (error) {
       console.error("Failed to play audio:", error);
       toast({ title: "Audio Error", description: "Could not play the message audio.", variant: "destructive" });
+      isAutoPlaying.current = false;
     } finally {
       setIsAudioLoading(null);
     }
@@ -317,6 +350,7 @@ export default function AnalyzePage() {
         setQuestionCount(0);
         setError(null);
         setLoadingMessage("");
+        setIsSpeechMode(false);
     }
   };
   
@@ -381,6 +415,13 @@ export default function AnalyzePage() {
           {step === 'proforma' && (
             <>
               <CardContent className="h-[50vh] flex flex-col p-0">
+                  <div className="p-4 border-b flex items-center justify-between">
+                      <h4 className="font-semibold text-sm">Conversational Proforma</h4>
+                      <div className="flex items-center space-x-2">
+                          <Label htmlFor="speech-mode" className="text-xs text-muted-foreground">Speech Mode</Label>
+                          <Switch id="speech-mode" checked={isSpeechMode} onCheckedChange={setIsSpeechMode} />
+                      </div>
+                  </div>
                   <ScrollArea className="flex-grow p-6" ref={scrollAreaRef}>
                        <div className="space-y-4">
                         {chatHistory.map((msg, index) => (
@@ -433,7 +474,7 @@ export default function AnalyzePage() {
                             <Button size="icon" variant={isListening ? 'destructive' : 'ghost'} onClick={handleMicClick} disabled={isLoading}>
                                 <Mic className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" onClick={handleUserResponse} disabled={isLoading || !userResponse.trim()}>
+                            <Button size="icon" variant="ghost" onClick={() => handleUserResponse(isListening)} disabled={isLoading || !userResponse.trim()}>
                               <Send className="h-4 w-4" />
                             </Button>
                           </div>
