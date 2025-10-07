@@ -24,6 +24,8 @@ import {
   Bot,
   User,
   Send,
+  Mic,
+  Volume2,
 } from "lucide-react";
 import Image from "next/image";
 import { finalEvaluation } from "@/ai/flows/final-evaluation";
@@ -36,11 +38,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { textToSpeech } from "@/ai/flows/text-to-speech";
+import { uploadFile } from "@/lib/actions";
 
 type Step = 'upload' | 'proforma' | 'analyzing' | 'error';
 type ChatMessage = { sender: 'ai' | 'user'; text: string };
 
 const MAX_QUESTIONS = 5;
+const SpeechRecognition = typeof window !== 'undefined' ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition : null;
+
 
 export default function AnalyzePage() {
   const searchParams = useSearchParams();
@@ -62,6 +68,13 @@ export default function AnalyzePage() {
   const { addAnalysis } = useAnalyses();
   const { user, userData } = useAuth();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
+  // Speech & Audio state
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [playingAudio, setPlayingAudio] = useState<{ audio: HTMLAudioElement; text: string } | null>(null);
+  const [isAudioLoading, setIsAudioLoading] = useState<string | null>(null);
+  const [audioCache, setAudioCache] = useState<Record<string, string>>({});
 
 
   useEffect(() => {
@@ -81,6 +94,30 @@ export default function AnalyzePage() {
         scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
     }
   }, [chatHistory]);
+
+  // Setup Speech Recognition
+  useEffect(() => {
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = event.results[0][0].transcript;
+      setUserResponse(transcript);
+    };
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('Speech recognition error:', event.error);
+      if (event.error === 'not-allowed') {
+        toast({ title: "Permission Denied", description: "Please enable microphone access in your browser settings.", variant: "destructive" });
+      }
+      setIsListening(false);
+    };
+    recognition.onend = () => setIsListening(false);
+    recognitionRef.current = recognition;
+  }, [toast]);
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -108,7 +145,6 @@ export default function AnalyzePage() {
       const { conditionName } = await detectDiseaseName({ photoDataUri: preview });
       setDetectedCondition(conditionName);
       setStep('proforma');
-      // Start the conversational proforma
       startProforma(conditionName);
     } catch (err) {
       console.error("Initial analysis failed:", err);
@@ -125,7 +161,6 @@ export default function AnalyzePage() {
       sender: 'ai',
       text: `I've identified the condition as likely being **${conditionName}**. To give you a more detailed report, I need to ask a few questions. Let's start with this:`
     }]);
-    // Kick off the first question
     getNextQuestion(conditionName, 'AI: Hello!');
   };
 
@@ -141,7 +176,6 @@ export default function AnalyzePage() {
       } catch (err) {
         console.error("Failed to get next question:", err);
         setChatHistory(prev => [...prev, { sender: 'ai', text: "I'm having trouble thinking of the next question. Let's proceed with the final analysis."}]);
-        // If question generation fails, just proceed to final eval
         handleFinalEvaluation();
       } finally {
         setIsLoading(false);
@@ -181,7 +215,7 @@ export default function AnalyzePage() {
      try {
       const answersString = chatHistory.map(a => `${a.sender === 'ai' ? 'Q' : 'A'}: ${a.text}`).join('\n\n');
       const proformaAnswers = chatHistory.reduce((acc, curr, index) => {
-        if (curr.sender === 'ai' && index > 0) { // Skip the initial greeting
+        if (curr.sender === 'ai' && index > 0) {
           const nextMessage = chatHistory[index + 1];
           if (nextMessage && nextMessage.sender === 'user') {
             acc.push({ question: curr.text, answer: nextMessage.text });
@@ -222,9 +256,56 @@ export default function AnalyzePage() {
     }
   }
 
+  const handleMicClick = () => {
+    if (!recognitionRef.current) return;
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
+
+  const handlePlayMessageAudio = async (text: string) => {
+    if (playingAudio && playingAudio.text === text) {
+      playingAudio.audio.pause();
+      setPlayingAudio(null);
+      return;
+    }
+    if (playingAudio) {
+      playingAudio.audio.pause();
+    }
+
+    if (audioCache[text]) {
+      const audio = new Audio(audioCache[text]);
+      setPlayingAudio({ audio, text });
+      audio.play();
+      audio.onended = () => setPlayingAudio(null);
+      return;
+    }
+    
+    setIsAudioLoading(text);
+    try {
+      const { audioBase64 } = await textToSpeech({ text });
+      const uploadResult = await uploadFile(null, audioBase64);
+      if (!uploadResult.success || !uploadResult.url) {
+          throw new Error(uploadResult.message || "Audio upload failed.");
+      }
+      setAudioCache(prev => ({...prev, [text]: uploadResult.url!}));
+      const audio = new Audio(uploadResult.url);
+      setPlayingAudio({ audio, text });
+      audio.play();
+      audio.onended = () => setPlayingAudio(null);
+    } catch (error) {
+      console.error("Failed to play audio:", error);
+      toast({ title: "Audio Error", description: "Could not play the message audio.", variant: "destructive" });
+    } finally {
+      setIsAudioLoading(null);
+    }
+  };
+
 
   const resetState = () => {
-    // If we came here from the agent, go back to dashboard. Otherwise, just reset the page.
     if (searchParams.get('condition')) {
         router.push('/dashboard');
     } else {
@@ -311,6 +392,13 @@ export default function AnalyzePage() {
                                 )}
                                 <div className={cn("rounded-lg px-4 py-2 max-w-[80%]", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
                                     <p className="text-sm" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                    {msg.sender === 'ai' && index > 0 && (
+                                      <div className="flex justify-end mt-1">
+                                          <Button size="icon" variant="ghost" className={cn("h-6 w-6 shrink-0", playingAudio?.text === msg.text && "text-primary")} onClick={() => handlePlayMessageAudio(msg.text)} disabled={isAudioLoading === msg.text}>
+                                              {isAudioLoading === msg.text ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4" />}
+                                          </Button>
+                                      </div>
+                                    )}
                                 </div>
                                 {msg.sender === 'user' && (
                                      <Avatar className="h-8 w-8">
@@ -334,15 +422,21 @@ export default function AnalyzePage() {
                   <div className="p-4 border-t">
                       <div className="relative">
                           <Input 
-                            placeholder="Type your answer..." 
+                            placeholder={isListening ? "Listening..." : "Type your answer..."}
                             value={userResponse}
                             onChange={(e) => setUserResponse(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleUserResponse()}
                             disabled={isLoading}
+                            className="pr-20"
                           />
-                          <Button size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={handleUserResponse} disabled={isLoading || !userResponse.trim()}>
-                            <Send className="h-4 w-4" />
-                          </Button>
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-1">
+                            <Button size="icon" variant={isListening ? 'destructive' : 'ghost'} onClick={handleMicClick} disabled={isLoading}>
+                                <Mic className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={handleUserResponse} disabled={isLoading || !userResponse.trim()}>
+                              <Send className="h-4 w-4" />
+                            </Button>
+                          </div>
                       </div>
                   </div>
               </CardContent>
