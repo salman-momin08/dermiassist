@@ -131,7 +131,7 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
         };
 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-            if (event.error !== 'no-speech') {
+            if (event.error !== 'no-speech' && event.error !== 'aborted') {
                 console.error('Speech recognition error:', event.error);
             }
             // After an error, restart listening
