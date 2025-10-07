@@ -71,8 +71,9 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
             processAudioQueue();
         } catch (error) {
             console.error("TTS Error:", error);
-            if (error instanceof Error && error.message.includes('429')) {
-                // Silently fail on rate limit errors
+            if (error instanceof Error && (error.message.includes('429') || error.message.includes('rate limit'))) {
+                // Silently fail on rate limit errors but log them for debugging
+                console.warn("TTS rate limit exceeded. Conversation will continue without audio for this turn.");
             } else {
                 toast({ title: "Speech Error", description: "Could not generate audio response.", variant: "destructive" });
             }
@@ -216,6 +217,16 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
 
 const AnimatedCharacter = ({ status }: { status: AssistantStatus }) => {
     const isListening = status === 'listening';
+    const isSpeaking = status === 'speaking';
+
+    const speakingAnimation = {
+        y: ["0%", "-5%", "0%"],
+        transition: {
+            duration: 1,
+            repeat: Infinity,
+            ease: "easeInOut",
+        },
+    };
 
     return (
         <motion.div
@@ -223,13 +234,18 @@ const AnimatedCharacter = ({ status }: { status: AssistantStatus }) => {
             animate={{ scale: isListening ? 1.05 : 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 15 }}
         >
-            <Image
-                src="https://res.cloudinary.com/dzkhtk23k/image/upload/v1724089348/assistant-character_d5anqs.png"
-                alt="Voice Assistant Character"
-                width={320}
-                height={320}
-                className="w-full h-full object-cover"
-            />
+            <motion.div
+                className="w-full h-full"
+                animate={isSpeaking ? speakingAnimation : { y: "0%" }}
+            >
+                <Image
+                    src="/character.png"
+                    alt="Voice Assistant Character"
+                    width={320}
+                    height={320}
+                    className="w-full h-full object-cover"
+                />
+            </motion.div>
             <motion.div
                 className="absolute inset-0 bg-primary/20"
                 animate={{
