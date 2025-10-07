@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +26,7 @@ import {
   Send,
   Mic,
   Volume2,
+  VolumeX,
 } from "lucide-react";
 import Image from "next/image";
 import { finalEvaluation } from "@/ai/flows/final-evaluation";
@@ -40,6 +41,9 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { textToSpeech } from "@/ai/flows/text-to-speech";
 import { uploadFile } from "@/lib/actions";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 type Step = 'upload' | 'proforma' | 'analyzing' | 'error';
 type ChatMessage = { sender: 'ai' | 'user'; text: string };
@@ -72,6 +76,7 @@ export default function AnalyzePage() {
   // Speech & Audio state
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const [speechMode, setSpeechMode] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<{ audio: HTMLAudioElement; text: string } | null>(null);
   const [isAudioLoading, setIsAudioLoading] = useState<string | null>(null);
   const [audioCache, setAudioCache] = useState<Record<string, string>>({});
@@ -106,6 +111,8 @@ export default function AnalyzePage() {
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       const transcript = event.results[0][0].transcript;
       setUserResponse(transcript);
+      // Automatically send the response when speech is recognized
+      handleUserResponse(transcript);
     };
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error('Speech recognition error:', event.error);
@@ -117,6 +124,16 @@ export default function AnalyzePage() {
     recognition.onend = () => setIsListening(false);
     recognitionRef.current = recognition;
   }, [toast]);
+  
+  // Effect to automatically play new AI messages in speech mode
+  useEffect(() => {
+      if (speechMode && chatHistory.length > 0) {
+          const lastMessage = chatHistory[chatHistory.length - 1];
+          if (lastMessage.sender === 'ai' && !isLoading) {
+              handlePlayMessageAudio(lastMessage.text);
+          }
+      }
+  }, [chatHistory, speechMode, isLoading]);
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,10 +199,11 @@ export default function AnalyzePage() {
       }
   };
 
-  const handleUserResponse = () => {
-    if (!userResponse.trim() || !detectedCondition) return;
+  const handleUserResponse = (responseText?: string) => {
+    const textToSend = responseText || userResponse;
+    if (!textToSend.trim() || !detectedCondition) return;
 
-    const newHistory = [...chatHistory, { sender: 'user' as const, text: userResponse }];
+    const newHistory = [...chatHistory, { sender: 'user' as const, text: textToSend }];
     setChatHistory(newHistory);
     setUserResponse("");
     
@@ -262,11 +280,12 @@ export default function AnalyzePage() {
       recognitionRef.current.stop();
     } else {
       recognitionRef.current.start();
+      setSpeechMode(true); // Activate speech mode on first mic use
       setIsListening(true);
     }
   };
 
-  const handlePlayMessageAudio = async (text: string) => {
+  const handlePlayMessageAudio = useCallback(async (text: string) => {
     if (playingAudio && playingAudio.text === text) {
       playingAudio.audio.pause();
       setPlayingAudio(null);
@@ -304,7 +323,7 @@ export default function AnalyzePage() {
     } finally {
       setIsAudioLoading(null);
     }
-  };
+  }, [audioCache, playingAudio, toast]);
 
 
   const resetState = () => {
@@ -383,6 +402,28 @@ export default function AnalyzePage() {
           {step === 'proforma' && (
             <>
               <CardContent className="h-[50vh] flex flex-col p-0">
+                  <div className="flex items-center justify-between p-4 border-b">
+                     <div className="flex items-center space-x-2">
+                        <TooltipProvider>
+                           <Tooltip>
+                              <TooltipTrigger asChild>
+                                 <Label htmlFor="speech-mode" className="flex items-center gap-2 cursor-pointer">
+                                    <Volume2 className="h-4 w-4" />
+                                    Speech Mode
+                                 </Label>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                 <p>Automatically play AI responses aloud.</p>
+                              </TooltipContent>
+                           </Tooltip>
+                        </TooltipProvider>
+                        <Switch
+                           id="speech-mode"
+                           checked={speechMode}
+                           onCheckedChange={setSpeechMode}
+                        />
+                     </div>
+                  </div>
                   <ScrollArea className="flex-grow p-6" ref={scrollAreaRef}>
                        <div className="space-y-4">
                         {chatHistory.map((msg, index) => (
@@ -397,7 +438,7 @@ export default function AnalyzePage() {
                                     {msg.sender === 'ai' && index > 0 && (
                                       <div className="flex justify-end mt-1">
                                           <Button size="icon" variant="ghost" className={cn("h-6 w-6 shrink-0", playingAudio?.text === msg.text && "text-primary")} onClick={() => handlePlayMessageAudio(msg.text)} disabled={isAudioLoading === msg.text}>
-                                              {isAudioLoading === msg.text ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4" />}
+                                              {isAudioLoading === msg.text ? <Loader2 className="h-4 w-4 animate-spin"/> : playingAudio?.text === msg.text ? <VolumeX className="h-4 w-4"/> : <Volume2 className="h-4 w-4" />}
                                           </Button>
                                       </div>
                                     )}
