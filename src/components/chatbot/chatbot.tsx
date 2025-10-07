@@ -87,9 +87,9 @@ export function Chatbot() {
         
         recognition.onend = () => {
             setIsListening(false);
+            // Automatically send the message when the user stops talking
             if (finalTranscriptRef.current.trim()) {
                 handleSend(finalTranscriptRef.current.trim());
-                finalTranscriptRef.current = '';
             }
         };
 
@@ -148,7 +148,7 @@ export function Chatbot() {
         }
     };
     
-    const handleMicClick = async () => {
+    const handleMicClick = useCallback(async () => {
         if (!SpeechRecognition) {
              toast({ title: "Unsupported", description: "Speech recognition is not supported in your browser.", variant: "destructive" });
              return;
@@ -162,21 +162,52 @@ export function Chatbot() {
             const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
             if (permissionStatus.state === 'denied') {
                 toast({ title: "Permission Denied", description: "Please enable microphone access in your browser settings.", variant: "destructive" });
-            } else {
-                 setInput('');
-                 finalTranscriptRef.current = '';
-                 recognitionRef.current?.start();
-                 setIsListening(true);
+                return;
             }
+            
+            // If we have permission or it's prompt, we can just start. The browser will handle the prompt.
+            setInput('');
+            finalTranscriptRef.current = '';
+            recognitionRef.current?.start();
+            setIsListening(true);
+            
         } catch (err) {
             // Fallback for browsers that don't support permissions.query
+            console.error("Permission query failed, falling back to direct start:", err);
             setInput('');
             finalTranscriptRef.current = '';
             recognitionRef.current?.start();
             setIsListening(true);
         }
-    };
+    }, [isListening, toast]);
     
+     const handleOpenAndListen = useCallback(() => {
+        setIsOpen(true);
+        // We need a slight delay to allow the sheet to animate open before starting recognition
+        setTimeout(() => {
+            handleMicClick();
+        }, 300);
+    }, [handleMicClick]);
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === 'm') {
+                event.preventDefault();
+                if (isOpen) {
+                    setIsOpen(false);
+                } else {
+                    handleOpenAndListen();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isOpen, handleOpenAndListen]);
+
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
