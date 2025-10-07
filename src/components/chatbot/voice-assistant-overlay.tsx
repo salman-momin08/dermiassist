@@ -26,6 +26,7 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const audioQueueRef = useRef<HTMLAudioElement[]>([]);
     const isPlayingRef = useRef(false);
+    const audioCacheRef = useRef<Record<string, string>>({}); // Use a ref for cache to persist across renders without causing re-renders
 
     const processAudioQueue = useCallback(() => {
         if (isPlayingRef.current || audioQueueRef.current.length === 0) {
@@ -49,18 +50,33 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
     }, []);
 
     const speak = useCallback(async (text: string) => {
+        // Check cache first
+        if (audioCacheRef.current[text]) {
+            const audio = new Audio(audioCacheRef.current[text]);
+            audioQueueRef.current.push(audio);
+            processAudioQueue();
+            return;
+        }
+
         try {
             const { audioBase64 } = await textToSpeech({ text });
             const uploadResult = await uploadFile(null, audioBase64);
             if (!uploadResult.success || !uploadResult.url) {
                 throw new Error(uploadResult.message || "Audio upload failed.");
             }
+            
+            // Store in cache
+            audioCacheRef.current[text] = uploadResult.url;
+
             const audio = new Audio(uploadResult.url);
             audioQueueRef.current.push(audio);
             processAudioQueue();
         } catch (error) {
             console.error("TTS Error:", error);
-            toast({ title: "Speech Error", description: "Could not generate audio response.", variant: "destructive" });
+            // Don't toast for rate limit errors, just fail gracefully
+            if (!(error instanceof Error && error.message.includes('429'))) {
+              toast({ title: "Speech Error", description: "Could not generate audio response.", variant: "destructive" });
+            }
             // If TTS fails, go back to listening
             startListening();
         }
