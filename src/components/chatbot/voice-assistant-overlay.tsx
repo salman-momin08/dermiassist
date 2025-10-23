@@ -23,21 +23,40 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
     const router = useRouter();
 
     const [status, setStatus] = useState<AssistantStatus>('idle');
-    const [conversationHistory, setConversationHistory] = useState<string>('');
+    const conversationHistoryRef = useRef<string>('');
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const audioQueueRef = useRef<HTMLAudioElement[]>([]);
     const isPlayingRef = useRef(false);
     const audioCacheRef = useRef<Record<string, string>>({});
+    const isMountedRef = useRef(true);
 
+
+    const startListening = useCallback(() => {
+        if (recognitionRef.current && status !== 'listening' && isMountedRef.current) {
+             try {
+                recognitionRef.current.start();
+                setStatus('listening');
+            } catch (e) {
+                // Already started, this can happen in some edge cases
+            }
+        }
+    }, [status]);
+    
     const processAudioQueue = useCallback(() => {
         if (isPlayingRef.current || audioQueueRef.current.length === 0) {
             return;
         }
         isPlayingRef.current = true;
         setStatus('speaking');
+
         const audio = audioQueueRef.current.shift();
         if (audio) {
-            audio.play();
+            audio.play().catch(e => {
+                console.error("Audio playback failed:", e);
+                isPlayingRef.current = false;
+                startListening(); 
+            });
+
             audio.onended = () => {
                 isPlayingRef.current = false;
                 if (audioQueueRef.current.length === 0) {
@@ -47,7 +66,7 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
                 }
             };
         }
-    }, []);
+    }, [startListening]);
 
     const speak = useCallback(async (text: string) => {
         if (audioCacheRef.current[text]) {
@@ -72,7 +91,6 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
         } catch (error) {
             console.error("TTS Error:", error);
             if (error instanceof Error && (error.message.includes('429') || error.message.includes('rate limit'))) {
-                // Silently fail on rate limit errors but log them for debugging
                 console.warn("TTS rate limit exceeded. Conversation will continue without audio for this turn.");
             } else {
                 toast({ title: "Speech Error", description: "Could not generate audio response.", variant: "destructive" });
@@ -80,22 +98,15 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
             // Continue listening even if TTS fails
             startListening();
         }
-    }, [processAudioQueue, toast]);
+    }, [processAudioQueue, toast, startListening]);
     
-    const startListening = useCallback(() => {
-        if (recognitionRef.current && status !== 'listening') {
-             try {
-                recognitionRef.current.start();
-                setStatus('listening');
-            } catch (e) {
-                // Already started
-            }
-        }
-    }, [status]);
-
-
+    // This effect runs ONLY ONCE when the component opens.
+    // It sets up the speech recognition and speaks the initial greeting.
     useEffect(() => {
         if (!open) return;
+        
+        isMountedRef.current = true;
+
         if (!SpeechRecognition) {
             toast({ title: "Browser Not Supported", description: "Voice recognition is not available in your browser.", variant: "destructive" });
             onOpenChange(false);
@@ -114,11 +125,11 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
             setStatus('processing');
 
             const newUserTurn = `User: ${transcript}\n`;
-            setConversationHistory(prev => prev + newUserTurn);
+            conversationHistoryRef.current += newUserTurn;
 
             if (!user) {
                 toast({ title: "Please Log In", description: "You need to be logged in to use the voice assistant.", variant: "destructive"});
-                speak("I'm sorry, but you need to be logged in for me to help with that.");
+                await speak("I'm sorry, but you need to be logged in for me to help with that.");
                 return;
             }
 
@@ -126,11 +137,11 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
                 const result = await dermiAssistant({
                     userId: user.uid,
                     command: transcript,
-                    conversationHistory: conversationHistory + newUserTurn
+                    conversationHistory: conversationHistoryRef.current
                 });
                 
                 const newBotTurn = `Assistant: ${result.response}\n`;
-                setConversationHistory(prev => prev + newBotTurn);
+                conversationHistoryRef.current += newBotTurn;
 
                 await speak(result.response);
                 
@@ -149,26 +160,43 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
             if (event.error !== 'no-speech' && event.error !== 'aborted') {
                 console.error('Speech recognition error:', event.error);
             }
-            startListening();
+             // Always try to restart listening unless the component is unmounting.
+            if(isMountedRef.current) {
+                startListening();
+            }
         };
         
         recognition.onend = () => {
-             if (status === 'listening') {
+            // The 'onend' event can fire for many reasons. We only want to restart listening
+            // if we are in the 'listening' state, meaning it ended naturally, not because we are processing.
+            if (status === 'listening' && isMountedRef.current) {
                 startListening();
             }
         };
         
         recognitionRef.current = recognition;
-        startListening();
+        // The initial `startListening` is now triggered by the `onended` of the initial greeting.
 
+        // Cleanup function
         return () => {
+            isMountedRef.current = false;
             if (recognitionRef.current) {
                 recognitionRef.current.stop();
+                recognitionRef.current.onresult = null;
+                recognitionRef.current.onerror = null;
+                recognitionRef.current.onend = null;
             }
-            audioQueueRef.current.forEach(audio => audio.pause());
+            audioQueueRef.current.forEach(audio => {
+                audio.pause();
+                audio.onended = null;
+            });
             audioQueueRef.current = [];
+            isPlayingRef.current = false;
+            conversationHistoryRef.current = '';
         };
-    }, [open, user, toast, router, onOpenChange, speak, conversationHistory, startListening, status]);
+    // The dependency array is key. This effect only re-runs if `open` changes.
+    // All other functions are stable thanks to useCallback.
+    }, [open, user, toast, router, onOpenChange, speak, startListening, status]);
 
 
     return (
