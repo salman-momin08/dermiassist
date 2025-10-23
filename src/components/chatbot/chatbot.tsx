@@ -5,7 +5,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
-import { Bot, Send, User, Loader2, Mic, Upload, Volume2 } from 'lucide-react';
+import { Bot, Send, User, Loader2, Mic, Upload } from 'lucide-react';
 import { Input } from '../ui/input';
 import { ScrollArea } from '../ui/scroll-area';
 import { Avatar, AvatarFallback } from '../ui/avatar';
@@ -17,10 +17,8 @@ import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { textToSpeech } from '@/ai/flows/text-to-speech';
 import { uploadFile } from '@/lib/actions';
-import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
-import { VoiceAssistantOverlay } from './voice-assistant-overlay';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 interface Message {
@@ -53,13 +51,6 @@ export function Chatbot() {
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const [isListening, setIsListening] = useState(false);
     const finalTranscriptRef = useRef('');
-
-    // Text-to-Speech & Speech Mode state
-    const [speechMode, setSpeechMode] = useState(false);
-    const [playingAudio, setPlayingAudio] = useState<{ audio: HTMLAudioElement; text: string } | null>(null);
-    const [isAudioLoading, setIsAudioLoading] = useState<string | null>(null);
-    const [audioCache, setAudioCache] = useState<Record<string, string>>({});
-
 
     useEffect(() => {
         if (scrollViewportRef.current) {
@@ -110,15 +101,6 @@ export function Chatbot() {
         recognitionRef.current = recognition;
     }, [toast]);
     
-    // Effect to automatically play new bot messages in speech mode
-    useEffect(() => {
-        if (speechMode && messages.length > 0) {
-            const lastMessage = messages[messages.length - 1];
-            if (lastMessage.sender === 'bot' && !isLoading) {
-                handlePlayMessageAudio(lastMessage.text);
-            }
-        }
-    }, [messages, speechMode, isLoading]);
 
     const handleSend = async (messageToSend?: string, photoDataUri?: string) => {
         const currentInput = messageToSend || input;
@@ -249,46 +231,6 @@ export function Chatbot() {
       cb();
       setIsOpen(false);
     }
-    
-    const handlePlayMessageAudio = useCallback(async (text: string) => {
-        if (playingAudio && playingAudio.text === text) {
-            playingAudio.audio.pause();
-            setPlayingAudio(null);
-            return;
-        }
-        if (playingAudio) {
-            playingAudio.audio.pause();
-        }
-
-        const onEnded = () => setPlayingAudio(null);
-
-        if (audioCache[text]) {
-            const audio = new Audio(audioCache[text]);
-            setPlayingAudio({ audio, text });
-            audio.play();
-            audio.onended = onEnded;
-            return;
-        }
-
-        setIsAudioLoading(text);
-        try {
-            const { audioBase64 } = await textToSpeech({ text });
-            const uploadResult = await uploadFile(null, audioBase64);
-            if (!uploadResult.success || !uploadResult.url) {
-                throw new Error(uploadResult.message || "Audio upload failed.");
-            }
-            setAudioCache(prev => ({...prev, [text]: uploadResult.url!}));
-            const audio = new Audio(uploadResult.url);
-            setPlayingAudio({ audio, text });
-            audio.play();
-            audio.onended = onEnded;
-        } catch (error) {
-            console.error("Failed to play audio:", error);
-            toast({ title: "Audio Error", description: "Could not play the message audio.", variant: "destructive" });
-        } finally {
-            setIsAudioLoading(null);
-        }
-    }, [audioCache, playingAudio, toast]);
 
     // Hide chatbot if user is not logged in.
     if (!user && !authLoading) {
@@ -313,25 +255,6 @@ export function Chatbot() {
                              <div className="flex items-center gap-2">
                                  <Bot className="text-primary"/>
                                  DermiAssistant
-                             </div>
-                             <div className="flex items-center space-x-2">
-                                <TooltipProvider>
-                                   <Tooltip>
-                                      <TooltipTrigger asChild>
-                                         <Label htmlFor="speech-mode" className="flex items-center gap-2 cursor-pointer">
-                                            <Mic className="h-4 w-4" />
-                                         </Label>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                         <p>Toggle Voice-Only Mode</p>
-                                      </TooltipContent>
-                                   </Tooltip>
-                                </TooltipProvider>
-                                <Switch
-                                   id="speech-mode"
-                                   checked={speechMode}
-                                   onCheckedChange={setSpeechMode}
-                                />
                              </div>
                         </SheetTitle>
                         <SheetDescription>
@@ -407,7 +330,8 @@ export function Chatbot() {
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                 </SheetContent>
             </Sheet>
-            {speechMode && <VoiceAssistantOverlay open={speechMode} onOpenChange={setSpeechMode} />}
         </>
     );
 }
+
+    
