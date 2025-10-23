@@ -32,18 +32,19 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
 
 
     const startListening = useCallback(() => {
-        if (recognitionRef.current && status !== 'listening' && isMountedRef.current) {
+        if (recognitionRef.current && isMountedRef.current) {
              try {
-                recognitionRef.current.start();
                 setStatus('listening');
+                recognitionRef.current.start();
             } catch (e) {
                 // Already started, this can happen in some edge cases
+                console.warn("Speech recognition already started.");
             }
         }
-    }, [status]);
+    }, []);
     
     const processAudioQueue = useCallback(() => {
-        if (isPlayingRef.current || audioQueueRef.current.length === 0) {
+        if (!isMountedRef.current || isPlayingRef.current || audioQueueRef.current.length === 0) {
             return;
         }
         isPlayingRef.current = true;
@@ -59,16 +60,18 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
 
             audio.onended = () => {
                 isPlayingRef.current = false;
-                if (audioQueueRef.current.length === 0) {
-                    startListening();
-                } else {
+                if (audioQueueRef.current.length > 0) {
                     processAudioQueue();
+                } else {
+                    startListening();
                 }
             };
         }
     }, [startListening]);
 
     const speak = useCallback(async (text: string) => {
+        if (!isMountedRef.current) return;
+
         if (audioCacheRef.current[text]) {
             const audio = new Audio(audioCacheRef.current[text]);
             audioQueueRef.current.push(audio);
@@ -83,37 +86,37 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
                 throw new Error(uploadResult.message || "Audio upload failed.");
             }
             
-            audioCacheRef.current[text] = uploadResult.url;
+            if (isMountedRef.current) {
+                audioCacheRef.current[text] = uploadResult.url;
+                const audio = new Audio(uploadResult.url);
+                audioQueueRef.current.push(audio);
+                processAudioQueue();
+            }
 
-            const audio = new Audio(uploadResult.url);
-            audioQueueRef.current.push(audio);
-            processAudioQueue();
         } catch (error) {
             console.error("TTS Error:", error);
             if (error instanceof Error && (error.message.includes('429') || error.message.includes('rate limit'))) {
                 console.warn("TTS rate limit exceeded. Conversation will continue without audio for this turn.");
             } else {
-                toast({ title: "Speech Error", description: "Could not generate audio response.", variant: "destructive" });
+                // Don't toast for TTS errors, just log them.
+                 console.error("Could not generate audio response.");
             }
             // Continue listening even if TTS fails
             startListening();
         }
-    }, [processAudioQueue, toast, startListening]);
+    }, [processAudioQueue, startListening]);
     
-    // This effect runs ONLY ONCE when the component opens.
-    // It sets up the speech recognition and speaks the initial greeting.
     useEffect(() => {
         if (!open) return;
         
         isMountedRef.current = true;
+        setStatus('idle');
 
         if (!SpeechRecognition) {
             toast({ title: "Browser Not Supported", description: "Voice recognition is not available in your browser.", variant: "destructive" });
             onOpenChange(false);
             return;
         }
-
-        speak("Hello! Dermi is here. How can I assist you?");
 
         const recognition = new SpeechRecognition();
         recognition.continuous = false;
@@ -122,6 +125,8 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
 
         recognition.onresult = async (event: SpeechRecognitionEvent) => {
             const transcript = event.results[0][0].transcript;
+            if (!isMountedRef.current) return;
+            
             setStatus('processing');
 
             const newUserTurn = `User: ${transcript}\n`;
@@ -140,6 +145,8 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
                     conversationHistory: conversationHistoryRef.current
                 });
                 
+                 if (!isMountedRef.current) return;
+                
                 const newBotTurn = `Assistant: ${result.response}\n`;
                 conversationHistoryRef.current += newBotTurn;
 
@@ -152,7 +159,9 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
 
             } catch (err) {
                 console.error("DermiAssistant Error:", err);
-                await speak("I'm sorry, I encountered an error. Please try again.");
+                if (isMountedRef.current) {
+                    await speak("I'm sorry, I encountered an error. Please try again.");
+                }
             }
         };
 
@@ -160,24 +169,21 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
             if (event.error !== 'no-speech' && event.error !== 'aborted') {
                 console.error('Speech recognition error:', event.error);
             }
-             // Always try to restart listening unless the component is unmounting.
-            if(isMountedRef.current) {
+             if(isMountedRef.current && status === 'listening') {
                 startListening();
             }
         };
         
         recognition.onend = () => {
-            // The 'onend' event can fire for many reasons. We only want to restart listening
-            // if we are in the 'listening' state, meaning it ended naturally, not because we are processing.
-            if (status === 'listening' && isMountedRef.current) {
+            if (isMountedRef.current && status === 'listening') {
                 startListening();
             }
         };
         
         recognitionRef.current = recognition;
-        // The initial `startListening` is now triggered by the `onended` of the initial greeting.
+        
+        speak("Hello! Dermi is here. How can I assist you?");
 
-        // Cleanup function
         return () => {
             isMountedRef.current = false;
             if (recognitionRef.current) {
@@ -194,8 +200,6 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: { open: boolean; o
             isPlayingRef.current = false;
             conversationHistoryRef.current = '';
         };
-    // The dependency array is key. This effect only re-runs if `open` changes.
-    // All other functions are stable thanks to useCallback.
     }, [open, user, toast, router, onOpenChange, speak, startListening, status]);
 
 
@@ -272,6 +276,7 @@ const AnimatedCharacter = ({ status }: { status: AssistantStatus }) => {
                     width={320}
                     height={320}
                     className="w-full h-full object-cover"
+                    priority
                 />
             </motion.div>
             <motion.div
