@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
-import { Bot, Send, User, Loader2, Mic, Upload } from 'lucide-react';
+import { Bot, Send, User, Loader2, Mic, Upload, Sparkles } from 'lucide-react';
 import { Input } from '../ui/input';
 import { ScrollArea } from '../ui/scroll-area';
 import { Avatar, AvatarFallback } from '../ui/avatar';
@@ -15,11 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { textToSpeech } from '@/ai/flows/text-to-speech';
-import { uploadFile } from '@/lib/actions';
-import { Label } from '../ui/label';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
+import { VoiceAssistantOverlay } from './voice-assistant-overlay';
 
 interface Message {
     sender: 'user' | 'bot';
@@ -31,7 +26,6 @@ interface Message {
 
 const SpeechRecognition = typeof window !== "undefined" ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition : null;
 
-
 export function Chatbot() {
     const [messages, setMessages] = useState<Message[]>([
         { sender: 'bot', text: "Hello! I'm Dermi, your personal AI assistant. How can I help you today?" }
@@ -41,13 +35,15 @@ export function Chatbot() {
     const [isOpen, setIsOpen] = useState(false);
     const [awaitingPhoto, setAwaitingPhoto] = useState(false);
     
+    // State for the new Voice Assistant Overlay
+    const [isVoiceOverlayOpen, setIsVoiceOverlayOpen] = useState(false);
+
     const scrollViewportRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
 
-    // Speech Recognition state
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const [isListening, setIsListening] = useState(false);
     const finalTranscriptRef = useRef('');
@@ -92,7 +88,6 @@ export function Chatbot() {
         
         recognition.onend = () => {
             setIsListening(false);
-            // Automatically send the message when the user stops talking
             if (finalTranscriptRef.current.trim()) {
                 handleSend(finalTranscriptRef.current.trim());
             }
@@ -172,14 +167,12 @@ export function Chatbot() {
                 return;
             }
             
-            // If we have permission or it's prompt, we can just start. The browser will handle the prompt.
             setInput('');
             finalTranscriptRef.current = '';
             recognitionRef.current?.start();
             setIsListening(true);
             
         } catch (err) {
-            // Fallback for browsers that don't support permissions.query
             console.error("Permission query failed, falling back to direct start:", err);
             setInput('');
             finalTranscriptRef.current = '';
@@ -188,23 +181,12 @@ export function Chatbot() {
         }
     }, [isListening, toast]);
     
-     const handleOpenAndListen = useCallback(() => {
-        setIsOpen(true);
-        // We need a slight delay to allow the sheet to animate open before starting recognition
-        setTimeout(() => {
-            handleMicClick();
-        }, 300);
-    }, [handleMicClick]);
-
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if ((event.ctrlKey || event.metaKey) && event.key === 'm') {
                 event.preventDefault();
-                if (isOpen) {
-                    setIsOpen(false);
-                } else {
-                    handleOpenAndListen();
-                }
+                setIsVoiceOverlayOpen(prev => !prev);
+                setIsOpen(false); // Close text chat when voice overlay opens
             }
         };
 
@@ -212,7 +194,7 @@ export function Chatbot() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isOpen, handleOpenAndListen]);
+    }, []);
 
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,13 +214,13 @@ export function Chatbot() {
       setIsOpen(false);
     }
 
-    // Hide chatbot if user is not logged in.
     if (!user && !authLoading) {
         return null;
     }
 
     return (
         <>
+            <VoiceAssistantOverlay open={isVoiceOverlayOpen} onOpenChange={setIsVoiceOverlayOpen} />
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
                 <SheetTrigger asChild>
                     <Button
@@ -256,9 +238,13 @@ export function Chatbot() {
                                  <Bot className="text-primary"/>
                                  DermiAssistant
                              </div>
+                             <Button variant="ghost" size="icon" onClick={() => setIsVoiceOverlayOpen(true)}>
+                                <Sparkles className="h-5 w-5"/>
+                                <span className="sr-only">Switch to Voice Mode</span>
+                             </Button>
                         </SheetTitle>
                         <SheetDescription>
-                            Your personal AI assistant. Press Ctrl+M to toggle.
+                            Your personal AI assistant. Press Ctrl+M to toggle Voice Mode.
                         </SheetDescription>
                     </SheetHeader>
                     <ScrollArea className="flex-grow my-4 pr-4 -mr-6" viewportRef={scrollViewportRef}>
@@ -333,5 +319,3 @@ export function Chatbot() {
         </>
     );
 }
-
-    
