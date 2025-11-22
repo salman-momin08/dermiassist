@@ -63,7 +63,7 @@ function LandingPageContent() {
                 transition={{ duration: 0.5, delay: 0.2 }}
               >
                 <Image
-                  src="https://picsum.photos/seed/derm-hero/600/600"
+                  src="/landing.jpg"
                   width="600"
                   height="600"
                   alt="Hero"
