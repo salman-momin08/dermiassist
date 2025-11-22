@@ -10,7 +10,6 @@ type AnimatedCharacterProps = {
 export function AnimatedCharacter({ status }: AnimatedCharacterProps) {
   const isListening = status === 'listening';
   const isSpeaking = status === 'speaking';
-  const isProcessing = status === 'processing';
 
   return (
     <div className="w-full h-full flex items-center justify-center">
@@ -47,7 +46,8 @@ export function AnimatedCharacter({ status }: AnimatedCharacterProps) {
                     transition={{
                         duration: isSpeaking ? 0.3 : 0.5,
                         repeat: isSpeaking ? Infinity : 0,
-                        repeatType: 'mirror'
+                        repeatType: 'mirror',
+                        ease: "easeInOut",
                     }}
                 />
                  <motion.div
@@ -60,21 +60,23 @@ export function AnimatedCharacter({ status }: AnimatedCharacterProps) {
                         duration: isSpeaking ? 0.3 : 0.5,
                         delay: 0.05,
                         repeat: isSpeaking ? Infinity : 0,
-                        repeatType: 'mirror'
+                        repeatType: 'mirror',
+                        ease: "easeInOut",
                     }}
                 />
             </div>
             {/* Mouth */}
              <motion.div
                 className="w-10 h-5 bg-primary-foreground/20 rounded-b-full mt-3"
-                initial={{ scaleY: 0 }}
+                initial={{ scaleY: 0.1 }}
                 animate={{
                     scaleY: isSpeaking ? [0.8, 0.2, 0.8] : 0.1,
                 }}
                 transition={{
                     duration: isSpeaking ? 0.3 : 0.5,
                     repeat: isSpeaking ? Infinity : 0,
-                    repeatType: 'mirror'
+                    repeatType: 'mirror',
+                    ease: "easeInOut",
                 }}
             />
           </motion.div>

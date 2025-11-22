@@ -35,8 +35,8 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
     const [conversationHistory, setConversationHistory] = useState<ConversationTurn[]>([]);
     const [transcript, setTranscript] = useState('');
     const recognitionRef = useRef<SpeechRecognition | null>(null);
-    const audioQueueRef = useRef<HTMLAudioElement[]>([]);
     const isMountedRef = useRef(false);
+    const greetingSaidRef = useRef(false); // Use ref to persist across renders
 
     const speak = useCallback(async (text: string) => {
         if (!text) return;
@@ -61,7 +61,6 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
                 audio.onerror = (e) => {
                     console.error("Audio playback error:", e);
                     if (isMountedRef.current) {
-                        // Don't reject, just resolve to continue the loop
                         resolve();
                     }
                 }
@@ -69,8 +68,9 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
             });
         } catch (error) {
             console.error("TTS or upload error:", error);
-            // Don't reject, just resolve to continue the loop
-            setStatus('idle');
+            if (isMountedRef.current) {
+                setStatus('idle');
+            }
             return Promise.resolve();
         }
     }, []);
@@ -83,7 +83,6 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
                 setTranscript('');
             } catch (e) {
                 console.error("Recognition start error:", e);
-                // If it fails to start, go back to idle.
                 if (isMountedRef.current) setStatus('idle');
             }
         }
@@ -92,7 +91,13 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
 
     useEffect(() => {
         isMountedRef.current = true;
-        if (!open) return;
+        if (!open) {
+            greetingSaidRef.current = false; // Reset greeting when closed
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+            }
+            return;
+        }
 
         if (!SpeechRecognition) {
             toast({ title: "Unsupported", description: "Your browser does not support speech recognition.", variant: "destructive" });
@@ -105,11 +110,9 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
         recognition.interimResults = true;
         recognitionRef.current = recognition;
         
-        let initialGreetingSaid = false;
-
         const handleOpen = async () => {
-            if (initialGreetingSaid || !isMountedRef.current) return;
-            initialGreetingSaid = true;
+            if (greetingSaidRef.current || !isMountedRef.current) return;
+            greetingSaidRef.current = true;
             
             await speak("Hello! I'm Dermi, your personal voice assistant. How can I help you?");
             
@@ -138,7 +141,6 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
 
         recognition.onend = () => {
             if (isMountedRef.current && status === 'listening') {
-                 // If recognition ends prematurely and we were still listening, go back to idle.
                 setStatus('idle');
             }
         };
@@ -156,7 +158,8 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
              }
         };
 
-    }, [open, onOpenChange, toast, speak, startListening]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, onOpenChange, toast]);
 
 
     const processCommand = async (command: string) => {
@@ -225,10 +228,9 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
                         <div className="w-48 h-48">
                            <AnimatedCharacter status={status} />
                         </div>
-                        <div className="text-center mt-8 space-y-2">
-                             <p className="text-2xl font-medium">
-          ===================================
-          ;.                      {status === 'listening' && (transcript || 'Listening...')}
+                        <div className="text-center mt-8 space-y-2 h-20">
+                             <p className="text-2xl font-medium min-h-[32px]">
+                                {status === 'listening' && (transcript || 'Listening...')}
                                 {status === 'processing' && 'Thinking...'}
                                 {status === 'speaking' && 'Speaking...'}
                                 {status === 'idle' && 'Click the mic to start'}
@@ -271,4 +273,3 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
         </AnimatePresence>
     );
 }
-
