@@ -4,7 +4,7 @@
 import { AppHeader } from "@/components/layout/header";
 import { AppFooter } from "@/components/layout/footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Bot, User, Shield, Lock, MessageSquare, LineChart, FileText, Video, Bell, Palette, Languages } from "lucide-react";
+import { CheckCircle, Bot, User, Shield, Lock, MessageSquare, LineChart, FileText, Video, Bell, Palette, Languages, Cpu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const features = [
@@ -64,6 +64,11 @@ const features = [
     },
 ];
 
+const techStack = [
+    "Next.js", "React", "TypeScript", "Genkit", "Gemini", "ShadCN UI", 
+    "Tailwind CSS", "Firebase", "Firestore", "Stream Chat", "Agora"
+];
+
 export default function ProjectDetailsPage() {
     return (
         <div className="flex flex-col min-h-screen">
@@ -72,12 +77,31 @@ export default function ProjectDetailsPage() {
                 <div className="container mx-auto p-4 md:p-8">
                      <div className="flex flex-col items-center justify-center space-y-4 text-center py-12">
                         <h1 className="text-4xl font-bold tracking-tight font-headline">
-                            Project Features
+                            Project Features & Tech Stack
                         </h1>
                         <p className="text-xl text-muted-foreground max-w-3xl">
-                           An in-depth look at the cutting-edge features that power the DermiAssist-AI intelligent dermatology platform.
+                           An in-depth look at the cutting-edge technologies and features that power the DermiAssist-AI intelligent dermatology platform.
                         </p>
                     </div>
+
+                    <Card className="mb-8">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-3">
+                                <Cpu className="h-6 w-6" />
+                                Core Technology Stack
+                            </CardTitle>
+                            <CardDescription>
+                                This project is built with a modern, server-centric, and AI-first technology stack.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-wrap gap-2">
+                                {techStack.map(tech => (
+                                    <Badge key={tech} variant="default" className="text-sm py-1 px-3">{tech}</Badge>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                         {features.map((feature, index) => (
