@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
@@ -303,6 +304,7 @@ export default function AnalysisDetailPage() {
             };
             
             await updateAnalysis(user.uid, analysis.id, { explanations: updatedExplanations });
+            setAnalysis(prev => prev ? ({ ...prev, explanations: updatedExplanations }) : null);
             
         } catch (error) {
             console.error("Failed to save explanation:", error);
@@ -323,8 +325,9 @@ export default function AnalysisDetailPage() {
         setExplanationError(null);
         setSelectedLanguage(language);
 
+        // Check for cached explanation first
         const cachedExplanation = analysis.explanations?.[language];
-        if (cachedExplanation) {
+        if (cachedExplanation?.audioUrl && cachedExplanation?.explanationText) {
             setExplanationAudioUrl(cachedExplanation.audioUrl);
             setExplanationMessages(cachedExplanation.chatHistory || [{ sender: 'bot', text: cachedExplanation.explanationText }]);
             setExplanationLoading(false);
@@ -354,6 +357,7 @@ export default function AnalysisDetailPage() {
             setExplanationMessages([initialMessage]);
             setExplanationAudioUrl(newExplanation.audioUrl);
 
+            // Save the newly generated explanation to Firestore for caching
             await saveExplanationToFirestore(language, newExplanation);
 
         } catch (err) {
@@ -891,16 +895,14 @@ export default function AnalysisDetailPage() {
                                         </DialogHeader>
                                         
                                         <div className="flex-grow flex flex-col min-h-0">
-                                            {(!hasExistingExplanations() && !explanationLoading) && (
-                                                <div className="space-y-4 py-2 flex-shrink-0">
+                                            {(<div className="space-y-4 py-2 flex-shrink-0">
                                                     <div className="space-y-2">
                                                         <Label htmlFor="language-select">Select Language</Label>
-                                                        <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                                                        <Select value={selectedLanguage} onValueChange={handleExplanationRequest}>
                                                             <SelectTrigger id="language-select">
                                                                 <SelectValue placeholder="Select a language" />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                {/* Language List */}
                                                                 <SelectItem value="English">English</SelectItem>
                                                                 <SelectItem value="Hindi">Hindi</SelectItem>
                                                                 <SelectItem value="Bengali">Bengali</SelectItem>
@@ -916,10 +918,12 @@ export default function AnalysisDetailPage() {
                                                             </SelectContent>
                                                         </Select>
                                                     </div>
-                                                    <Button onClick={() => handleExplanationRequest(selectedLanguage)} disabled={explanationLoading} className="w-full">
-                                                        {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                                        Generate Explanation
-                                                    </Button>
+                                                    {!explanationMessages.length && (
+                                                      <Button onClick={() => handleExplanationRequest(selectedLanguage)} disabled={explanationLoading} className="w-full">
+                                                          {explanationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                                          Generate Explanation
+                                                      </Button>
+                                                    )}
                                                 </div>
                                             )}
 
@@ -938,28 +942,6 @@ export default function AnalysisDetailPage() {
 
                                             {explanationMessages.length > 0 && !explanationLoading && (
                                                 <div className="flex flex-col flex-grow min-h-0 space-y-4">
-                                                    <div className="space-y-2 flex-shrink-0">
-                                                        <Label htmlFor="language-select-active">Language</Label>
-                                                        <Select value={selectedLanguage} onValueChange={handleExplanationRequest}>
-                                                            <SelectTrigger id="language-select-active">
-                                                                <SelectValue placeholder="Select a language" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="English">English</SelectItem>
-                                                                <SelectItem value="Hindi">Hindi</SelectItem>
-                                                                <SelectItem value="Bengali">Bengali</SelectItem>
-                                                                <SelectItem value="Telugu">Telugu</SelectItem>
-                                                                <SelectItem value="Marathi">Marathi</SelectItem>
-                                                                <SelectItem value="Tamil">Tamil</SelectItem>
-                                                                <SelectItem value="Urdu">Urdu</SelectItem>
-                                                                <SelectItem value="Gujarati">Gujarati</SelectItem>
-                                                                <SelectItem value="Kannada">Kannada</SelectItem>
-                                                                <SelectItem value="Odia">Odia</SelectItem>
-                                                                <SelectItem value="Malayalam">Malayalam</SelectItem>
-                                                                <SelectItem value="Punjabi">Punjabi</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
                                                     {explanationAudioUrl && (
                                                         <div className="flex-shrink-0">
                                                             <p className="text-sm font-medium mb-2">Main Explanation Audio</p>

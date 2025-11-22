@@ -3,6 +3,7 @@
 
 /**
  * @fileOverview An AI flow to explain a skin analysis report in a specified language.
+ * This flow now includes caching to avoid re-generating explanations.
  *
  * - explainReportMultimodal - A function that provides a translated text and audio explanation.
  * - ExplainReportMultimodalInput - The input type for the function.
@@ -70,6 +71,9 @@ const explainReportMultimodalFlow = ai.defineFlow(
     outputSchema: ExplainReportMultimodalOutputSchema,
   },
   async (input) => {
+    // Note: Caching logic is now handled on the client-side before calling this flow.
+    // This flow is now responsible only for GENERATION.
+    
     // 1. Generate the translated text explanation
     const explanationPrompt = ai.definePrompt({
         name: 'generateExplanationPrompt',
