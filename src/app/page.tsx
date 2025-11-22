@@ -63,7 +63,7 @@ function LandingPageContent() {
                 transition={{ duration: 0.5, delay: 0.2 }}
               >
                 <Image
-                  src="/landing.jpg"
+                  src="/landing.png"
                   width="600"
                   height="600"
                   alt="Hero"
