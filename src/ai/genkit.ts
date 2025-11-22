@@ -6,6 +6,6 @@ export const ai = genkit({
   plugins: [
     googleAI(),
   ],
-  model: 'googleai/gemini-pro', // Updated to a standard, non-preview model
+  model: 'googleai/gemini-1.5-flash-latest',
   enableTracingAndMetrics: true, // Enable to see traces in the Firebase console
 });
