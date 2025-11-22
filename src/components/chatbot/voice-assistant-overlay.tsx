@@ -61,7 +61,7 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
                 audio.onerror = (e) => {
                     console.error("Audio playback error:", e);
                     if (isMountedRef.current) {
-                        resolve();
+                        resolve(); // Resolve even on error to continue the flow
                     }
                 }
                 audio.play();
@@ -145,14 +145,21 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
             }
         };
         
-        recognition.onerror = (event) => {
-            console.error("Speech Recognition Error:", event.error);
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+             // The 'no-speech' error is common and not a critical bug.
+             // It just means the user was silent. We can ignore it and let the 'onend' event handle resetting the state.
+            if (event.error !== 'no-speech') {
+                console.error("Speech Recognition Error:", event.error);
+            }
              if (isMountedRef.current) setStatus('idle');
         };
 
         return () => {
              isMountedRef.current = false;
              if (recognitionRef.current) {
+                recognitionRef.current.onresult = null;
+                recognitionRef.current.onend = null;
+                recognitionRef.current.onerror = null;
                 recognitionRef.current.stop();
                 recognitionRef.current = null;
              }
@@ -233,10 +240,11 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
                                 {status === 'listening' && (transcript || 'Listening...')}
                                 {status === 'processing' && 'Thinking...'}
                                 {status === 'speaking' && 'Speaking...'}
-                                {status === 'idle' && 'Click the mic to start'}
+                                {status === 'idle' && (conversationHistory.length > 0 ? 'Ready' : 'Say "Hello"')}
                             </p>
                             <p className="text-muted-foreground text-sm">
-                                {status === 'listening' ? 'I am ready for your command.' : '...'}
+                                {status === 'listening' && 'I am ready for your command.'}
+                                {status === 'idle' && conversationHistory.length > 0 && 'I am ready for your next command.'}
                             </p>
                         </div>
                     </div>
