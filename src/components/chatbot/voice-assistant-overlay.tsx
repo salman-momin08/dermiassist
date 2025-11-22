@@ -227,7 +227,8 @@ export function VoiceAssistantOverlay({ open, onOpenChange }: VoiceAssistantOver
                         </div>
                         <div className="text-center mt-8 space-y-2">
                              <p className="text-2xl font-medium">
-                                {status === 'listening' && (transcript || 'Listening...')}
+          ===================================
+          ;.                      {status === 'listening' && (transcript || 'Listening...')}
                                 {status === 'processing' && 'Thinking...'}
                                 {status === 'speaking' && 'Speaking...'}
                                 {status === 'idle' && 'Click the mic to start'}
