@@ -1,7 +1,15 @@
-import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/googleai';
+import { genkit, type Plugin } from 'genkit';
+import { googleAI } from '@genkit-ai/googleai';
+import { firebase } from '@genkit-ai/firebase';
+import { defineDotprompt } from 'genkit/dotprompt';
+import { core } from '@genkit-ai/core';
 
 export const ai = genkit({
-  plugins: [googleAI()],
-  model: 'googleai/gemini-2.0-flash',
+  plugins: [
+    googleAI(),
+    firebase(), // Add the firebase plugin
+    core(),
+  ],
+  model: 'googleai/gemini-pro', // Updated to a standard, non-preview model
+  enableTracingAndMetrics: true, // Enable to see traces in the Firebase console
 });
