@@ -14,7 +14,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { getAnalysesForUser } from '@/lib/data';
 import { detectDiseaseName }from '@/ai/flows/detect-disease-name';
 

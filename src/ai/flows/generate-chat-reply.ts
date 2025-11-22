@@ -10,7 +10,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 
 const GenerateChatReplyInputSchema = z.object({
   patientName: z.string().describe("The patient's name."),

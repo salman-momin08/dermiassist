@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 const GenerateCaseFileSummaryInputSchema = z.object({
   patientName: z.string().describe("The patient's full name."),

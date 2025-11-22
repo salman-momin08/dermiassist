@@ -10,7 +10,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 const ProformaChatInputSchema = z.object({
   conditionName: z.string().describe('The name of the detected skin condition.'),

@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 const GenerateAiReportSummaryInputSchema = z.object({
   report: z.string().describe('The complete AI skin analysis report.'),

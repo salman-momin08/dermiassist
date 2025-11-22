@@ -5,13 +5,13 @@
  * @fileOverview A flow for generating a video that visualizes skin healing progress.
  *
  * - generateHealingVideo - A function that creates a video transitioning between two photos.
- * - GenerateHealingVideoInput - The input type for the generateHealingVideo function.
+ * - GenerateHealingVideoInput - The input type for the generateHealingVideo functionूं।
  * - GenerateHealingVideoOutput - The return type for the generateHealingVideo function.
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
-import { z } from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
+import { z } from 'zod';
 
 const GenerateHealingVideoInputSchema = z.object({
   originalPhotoDataUri: z
