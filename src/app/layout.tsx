@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { Chatbot } from '@/components/chatbot/chatbot';
 import { AuthProvider } from '@/hooks/use-auth';
+import { MobileWarning } from '@/components/mobile-warning';
 
 export const metadata: Metadata = {
   title: 'DermiAssist-AI - Your Personal Dermatology Assistant',
@@ -39,6 +40,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
+            <MobileWarning />
             <Chatbot />
             <Toaster />
           </ThemeProvider>
