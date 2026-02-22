@@ -826,8 +826,8 @@ export default function AnalysisDetailPage() {
                                 <Dialog>
                                     <DialogTrigger asChild>
                                         <Button className="w-full" onClick={handleFindSpecialist}>
-                                            {isRecommending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Stethoscope className="mr-2 h-4 w-4" />}
-                                            Find a Specialist
+                                            {isRecommending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <User className="mr-2 h-4 w-4" />}
+                                            Find a Doctor
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent className="sm:max-w-md">
@@ -1027,86 +1027,88 @@ export default function AnalysisDetailPage() {
                                                 Upload a new photo to get an AI-powered comparison and see how your skin is changing.
                                             </DialogDescription>
                                         </DialogHeader>
-                                        <div className="space-y-4 py-4">
-                                            <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                                {progressImage ? (
-                                                    <Image
-                                                        src={progressImage}
-                                                        alt="New progress photo"
-                                                        width={200}
-                                                        height={200}
-                                                        className="mx-auto rounded-lg"
+                                        <ScrollArea className="max-h-[70vh] pr-4">
+                                            <div className="space-y-4 py-4">
+                                                <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                                                    {progressImage ? (
+                                                        <Image
+                                                            src={progressImage}
+                                                            alt="New progress photo"
+                                                            width={200}
+                                                            height={200}
+                                                            className="mx-auto rounded-lg"
+                                                        />
+                                                    ) : (
+                                                        <div className="space-y-2 text-muted-foreground">
+                                                            <Upload className="mx-auto h-10 w-10" />
+                                                            <p className="text-sm">Click to upload a new photo</p>
+                                                        </div>
+                                                    )}
+                                                    <input
+                                                        ref={fileInputRef}
+                                                        type="file"
+                                                        className="hidden"
+                                                        accept="image/*"
+                                                        onChange={handleFileChange}
                                                     />
-                                                ) : (
-                                                    <div className="space-y-2 text-muted-foreground">
-                                                        <Upload className="mx-auto h-10 w-10" />
-                                                        <p className="text-sm">Click to upload a new photo</p>
+                                                </div>
+                                                {progressSummary && (
+                                                    <Alert className="border-primary/50 bg-primary/10">
+                                                        <Sparkles className="h-4 w-4 text-primary" />
+                                                        <AlertTitle className="text-primary">AI Progress Report</AlertTitle>
+                                                        <AlertDescription className="text-primary/90">
+                                                            {progressSummary}
+                                                        </AlertDescription>
+                                                    </Alert>
+                                                )}
+                                                {videoUri && (
+                                                    <div className="mt-4">
+                                                        <video src={videoUri} controls className="w-full rounded-lg" />
                                                     </div>
                                                 )}
-                                                <input
-                                                    ref={fileInputRef}
-                                                    type="file"
-                                                    className="hidden"
-                                                    accept="image/*"
-                                                    onChange={handleFileChange}
-                                                />
+                                                {isComparing && !progressSummary && (
+                                                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                        <span>Analyzing progress...</span>
+                                                    </div>
+                                                )}
+                                                {isGeneratingVideo && (
+                                                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                        <span>Generating video... This may take a moment.</span>
+                                                    </div>
+                                                )}
+                                                {error && (
+                                                    <Alert variant="destructive">
+                                                        <AlertTitle>Error</AlertTitle>
+                                                        <AlertDescription>{error}</AlertDescription>
+                                                    </Alert>
+                                                )}
                                             </div>
-                                            {progressSummary && (
-                                                <Alert className="border-primary/50 bg-primary/10">
-                                                    <Sparkles className="h-4 w-4 text-primary" />
-                                                    <AlertTitle className="text-primary">AI Progress Report</AlertTitle>
-                                                    <AlertDescription className="text-primary/90">
-                                                        {progressSummary}
-                                                    </AlertDescription>
-                                                </Alert>
-                                            )}
-                                            {videoUri && (
-                                                <div className="mt-4">
-                                                    <video src={videoUri} controls className="w-full rounded-lg" />
-                                                </div>
-                                            )}
-                                            {isComparing && !progressSummary && (
-                                                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                    <span>Analyzing progress...</span>
-                                                </div>
-                                            )}
-                                            {isGeneratingVideo && (
-                                                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                    <span>Generating video... This may take a moment.</span>
-                                                </div>
-                                            )}
-                                            {error && (
-                                                <Alert variant="destructive">
-                                                    <AlertTitle>Error</AlertTitle>
-                                                    <AlertDescription>{error}</AlertDescription>
-                                                </Alert>
-                                            )}
-                                        </div>
+                                        </ScrollArea>
                                         <DialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                            <Button onClick={handleCompare} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full">
+                                            <Button onClick={handleCompare} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full text-sm">
                                                 {isComparing ? (
                                                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Comparing...</>
                                                 ) : (
-                                                    <><Sparkles className="mr-2 h-4 w-4" />Analyze Progress</>
+                                                    <><Sparkles className="mr-2 h-4 w-4" />Analyze</>
                                                 )}
                                             </Button>
                                             <TooltipProvider>
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
                                                         <div className="w-full">
-                                                            <Button variant="default" onClick={handleGenerateVideo} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full">
+                                                            <Button variant="default" onClick={handleGenerateVideo} disabled={!progressImage || isComparing || isGeneratingVideo} className="w-full text-sm">
                                                                 {isGeneratingVideo ? (
                                                                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
                                                                 ) : (
-                                                                    <><Video className="mr-2 h-4 w-4" />Generate Healing Video</>
+                                                                    <><Video className="mr-2 h-4 w-4" />Generate Video</>
                                                                 )}
                                                             </Button>
                                                         </div>
                                                     </TooltipTrigger>
                                                     <TooltipContent>
-                                                        <p>Premium feature. Requires GCP billing to be enabled.</p>
+                                                        <p>Premium feature. You need a premium version to generate healing videos.</p>
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </TooltipProvider>

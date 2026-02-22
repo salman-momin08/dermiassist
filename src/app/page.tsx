@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Bot, Stethoscope, FileText, Loader2 } from 'lucide-react';
+import { CheckCircle, Bot, Stethoscope, FileText, Loader2, Search } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AppHeader } from '@/components/layout/header';
@@ -117,7 +117,7 @@ function LandingPageContent() {
                 </p>
               </motion.div>
               <motion.div className="grid gap-2 text-center p-4 rounded-lg hover:bg-card transition-colors duration-300" variants={featureItemVariants}>
-                <Stethoscope className="h-10 w-10 mx-auto text-primary" />
+                <Search className="h-10 w-10 mx-auto text-primary" />
                 <h3 className="text-lg font-bold">Find a Doctor</h3>
                 <p className="text-sm text-muted-foreground">
                   Connect with certified dermatologists for online or offline
