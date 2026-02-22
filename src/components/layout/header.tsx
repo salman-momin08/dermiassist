@@ -131,9 +131,9 @@ export function AppHeader() {
             </div>
           )}
 
-          <Link href={getHomeHref()} className="flex items-center space-x-2">
-            <Logo className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8" showText={false} />
-            <span className="text-base sm:text-lg md:text-xl font-bold font-headline">DermiAssist-AI</span>
+          <Link href={getHomeHref()} className="flex items-center space-x-1.5 sm:space-x-2">
+            <Logo className="h-5 w-5 sm:h-7 sm:w-7 md:h-8 md:w-8" showText={false} />
+            <span className="text-sm sm:text-lg md:text-xl font-bold font-headline truncate max-w-[120px] sm:max-w-none">DermiAssist-AI</span>
           </Link>
         </div>
 

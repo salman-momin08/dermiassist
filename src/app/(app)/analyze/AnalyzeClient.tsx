@@ -87,10 +87,12 @@ export default function AnalyzeClient() {
     const prefilledImage = searchParams.get('image');
 
     if (prefilledCondition && prefilledImage) {
-      setDetectedCondition(prefilledCondition);
+      // Basic sanitization: remove any HTML tags from the prefilled condition
+      const sanitizedCondition = prefilledCondition.replace(/<[^>]*>?/gm, '');
+      setDetectedCondition(sanitizedCondition);
       setPreview(prefilledImage);
       setStep('proforma');
-      startProforma(prefilledCondition);
+      startProforma(sanitizedCondition);
     }
   }, [searchParams]);
 
@@ -435,7 +437,14 @@ export default function AnalyzeClient() {
                           </Avatar>
                         )}
                         <div className={cn("rounded-lg px-4 py-2 max-w-[80%]", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                          <p className="text-sm" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                          <p className="text-sm">
+                            {msg.text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
+                              if (part.startsWith('**') && part.endsWith('**')) {
+                                return <strong key={i}>{part.slice(2, -2)}</strong>;
+                              }
+                              return part;
+                            })}
+                          </p>
                           {msg.sender === 'ai' && index > 0 && (
                             <div className="flex justify-end mt-1">
                               <Button size="icon" variant="ghost" className={cn("h-6 w-6 shrink-0", playingAudio?.text === msg.text && "text-primary")} onClick={() => handlePlayMessageAudio(msg.text)} disabled={isAudioLoading === msg.text}>

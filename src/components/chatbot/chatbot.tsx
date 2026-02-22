@@ -39,7 +39,7 @@ export function Chatbot() {
     const scrollViewportRef = useRef<HTMLDivElement>(null);
 
     const { toast } = useToast();
-    const { user, loading: authLoading } = useAuth();
+    const { user, role, loading: authLoading } = useAuth();
     const router = useRouter();
 
 
@@ -78,6 +78,7 @@ export function Chatbot() {
 
             const result = await dermiAssistant({
                 userId: user.id,
+                userRole: role,
                 command: currentInput,
                 conversationHistory: historyString,
             });
@@ -155,7 +156,14 @@ export function Chatbot() {
                                         </Avatar>
                                     )}
                                     <div className={cn("rounded-lg px-4 py-2 max-w-[80%]", message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                                        <p className="text-sm" dangerouslySetInnerHTML={{ __html: message.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                        <p className="text-sm">
+                                            {message.text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
+                                                if (part.startsWith('**') && part.endsWith('**')) {
+                                                    return <strong key={i}>{part.slice(2, -2)}</strong>;
+                                                }
+                                                return part;
+                                            })}
+                                        </p>
                                     </div>
                                     {message.sender === 'user' && (
                                         <Avatar className="h-8 w-8">

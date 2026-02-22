@@ -520,17 +520,14 @@ sequenceDiagram
 
 ---
 
-## 📐 Development Methodology
+### Development Approach
 
-### Agile Development Approach
+I follow an **Agile development approach** with continuous iteration and improvement:
 
-We follow an **Agile development methodology** with continuous iteration and improvement:
-
-1. **Sprint Planning**: 2-week sprints with clear objectives
-2. **Daily Standups**: Quick sync on progress and blockers
-3. **Code Reviews**: All PRs require peer review
-4. **Testing**: Comprehensive testing before deployment
-5. **Retrospectives**: Regular team reflection and improvement
+1. **Sprint Planning**: Set clear 2-week objectives
+2. **Progress Tracking**: Regular self-sync on objectives and blockers
+3. **Quality Assurance**: Comprehensive testing before deployment
+4. **Retrospectives**: Regular reflection and performance improvement
 
 ### Code Quality Standards
 
@@ -948,7 +945,7 @@ dermiassist/
 
 ## 🤝 Contributing
 
-We welcome contributions! Please follow these guidelines:
+Contributions are welcome! Please follow these guidelines:
 
 ### Development Workflow
 
@@ -988,7 +985,7 @@ We welcome contributions! Please follow these guidelines:
 - Reference related issues
 - Include screenshots for UI changes
 - Ensure all tests pass
-- Request review from maintainers
+- Submit your PR for review
 
 ---
 
@@ -1071,6 +1068,6 @@ npm run typecheck
 
 **Built with ❤️ using Next.js, Google AI, and Supabase**
 
-⭐ Star us on GitHub if you find this project useful!
+⭐ Star me on GitHub if you find this project useful!
 
 </div>

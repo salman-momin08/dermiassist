@@ -223,6 +223,43 @@ export default function AdminDashboardPage() {
         );
     };
 
+    const UserActions = ({ user, onDelete, onViewProfile }: { user: User, onDelete: (id: string) => void, onViewProfile: (user: User) => void }) => (
+        <AlertDialog>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button aria-haspopup="true" size="icon" variant="ghost">
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Toggle menu</span>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DialogTrigger asChild>
+                        <DropdownMenuItem onSelect={() => onViewProfile(user)}>
+                            <UserIcon className="mr-2 h-4 w-4" /> View Profile
+                        </DropdownMenuItem>
+                    </DialogTrigger>
+                    <AlertDialogTrigger asChild>
+                        <DropdownMenuItem className="text-red-600 dark:text-red-500 focus:text-red-600 focus:dark:text-red-500" onSelect={(e) => e.preventDefault()}>
+                            <Trash2 className="mr-2 h-4 w-4" />Delete User
+                        </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete this user's record from Supabase.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onDelete(user.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+
     return (
         <div className="container mx-auto p-4 md:p-8">
             <div className="space-y-2 mb-8">
@@ -270,7 +307,8 @@ export default function AdminDashboardPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="rounded-md border overflow-x-auto">
+                            {/* Desktop Table View */}
+                            <div className="hidden md:block rounded-md border overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -281,70 +319,57 @@ export default function AdminDashboardPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {(() => {
-                                            return filteredUsers.length > 0 ? filteredUsers.map(user => {
-                                                return (
-                                                    <TableRow key={user.id}>
-                                                        <TableCell>
-                                                            <div className="font-medium">{user.name}</div>
-                                                            <div className="text-sm text-muted-foreground">{user.email}</div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Badge variant={user.role === 'doctor' ? 'default' : 'secondary'} className="capitalize">
-                                                                {user.role}
-                                                            </Badge>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {user.joined}
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            <AlertDialog>
-                                                                <DropdownMenu>
-                                                                    <DropdownMenuTrigger asChild>
-                                                                        <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                                            <MoreHorizontal className="h-4 w-4" />
-                                                                            <span className="sr-only">Toggle menu</span>
-                                                                        </Button>
-                                                                    </DropdownMenuTrigger>
-                                                                    <DropdownMenuContent align="end">
-                                                                        <DialogTrigger asChild>
-                                                                            <DropdownMenuItem onSelect={() => setSelectedUser(user)}>
-                                                                                <UserIcon className="mr-2 h-4 w-4" /> View Profile
-                                                                            </DropdownMenuItem>
-                                                                        </DialogTrigger>
-                                                                        <AlertDialogTrigger asChild>
-                                                                            <DropdownMenuItem className="text-red-600 dark:text-red-500 focus:text-red-600 focus:dark:text-red-500" onSelect={(e) => e.preventDefault()}>
-                                                                                <Trash2 className="mr-2 h-4 w-4" />Delete User
-                                                                            </DropdownMenuItem>
-                                                                        </AlertDialogTrigger>
-                                                                    </DropdownMenuContent>
-                                                                </DropdownMenu>
-                                                                <AlertDialogContent>
-                                                                    <AlertDialogHeader>
-                                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                                                        <AlertDialogDescription>
-                                                                            This action cannot be undone. This will permanently delete this user's record from Supabase.
-                                                                        </AlertDialogDescription>
-                                                                    </AlertDialogHeader>
-                                                                    <AlertDialogFooter>
-                                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                        <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                                                                    </AlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                );
-                                            }) : (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} className="h-24 text-center">
-                                                        No users found.
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })()}
+                                        {filteredUsers.length > 0 ? filteredUsers.map(user => (
+                                            <TableRow key={user.id}>
+                                                <TableCell>
+                                                    <div className="font-medium">{user.name}</div>
+                                                    <div className="text-sm text-muted-foreground">{user.email}</div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant={user.role === 'doctor' ? 'default' : 'secondary'} className="capitalize">
+                                                        {user.role}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>{user.joined}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <UserActions user={user} onDelete={handleDeleteUser} onViewProfile={(u) => setSelectedUser(u)} />
+                                                </TableCell>
+                                            </TableRow>
+                                        )) : (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="h-24 text-center">No users found.</TableCell>
+                                            </TableRow>
+                                        )}
                                     </TableBody>
                                 </Table>
+                            </div>
+
+                            {/* Mobile Card View */}
+                            <div className="md:hidden space-y-4">
+                                {filteredUsers.length > 0 ? filteredUsers.map(user => (
+                                    <Card key={user.id} className="overflow-hidden border-zinc-200 dark:border-zinc-800 shadow-sm">
+                                        <div className="p-4 space-y-4">
+                                            <div className="flex items-start justify-between">
+                                                <div className="space-y-1">
+                                                    <div className="font-bold text-lg">{user.name}</div>
+                                                    <div className="text-sm text-muted-foreground truncate max-w-[200px]">{user.email}</div>
+                                                </div>
+                                                <Badge variant={user.role === 'doctor' ? 'default' : 'secondary'} className="capitalize">
+                                                    {user.role}
+                                                </Badge>
+                                            </div>
+
+                                            <div className="flex items-center justify-between pt-2 border-t text-sm">
+                                                <div className="text-muted-foreground">Joined: {user.joined}</div>
+                                                <UserActions user={user} onDelete={handleDeleteUser} onViewProfile={(u) => setSelectedUser(u)} />
+                                            </div>
+                                        </div>
+                                    </Card>
+                                )) : (
+                                    <div className="text-center py-8 text-muted-foreground border rounded-lg bg-muted/20">
+                                        No users found.
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

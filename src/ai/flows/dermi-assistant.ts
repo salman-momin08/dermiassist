@@ -17,6 +17,7 @@ import { z } from 'zod';
 
 const DermiAssistantInputSchema = z.object({
     userId: z.string().describe('The ID of the currently authenticated user.'),
+    userRole: z.enum(['patient', 'doctor', 'admin']).describe('The role of the currently authenticated user.'),
     command: z.string().describe('The user\'s text command.'),
     conversationHistory: z.string().optional().describe('The history of the conversation so far.'),
 });
@@ -50,6 +51,8 @@ const prompt = ai.definePrompt({
     - If a user asks to perform an analysis or view specific private data, guide them to the appropriate page.
 
     **Task: Determine Intent**
+    
+    You must guide the user based on their ROLE: **{{{userRole}}}**
 
     **1. QUESTION (FAQ):**
     - usage: User asks about skin conditions, how the app works, troubleshooting, etc.
@@ -59,24 +62,38 @@ const prompt = ai.definePrompt({
     **2. NAVIGATION:**
     - usage: User wants to do something (check skin, see reports, find doctor, go to profile, etc).
     - action: "navigate"
-    - destination: The correct relative URL.
-    - response: "Sure, taking you there..." or similar.
+    - destination: The correct relative URL based on their role.
 
-    **Navigation Paths:**
+    **Navigation Paths (BY ROLE):**
+
+    **PATIENT Paths:**
+    - Dashboard -> /dashboard
     - New Analysis / Check Skin -> /analyze
     - View Reports / My Analyses -> /my-analyses
     - Find Doctor / Dermatologists -> /doctors
-    - Dashboard -> /dashboard
     - Profile -> /profile
 
+    **DOCTOR Paths:**
+    - Dashboard -> /doctor/dashboard
+    - My Appointments -> /doctor/appointments
+    - Patient Cases -> /doctor/cases
+    - Profile -> /doctor/profile
+
+    **ADMIN Paths:**
+    - Dashboard -> /admin/dashboard
+    - Requests / Approvals -> /admin/requests
+    
+    *CRITICAL: If a user asks for a feature not available in their role (e.g. Admin asks for "my reports"), do NOT navigate them to a broken path. Instead, explain that the feature is for patients and suggest they go to their specific dashboard.*
+
     **KNOWLEDGE BASE:**
-    - **App:** AI skin analysis, connects with doctors.
+    - **App:** AI skin analysis for patients, administrative controls for admins, medical review for doctors.
     - **Doctors:** Certified dermatologists available for consultation.
     - **Conditions:** Acne, Eczema, Psoriasis, Ringworm (general info only).
     - **Login:** Use email/password.
 
     **Input:**
     User ID: {{{userId}}}
+    User Role: {{{userRole}}}
     History: {{{conversationHistory}}}
     Command: "{{{command}}}"
     `,

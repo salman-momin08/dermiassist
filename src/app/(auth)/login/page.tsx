@@ -90,7 +90,7 @@ export default function LoginPage() {
       if (role === 'doctor') {
         destination = '/doctor/dashboard';
       } else if (role === 'admin') {
-        destination = '/admin/requests';
+        destination = '/admin/dashboard';
       }
       router.push(destination);
 

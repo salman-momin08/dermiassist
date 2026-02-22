@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import Link from "next/link"
 import { useAuth } from "@/hooks/use-auth"
+import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import { format, parse, isValid } from "date-fns"
 import { Separator } from "@/components/ui/separator"
@@ -419,7 +420,8 @@ export default function DoctorDashboardPage() {
                             <CardDescription>Patients requesting to connect for direct messaging.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="rounded-md border overflow-x-auto">
+                            {/* Desktop Connection Requests Table */}
+                            <div className="hidden md:block rounded-md border overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -433,10 +435,7 @@ export default function DoctorDashboardPage() {
                                         {connectionRequests.map((req) => (
                                             <TableRow key={req.id}>
                                                 <TableCell className="font-medium">
-                                                    <div className="flex items-center gap-2">
-                                                        {/* Avatar placeholder if needed */}
-                                                        {req.profiles?.display_name || 'Anonymous'}
-                                                    </div>
+                                                    {req.profiles?.display_name || 'Anonymous'}
                                                 </TableCell>
                                                 <TableCell>{req.profiles?.email}</TableCell>
                                                 <TableCell>{format(new Date(req.created_at), 'PPp')}</TableCell>
@@ -448,6 +447,27 @@ export default function DoctorDashboardPage() {
                                         ))}
                                     </TableBody>
                                 </Table>
+                            </div>
+
+                            {/* Mobile Connection Requests Cards */}
+                            <div className="md:hidden space-y-4">
+                                {connectionRequests.map((req) => (
+                                    <Card key={req.id} className="border-zinc-200 dark:border-zinc-800 shadow-sm">
+                                        <div className="p-4 space-y-3">
+                                            <div className="flex flex-col gap-1">
+                                                <div className="font-bold text-lg">{req.profiles?.display_name || 'Anonymous'}</div>
+                                                <div className="text-sm text-muted-foreground">{req.profiles?.email}</div>
+                                            </div>
+                                            <div className="text-xs text-muted-foreground pt-1 border-t">
+                                                Requested: {format(new Date(req.created_at), 'PP')}
+                                            </div>
+                                            <div className="flex gap-2 pt-2">
+                                                <Button size="sm" variant="outline" className="flex-1" onClick={() => handleConnectionAction(req.id, 'rejected')}>Deny</Button>
+                                                <Button size="sm" className="flex-1" onClick={() => handleConnectionAction(req.id, 'accepted')}>Accept</Button>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                ))}
                             </div>
                         </CardContent>
                     </Card>
@@ -462,12 +482,13 @@ export default function DoctorDashboardPage() {
                         <CardDescription>Review and respond to new appointment requests.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="rounded-md border overflow-x-auto">
+                        {/* Desktop Appointment Requests Table */}
+                        <div className="hidden md:block rounded-md border overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Patient</TableHead>
-                                        <TableHead className="hidden sm:table-cell">Requested Date/Time</TableHead>
+                                        <TableHead className="hidden lg:table-cell">Requested Date/Time</TableHead>
                                         <TableHead>Tools</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -485,7 +506,7 @@ export default function DoctorDashboardPage() {
                                                 <div className="font-medium">{app.patientName}</div>
                                                 <div className="text-sm text-muted-foreground">{app.mode}</div>
                                             </TableCell>
-                                            <TableCell className="hidden sm:table-cell">
+                                            <TableCell className="hidden lg:table-cell">
                                                 {`${getFormattedRequestedDate(app)} at ${app.preferredTime || 'any time'}`}
                                             </TableCell>
                                             <TableCell>
@@ -526,6 +547,61 @@ export default function DoctorDashboardPage() {
                                     )}
                                 </TableBody>
                             </Table>
+                        </div>
+
+                        {/* Mobile Appointment Requests Cards */}
+                        <div className="md:hidden space-y-4">
+                            {isLoadingAppointments ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                </div>
+                            ) : pendingRequests.length > 0 ? pendingRequests.map(app => (
+                                <Card key={app.id} className="border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+                                    <div className="p-4 space-y-4">
+                                        <div className="flex items-start justify-between">
+                                            <div className="space-y-1">
+                                                <div className="font-bold text-lg">{app.patientName}</div>
+                                                <div className="text-sm text-muted-foreground">{app.mode} Consultation</div>
+                                            </div>
+                                            <Badge variant="outline">{app.status}</Badge>
+                                        </div>
+
+                                        <div className="text-sm space-y-1 text-muted-foreground">
+                                            <div className="font-medium text-foreground">Requested Session:</div>
+                                            <div>{getFormattedRequestedDate(app)} at {app.preferredTime || 'any time'}</div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" size="sm" className="w-full" onClick={() => { setSelectedAppointment(app); setActiveDialog('summary'); handleGenerateSummary(app.attachedReport?.recommendations); }}>
+                                                    <Bot className="mr-2 h-4 w-4" /> AI Summary
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" size="sm" className="w-full" onClick={() => { setSelectedAppointment(app); setActiveDialog('caseFile'); handleGenerateCaseFile(app); }}>
+                                                    <BookUser className="mr-2 h-4 w-4" /> Case File
+                                                </Button>
+                                            </DialogTrigger>
+                                            {(app.uploadedImageUrls?.length || app.uploadedReportUrls?.length) && (
+                                                <DialogTrigger asChild>
+                                                    <Button variant="secondary" size="sm" className="col-span-2 w-full" onClick={() => openAttachmentsDialog(app)}>
+                                                        <Paperclip className="mr-2 h-4 w-4" /> View Attachments
+                                                    </Button>
+                                                </DialogTrigger>
+                                            )}
+                                        </div>
+
+                                        <div className="flex gap-2 pt-2 border-t">
+                                            <Button size="sm" variant="destructive" className="flex-1" onClick={() => handleRequest(app.id, 'Declined')}>Decline</Button>
+                                            <Button size="sm" className="flex-1" onClick={() => handleRequest(app.id, 'Confirmed')}>Approve</Button>
+                                        </div>
+                                    </div>
+                                </Card>
+                            )) : (
+                                <div className="text-center py-8 text-muted-foreground border rounded-lg bg-muted/20">
+                                    No pending appointment requests.
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
