@@ -95,8 +95,8 @@ DermiAssist-AI is a comprehensive, AI-powered web application that revolutionize
 | **Google Gemini** | 1.5 Flash | Advanced AI model for skin analysis and report generation |
 | **Genkit** | 1.24.0 | AI workflow orchestration and flow management |
 | **Supabase** | 2.90.1 | PostgreSQL database with real-time subscriptions |
-| **Supabase Auth** | Latest | Authentication and user management |
-| **Upstash Redis** | 1.36.1 | Serverless Redis for caching and performance |
+| **next-themes** | 0.4.4 | Theme management (Light/Dark mode) with React 19 support |
+| **Upstash Redis** | 1.36.2 | Serverless Redis for caching and rate limiting |
 
 ### Real-time Communication
 | Technology | Version | Purpose |
@@ -640,45 +640,42 @@ npm install
 
 Ensure you have a Supabase project created with **PostgreSQL** and **Supabase Auth** (Email/Password provider) enabled.
 
-Apply database migrations in order from the `supabase_migrations/` directory:
+Apply database migrations in order from the `supabase_migrations/` directory. For a fresh setup, using the **Master Integrated Schema** is highly recommended.
 
-**Database Migrations**
+**Database Migrations (Sequential Order)**
 
 | # | File | Description |
 |---|------|-------------|
-| 01 | `01_profiles_table.sql` | User profiles table with role-based fields (patient, doctor, admin) and RLS policies |
-| 02 | `02_analyses_table.sql` | AI skin analysis results and reports storage |
-| 03 | `03_appointments_table.sql` | Doctor-patient appointment management (online/offline) |
-| 04 | `04_doctor_cases_table.sql` | Doctor case files and treatment plans |
-| 05 | `05_contact_requests_table.sql` | Contact and role-change requests with document upload workflow |
-| 06 | `06_connection_requests_table.sql` | Patient-doctor connection requests |
-| 07 | `07_storage_bucket.sql` | Supabase storage bucket for verification documents |
-| 08 | `08_email_uniqueness.sql` | Email uniqueness constraint and auto-profile creation |
-| 09 | `09_admin_rls_policies.sql` | Admin RLS policy fixes for all tables |
-| 10 | `10_doctor_profile_fields.sql` | Enhanced doctor profile fields (education, certificates, testimonials) |
-| 11 | `11_documents_public_field.sql` | Document visibility control for doctor profiles |
-| 12 | `12_delete_user_trigger.sql` | Automatic auth.users deletion trigger for complete account removal |
-| 13 | `13_schema_fixes.sql` | Adds missing columns (`appointment_date`, `prescription`) and constraints required by the app |
-| 14 | `14_policies_fix.sql` | Adds RLS policies for doctors to view assigned patient profiles |
+| 01 | `01_profiles_table.sql` | Core user profile entity with RBAC fields |
+| 02 | `02_analyses_table.sql` | AI analysis results and history |
+| 03 | `03_appointments_table.sql` | Primary appointment entity |
+| 04 | `04_doctor_cases_table.sql` | Case file management for doctors |
+| 05 | `05_contact_requests_table.sql` | Role-change and contact request logging |
+| 06 | `06_connection_requests_table.sql` | Patient-doctor link management |
+| 07 | `07_storage_bucket.sql` | Document verification bucket configuration |
+| 08 | `08_email_uniqueness.sql` | Constraints and auto-profile triggers |
+| 09 | `09_admin_rls_policies.sql` | Global Admin access control policies |
+| 10 | `10_doctor_profile_fields.sql` | Professional metadata fields |
+| 11 | `11_documents_public_field.sql` | Privacy controls for verification docs |
+| 12 | `12_delete_user_trigger.sql` | Cascade deletion for account removal |
+| 13 | `13_add_signature_url.sql` | Digital signature field integration |
+| 14 | `14_schema_fixes.sql` | Application-specific column snapshots |
+| 15 | `15_doctor_reviews_table.sql` | Patient feedback and rating system |
+| 16 | `16_policies_fix.sql` | Cross-role data visibility patches |
+| 17 | `17_fix_doctor_columns.sql` | Verification status logic updates |
+| 18 | `18_fix_connection_requests_rls.sql` | Stream Chat integration security rules |
+| 19 | `19_fix_appointments_columns.sql` | Advanced booking form field support |
 
-**Utility Scripts** (in `supabase_migrations/utils/` folder):
-- `check_admin_policies.sql` - Diagnostic queries for verifying admin RLS policies
-
-**Migration Methods:**
+**Recommended Migration Method:**
 
 ```bash
-# Option 1: Using Supabase Dashboard (Recommended)
-# 1. Go to your Supabase project dashboard
-# 2. Navigate to SQL Editor
-# 3. Run each migration file in order (01 through 12)
-
-# Option 2: Using Supabase CLI
-npm install -g supabase
-supabase link --project-ref your-project-ref
-supabase db push
+# Unified Setup (Fastest)
+# 1. Open the Supabase SQL Editor
+# 2. Copy/Paste the content of supabase_migrations/master_integrated_schema.sql
+# 3. Run the complete script once.
 ```
 
-> **Note**: All migrations are idempotent and can be safely re-run. They use `IF NOT EXISTS` and `DROP IF EXISTS` clauses.
+> **Note**: All migrations are idempotent. The `master_integrated_schema.sql` contains the combined logic of all 19 files in the exact execution order.
 
 #### 4. Run Development Servers
 
@@ -770,19 +767,9 @@ dermiassist/
 │   └── types/                        # TypeScript type definitions
 │       ├── database.ts               # Database types
 │       └── index.ts                  # Shared types
-├── supabase_migrations/              # Database migrations
-│   ├── 01_profiles_table.sql
-│   ├── 02_analyses_table.sql
-│   ├── 03_appointments_table.sql
-│   ├── 04_doctor_cases_table.sql
-│   ├── 06_connection_requests_table.sql
-│   ├── 07_update_contact_requests_status.sql
-│   ├── 08_add_user_update_policy.sql
-│   ├── 09_enforce_email_uniqueness.sql
-│   ├── 10_fix_admin_rls_policy.sql
-│   ├── 11_add_documents_public_field.sql
-│   ├── 12_add_delete_user_trigger.sql
-│   └── 20260117_add_doctor_profile_fields.sql
+├── supabase_migrations/              # Database migrations (01-19)
+│   ├── utils/                        # DB Diagnostic scripts
+│   └── master_integrated_schema.sql  # Combined schema for production setup
 ├── public/                           # Static assets
 │   ├── images/
 │   └── icons/
