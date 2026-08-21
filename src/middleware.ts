@@ -86,19 +86,21 @@ export async function middleware(request: NextRequest) {
         }
     );
 
-    // IMPORTANT: Do not run user code between createServerClient and
-    // supabase.auth.getUser(). A simple mistake could make it very hard
-    // to debug issues with users being randomly logged out.
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    // ── 2. Server-side route protection & session check ─────────
+    // Fast path: Only perform network auth validation for protected routes
+    const isProtected = isProtectedRoute(pathname);
 
-    // ── 2. Server-side route protection ─────────────────────
-    if (!user && isProtectedRoute(pathname)) {
-        const loginUrl = new URL('/login', request.url);
-        // Preserve the intended destination so login can redirect back
-        loginUrl.searchParams.set('redirectTo', pathname);
-        return NextResponse.redirect(loginUrl);
+    if (isProtected) {
+        // Only make network auth request if the user is navigating to a protected route
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            const loginUrl = new URL('/login', request.url);
+            loginUrl.searchParams.set('redirectTo', pathname);
+            return NextResponse.redirect(loginUrl);
+        }
     }
 
     // ── 3. API rate limiting ─────────────────────────────────
@@ -107,11 +109,9 @@ export async function middleware(request: NextRequest) {
         // fall back to IP for unauthenticated API calls.
         const forwardedFor = request.headers.get('x-forwarded-for');
         const realIp = request.headers.get('x-real-ip');
-        const ip = forwardedFor
+        const identifier = forwardedFor
             ? forwardedFor.split(',')[0].trim()
             : (realIp ?? 'unknown-ip');
-
-        const identifier = user?.id ?? ip;
 
         const result = await checkRateLimit({
             limit: RateLimitPresets.API_DEFAULT.limit,

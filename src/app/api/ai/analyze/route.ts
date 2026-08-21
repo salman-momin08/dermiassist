@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
                     image_url: imageUrl,
                     body_location: bodyLocation,
                 }),
-                signal: AbortSignal.timeout(3000), // 3s timeout
+                signal: AbortSignal.timeout(500), // 500ms fast connection timeout
             });
 
             if (fastApiResponse.ok) {
