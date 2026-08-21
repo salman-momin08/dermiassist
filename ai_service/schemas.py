@@ -83,3 +83,26 @@ class DoctorSlot(BaseModel):
 
 class DoctorQueryResponse(BaseModel):
     doctors: List[DoctorSlot]
+
+# ── 4. LONGITUDINAL HEALING SCHEMAS ──────────────────────────────
+
+class HealingTrackRequest(BaseModel):
+    initial_image_url: str = Field(..., description="Baseline lesion photo Cloudinary URL")
+    current_image_url: str = Field(..., description="Follow-up lesion photo Cloudinary URL")
+    days_elapsed: int = Field(14, ge=1, le=365, description="Days between baseline and follow-up photo")
+
+class HealingMetrics(BaseModel):
+    surface_area_reduction_percentage: float
+    erythema_fading_index: float
+    healing_velocity_score: float
+    clinical_trajectory: str
+
+class HealingTrackResponse(BaseModel):
+    success: bool
+    days_elapsed: int
+    metrics: HealingMetrics
+    baseline_assessment: Dict[str, Any]
+    followup_assessment: Dict[str, Any]
+    recommendations: List[str]
+    processing_time_ms: float
+

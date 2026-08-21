@@ -9,11 +9,13 @@ from ai_service.schemas import (
     AnalysisRequest, AnalysisResponse,
     RAGQueryRequest, RAGQueryResponse,
     DrugInteractionRequest, DrugInteractionResponse,
-    DoctorQueryRequest, DoctorQueryResponse
+    DoctorQueryRequest, DoctorQueryResponse,
+    HealingTrackRequest, HealingTrackResponse
 )
 from ai_service.services.rag_service import search_vector_rag
 from ai_service.services.orchestrator_service import run_multi_agent_pipeline
 from ai_service.services.huggingface_service import classify_skin_lesion_hf, generate_bge_embedding_hf
+from ai_service.services.healing_tracker import track_longitudinal_healing
 
 app = FastAPI(
     title="DermiAssist-AI Polyglot Python Microservice",
@@ -81,6 +83,19 @@ async def search_rag(request: RAGQueryRequest):
             query=request.query,
             category_filter=request.category_filter,
             match_count=request.match_count
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/analytics/track-healing", response_model=HealingTrackResponse, tags=["Longitudinal Analytics"])
+async def track_healing_analytics(request: HealingTrackRequest):
+    """Calculate Longitudinal Lesion Healing Velocity and Progress Metrics."""
+    try:
+        res = await track_longitudinal_healing(
+            initial_image_url=request.initial_image_url,
+            current_image_url=request.current_image_url,
+            days_elapsed=request.days_elapsed
         )
         return res
     except Exception as e:

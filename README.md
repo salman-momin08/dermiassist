@@ -429,7 +429,20 @@ Implemented at [`src/app/api/ai/stream-analysis/route.ts`](file:///c:/Users/salm
 
 ---
 
-### 5.6. Model Context Protocol (MCP) Server
+### 5.6. Longitudinal Lesion Healing Analytics & Progress Tracker
+Implemented at [`ai_service/services/healing_tracker.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/services/healing_tracker.py) and exposed via `POST /api/v1/analytics/track-healing`:
+- Compares sequential skin photos over time (e.g. Day 1 vs. Day 14 vs. Day 30) using Gemini 2.5 Vision and Hugging Face ResNet feature extraction.
+- Computes **Surface Area Reduction %**, **Erythema (Redness) Fading Index**, and **Healing Velocity Score**.
+
+---
+
+### 5.7. Enterprise Clinical PDF Generator with QR Verification
+Implemented at [`src/lib/pdf-generator.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/lib/pdf-generator.ts):
+- Generates high-resolution multi-page medical PDF reports with ICD-10 medical codes, grounded literature citations, doctor digital signatures, and an embedded cryptographic QR code linking to digital report verification.
+
+---
+
+### 5.8. Model Context Protocol (MCP) Server
 Implemented at [`src/ai/mcp/server.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/ai/mcp/server.ts) and exposed via `/api/mcp`:
 
 ```mermaid
