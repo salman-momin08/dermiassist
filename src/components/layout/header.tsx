@@ -1,7 +1,7 @@
-
 "use client"
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -13,36 +13,48 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '../u
 import { LogOut, Menu } from 'lucide-react';
 import React from 'react';
 import NotificationInbox from '@/components/notifications/notification-bell';
+import { cn } from '@/lib/utils';
 
 export function AppHeader() {
   const { user, userData, role, loading, signOut } = useAuth();
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+  const pathname = usePathname();
 
   const authenticated = !!user;
 
-  const navLinks = [
-    { href: "/dashboard", label: "Dashboard", roles: ["patient"] },
-    { href: "/my-analyses", label: "Analyses", roles: ["patient"] },
-    { href: "/appointments", label: "Appointments", roles: ["patient"] },
-    { href: "/doctors", label: "Doctors", roles: ["patient"] },
-    { href: "/chat", label: "Chat", roles: ["patient"] },
-    { href: "/my-requests", label: "Requests", roles: ["patient", "doctor"] },
-    { href: "/contact", label: "Contact", roles: ["patient", "doctor"] },
-    { href: "/doctor/dashboard", label: "Dashboard", roles: ["doctor"] },
-    { href: "/doctor/appointments", label: "Appointments", roles: ["doctor"] },
-    { href: "/doctor/cases", label: "Patient Cases", roles: ["doctor"] },
-    { href: "/chat", label: "Patients", roles: ["doctor"] },
-    { href: "/admin/dashboard", label: "Dashboard", roles: ["admin"] },
-    { href: "/admin/requests", label: "Requests", roles: ["admin"] },
-    { href: "/admin/ai-engineering", label: "AI Control Center", roles: ["admin"] },
-  ];
-
-  const getFilteredLinks = (userRole: typeof role) => {
-    if (!userRole) return [];
-    return navLinks.filter(link => link.roles.includes(userRole));
+  // Strict role-ordered navigation links: Dashboard is ALWAYS first
+  const getNavLinks = (userRole: typeof role) => {
+    switch (userRole) {
+      case 'doctor':
+        return [
+          { href: "/doctor/dashboard", label: "Dashboard" },
+          { href: "/doctor/appointments", label: "Appointments" },
+          { href: "/doctor/cases", label: "Patient Cases" },
+          { href: "/chat", label: "Patients" },
+          { href: "/my-requests", label: "Requests" },
+          { href: "/contact", label: "Contact" },
+        ];
+      case 'admin':
+        return [
+          { href: "/admin/dashboard", label: "Dashboard" },
+          { href: "/admin/requests", label: "Requests" },
+          { href: "/admin/ai-engineering", label: "AI Control Center" },
+        ];
+      case 'patient':
+      default:
+        return [
+          { href: "/dashboard", label: "Dashboard" },
+          { href: "/my-analyses", label: "Analyses" },
+          { href: "/appointments", label: "Appointments" },
+          { href: "/doctors", label: "Doctors" },
+          { href: "/chat", label: "Chat" },
+          { href: "/my-requests", label: "Requests" },
+          { href: "/contact", label: "Contact" },
+        ];
+    }
   };
 
-  const filteredNavLinks = getFilteredLinks(role);
+  const filteredNavLinks = getNavLinks(role);
 
   const getHomeHref = () => {
     if (!authenticated) return "/";
@@ -55,7 +67,7 @@ export function AppHeader() {
       default:
         return "/dashboard";
     }
-  }
+  };
 
   const displayName = userData?.displayName || user?.user_metadata?.full_name || user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User';
 
@@ -69,14 +81,14 @@ export function AppHeader() {
             <div className="lg:hidden">
               <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" aria-label="Open navigation menu">
                     <Menu className="h-6 w-6" />
                     <span className="sr-only">Open Menu</span>
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="flex flex-col w-72 p-0" aria-describedby={undefined}>
                   <SheetHeader className="sr-only">
-                    <SheetTitle>Main Menu</SheetTitle>
+                    <SheetTitle>Main Navigation Menu</SheetTitle>
                   </SheetHeader>
 
                   {/* Sheet Header: Logo + Brand name */}
@@ -86,23 +98,31 @@ export function AppHeader() {
                   </div>
 
                   {/* Nav Links */}
-                  <nav className="flex flex-col gap-1 px-3 py-3 flex-1 overflow-y-auto">
-                    {filteredNavLinks.map(link => (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        className="rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                        onClick={() => setIsSheetOpen(false)}
-                      >
-                        {link.label}
-                      </Link>
-                    ))}
+                  <nav className="flex flex-col gap-1 px-3 py-3 flex-1 overflow-y-auto" aria-label="Mobile Navigation">
+                    {filteredNavLinks.map(link => {
+                      const isActive = pathname === link.href || (link.href !== '/' && pathname?.startsWith(link.href));
+                      return (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={cn(
+                            "rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                            isActive
+                              ? "bg-primary/10 text-primary font-semibold"
+                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                          )}
+                          onClick={() => setIsSheetOpen(false)}
+                        >
+                          {link.label}
+                        </Link>
+                      );
+                    })}
                   </nav>
 
                   {/* Sheet Footer: User Profile + Logout */}
                   {!loading && authenticated && user && (
                     <div className="border-t">
-                      {/* Profile row → links to profile page */}
                       <Link
                         href={role === 'doctor' ? '/doctor/profile' : role === 'admin' ? '/admin/profile' : '/profile'}
                         className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors"
@@ -117,7 +137,6 @@ export function AppHeader() {
                           <span className="text-xs text-muted-foreground truncate">{user.email}</span>
                         </div>
                       </Link>
-                      {/* Logout row */}
                       <button
                         onClick={() => { setIsSheetOpen(false); signOut(); }}
                         className="flex items-center gap-3 px-4 py-3 w-full text-left text-sm text-destructive hover:bg-destructive/10 transition-colors border-t"
@@ -132,21 +151,34 @@ export function AppHeader() {
             </div>
           )}
 
-          <Link href={getHomeHref()} className="flex items-center space-x-1.5 sm:space-x-2">
+          <Link href={getHomeHref()} className="flex items-center space-x-1.5 sm:space-x-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md p-1">
             <Logo className="h-5 w-5 sm:h-7 sm:w-7 md:h-8 md:w-8" showText={false} />
             <span className="text-sm sm:text-lg md:text-xl font-bold font-headline truncate max-w-[120px] sm:max-w-none">DermiAssist-AI</span>
           </Link>
         </div>
 
-        {/* Center: Desktop Nav — absolutely centered */}
+        {/* Center: Desktop Nav — absolutely centered with active indicators */}
         <div className="absolute left-1/2 -translate-x-1/2 hidden lg:flex items-center">
           {authenticated && (
-            <nav className="flex items-center space-x-6 text-sm font-medium">
-              {filteredNavLinks.map(link => (
-                <Link key={link.href} href={link.href} className="transition-colors hover:text-foreground/80 text-foreground/60">
-                  {link.label}
-                </Link>
-              ))}
+            <nav className="flex items-center space-x-6 text-sm font-medium" aria-label="Desktop Navigation">
+              {filteredNavLinks.map(link => {
+                const isActive = pathname === link.href || (link.href !== '/' && pathname?.startsWith(link.href));
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={cn(
+                      "transition-colors hover:text-foreground py-1 border-b-2 font-medium",
+                      isActive
+                        ? "border-primary text-primary font-semibold"
+                        : "border-transparent text-muted-foreground hover:border-muted"
+                    )}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
             </nav>
           )}
         </div>
@@ -164,7 +196,6 @@ export function AppHeader() {
           {loading ? (
             <Skeleton className="h-8 w-8 sm:h-9 sm:w-9 rounded-full" />
           ) : authenticated && user ? (
-            /* UserNav is hidden on mobile (shown inside sheet), visible on desktop */
             <div className="hidden lg:block">
               <UserNav name={displayName} email={user.email || ''} role={role} />
             </div>
