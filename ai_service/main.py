@@ -1,6 +1,7 @@
 """
 DermiAssist-AI FastAPI Python Microservice Application.
-Provides RESTful AI endpoints, RAG search, Tool Execution, MCP Server, and Hugging Face Open-Source Model Integrations.
+Provides RESTful AI endpoints, RAG search, Tool Execution, MCP Server, Hugging Face Open-Source Models,
+and Distributed System Design Architecture (RRF Search, Token Budgeting, Circuit Breakers, Async Queue).
 """
 
 from fastapi import FastAPI, HTTPException
@@ -16,11 +17,15 @@ from ai_service.services.rag_service import search_vector_rag
 from ai_service.services.orchestrator_service import run_multi_agent_pipeline
 from ai_service.services.huggingface_service import classify_skin_lesion_hf, generate_bge_embedding_hf
 from ai_service.services.healing_tracker import track_longitudinal_healing
+from ai_service.services.hybrid_search import search_hybrid_rrf
+from ai_service.utils.token_budget import estimate_token_count, truncate_to_token_budget, calculate_llm_cost
+from ai_service.utils.circuit_breaker import gemini_circuit_breaker, huggingface_circuit_breaker
+from ai_service.queue.task_worker import submit_async_job, get_job_status
 
 app = FastAPI(
     title="DermiAssist-AI Polyglot Python Microservice",
-    description="Enterprise AI Engineering Microservice providing Multi-Agent Orchestration, Vector RAG Retrieval, MCP Protocol, Agent Tools, and Hugging Face Open-Source Models.",
-    version="2.0.0",
+    description="Enterprise AI Engineering Microservice providing Multi-Agent Orchestration, Vector RAG Retrieval, MCP Protocol, Agent Tools, Hugging Face Models, and Distributed System Design Architecture.",
+    version="4.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -39,8 +44,12 @@ async def health_check():
     return {
         "status": "online",
         "service": "DermiAssist-AI FastAPI Engine",
-        "version": "2.0.0",
-        "huggingface": "enabled",
+        "version": "4.0.0",
+        "architecture": "Polyglot Microservice (FastAPI + Next.js 15)",
+        "circuit_breakers": {
+            "gemini": gemini_circuit_breaker.get_status(),
+            "huggingface": huggingface_circuit_breaker.get_status()
+        },
         "docs": "/docs"
     }
 
@@ -57,6 +66,61 @@ async def analyze_symptoms(request: AnalysisRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/v1/jobs/submit", tags=["Async Background Worker Queue"])
+async def submit_job(request: AnalysisRequest):
+    """Submit heavy diagnostic task to Redis Async Task Worker Queue."""
+    try:
+        res = await submit_async_job(
+            symptoms=request.symptoms,
+            image_url=request.image_url,
+            body_location=request.body_location
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/jobs/{job_id}", tags=["Async Background Worker Queue"])
+async def poll_job(job_id: str):
+    """Poll execution status of an async background job."""
+    return get_job_status(job_id)
+
+@app.post("/api/v1/rag/hybrid-search", tags=["Vector RAG Engine"])
+async def hybrid_search_rrf(request: RAGQueryRequest):
+    """Execute Hybrid BM25 Keyword + Vector Cosine Distance Search via Reciprocal Rank Fusion (RRF)."""
+    try:
+        res = await search_hybrid_rrf(
+            query=request.query,
+            category_filter=request.category_filter,
+            top_k=request.match_count
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/system/token-budget", tags=["System Design & AI Budgeting"])
+async def analyze_token_budget(text: str, max_budget: int = 1024):
+    """Analyze sub-word token count, enforce dynamic token budget, and calculate LLM billing cost."""
+    try:
+        tokens = estimate_token_count(text)
+        truncation = truncate_to_token_budget(text, max_budget)
+        cost = calculate_llm_cost(tokens, completion_tokens=256, model="gemini-2.5-flash")
+        return {
+            "success": True,
+            "estimated_tokens": tokens,
+            "truncation_analysis": truncation,
+            "billing_cost_analysis": cost
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/system/circuit-breakers", tags=["System Design & AI Budgeting"])
+async def get_circuit_breakers():
+    """Retrieve status of API Circuit Breakers (Gemini & Hugging Face)."""
+    return {
+        "gemini": gemini_circuit_breaker.get_status(),
+        "huggingface": huggingface_circuit_breaker.get_status()
+    }
+
 @app.post("/api/v1/huggingface/classify-lesion", tags=["Hugging Face Open-Source Models"])
 async def classify_lesion_huggingface(image_url: str = ""):
     """Classify skin lesion photo using Hugging Face Open-Source Lesion Classifier (HAM10000)."""
@@ -72,19 +136,6 @@ async def embed_huggingface(text: str):
     try:
         vector = await generate_bge_embedding_hf(text)
         return {"success": True, "model": "BAAI/bge-small-en-v1.5", "dimensions": len(vector), "vector": vector[:10]}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/v1/rag/search", response_model=RAGQueryResponse, tags=["Vector RAG Engine"])
-async def search_rag(request: RAGQueryRequest):
-    """Execute hybrid vector cosine distance search against Supabase pgvector."""
-    try:
-        res = await search_vector_rag(
-            query=request.query,
-            category_filter=request.category_filter,
-            match_count=request.match_count
-        )
-        return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -142,7 +193,7 @@ async def handle_mcp_jsonrpc(payload: dict):
             "id": req_id,
             "result": {
                 "protocolVersion": "2024-11-05",
-                "serverInfo": {"name": "DermiAssist-FastAPI-MCP", "version": "2.0.0"}
+                "serverInfo": {"name": "DermiAssist-FastAPI-MCP", "version": "4.0.0"}
             }
         }
 
@@ -153,7 +204,7 @@ async def handle_mcp_jsonrpc(payload: dict):
             "result": {
                 "tools": [
                     {"name": "analyze_skin_condition", "description": "FastAPI Multi-Agent Diagnostic Engine"},
-                    {"name": "search_medical_knowledge", "description": "Supabase pgvector Hybrid Search"},
+                    {"name": "search_hybrid_rrf", "description": "Hybrid BM25 + Vector RRF Search"},
                     {"name": "classify_skin_lesion_hf", "description": "Hugging Face Open-Source Lesion Classifier"}
                 ]
             }
