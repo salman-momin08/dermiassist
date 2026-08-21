@@ -185,7 +185,8 @@ graph TB
     end
     
     subgraph External AI & Telehealth Infrastructure
-        GeminiAPI[Google Gemini 2.5 / Vision API]
+        GeminiAPI[Google Gemini 2.5 Flash / Vision API]
+        OpenAIAPI[OpenAI GPT-4o Clinical Reasoning API]
         HuggingFaceAPI[Hugging Face Inference API - HAM10000 / BGE]
         AgoraAPI[Agora RTC WebRTC Infrastructure]
         StreamAPI[Stream Chat Infrastructure]
@@ -195,6 +196,7 @@ graph TB
     Vercel <--> SupabaseDB
     Vercel <--> Upstash
     VercelFastAPI --> GeminiAPI
+    VercelFastAPI --> OpenAIAPI
     VercelFastAPI --> HuggingFaceAPI
     VercelFastAPI <--> SupabaseDB
     Vercel --> CloudinaryCDN

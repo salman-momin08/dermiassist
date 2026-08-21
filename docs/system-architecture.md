@@ -32,13 +32,16 @@ graph TB
     end
     
     subgraph AI Engine & Multi-Agent Orchestration
-        AI_ORCHESTRATOR[Master Multi-Agent Orchestrator]
+        AI_ORCHESTRATOR[Master Multi-Agent Orchestrator - Fast-Path & Parallel Engine]
+        GEMINI_ENGINE[Google Gemini 2.5 Flash Multimodal Vision & Triage]
+        OPENAI_ENGINE[OpenAI GPT-4o Clinical Reasoning & Consensus Engine]
         HF_SERVICE[Hugging Face Open-Source Model Engine - HAM10000 / BGE]
         GUARDRAILS_IN[Input Guardrail & PII Redactor]
         GUARDRAILS_OUT[Output Guardrail & Disclaimer Enforcer]
         TOKEN_BUDGET[Dynamic Token Budget Allocator]
         CIRCUIT_BREAKER[Circuit Breaker Resilience Pattern]
         TASK_WORKER[Redis Async Task Worker Pool]
+        CBR_REGISTRY[500-Patient Empirical Clinical Case Registry]
     end
     
     subgraph Data & Vector Storage Layer
