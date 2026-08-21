@@ -18,13 +18,14 @@ from ai_service.services.orchestrator_service import run_multi_agent_pipeline
 from ai_service.services.huggingface_service import classify_skin_lesion_hf, generate_bge_embedding_hf
 from ai_service.services.healing_tracker import track_longitudinal_healing
 from ai_service.services.hybrid_search import search_hybrid_rrf
+from ai_service.services.openai_service import analyze_disease_with_openai
 from ai_service.utils.token_budget import estimate_token_count, truncate_to_token_budget, calculate_llm_cost
 from ai_service.utils.circuit_breaker import gemini_circuit_breaker, huggingface_circuit_breaker
 from ai_service.queue.task_worker import submit_async_job, get_job_status
 
 app = FastAPI(
     title="DermiAssist-AI Polyglot Python Microservice",
-    description="Enterprise AI Engineering Microservice providing Multi-Agent Orchestration, Vector RAG Retrieval, MCP Protocol, Agent Tools, Hugging Face Models, and Distributed System Design Architecture.",
+    description="Enterprise AI Engineering Microservice providing Multi-Agent Orchestration, Vector RAG Retrieval, MCP Protocol, Agent Tools, Hugging Face Models, OpenAI GPT-4o, and Distributed System Design Architecture.",
     version="4.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -52,6 +53,18 @@ async def health_check():
         },
         "docs": "/docs"
     }
+
+@app.post("/api/v1/analyze/openai", tags=["AI Diagnostic Engine"])
+async def analyze_symptoms_openai(request: AnalysisRequest):
+    """Trigger disease analysis using OpenAI GPT-4o clinical reasoning engine."""
+    try:
+        res = await analyze_disease_with_openai(
+            symptoms=request.symptoms,
+            vision_findings={"body_location": request.body_location, "image_url": request.image_url} if request.image_url else None
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/analyze", response_model=AnalysisResponse, tags=["AI Diagnostic Engine"])
 async def analyze_symptoms(request: AnalysisRequest):

@@ -10,6 +10,7 @@ import { Cpu, Database, Zap, Award, Activity, RefreshCw, CheckCircle2, AlertTria
 
 export default function AIEngineeringDashboard() {
     const [symptomsInput, setSymptomsInput] = useState('Itchy red elevated rash on inner elbows for 3 weeks, dry skin');
+    const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'openai'>('gemini');
     const [loading, setLoading] = useState(false);
     const [evalLoading, setEvalLoading] = useState(false);
     const [mcpLoading, setMcpLoading] = useState(false);
@@ -17,14 +18,15 @@ export default function AIEngineeringDashboard() {
     const [evalReport, setEvalReport] = useState<any>(null);
     const [mcpResult, setMcpResult] = useState<any>(null);
 
-    const handleRunPipeline = async () => {
+    const handleRunPipeline = async (providerOverride?: 'gemini' | 'openai') => {
+        const provider = providerOverride || selectedProvider;
         setLoading(true);
         setPipelineResult(null);
         try {
             const res = await fetch('/api/ai/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ symptoms: symptomsInput }),
+                body: JSON.stringify({ symptoms: symptomsInput, provider }),
             });
             const data = await res.json();
             setPipelineResult(data);
@@ -140,15 +142,39 @@ export default function AIEngineeringDashboard() {
                                 />
                             </div>
 
-                            <Button onClick={handleRunPipeline} disabled={loading} className="w-full md:w-auto">
+                            <div>
+                                <label className="text-sm font-semibold mb-2 block">AI Reasoning Engine & Provider</label>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={selectedProvider === 'gemini' ? 'default' : 'outline'}
+                                        onClick={() => setSelectedProvider('gemini')}
+                                        className="text-xs"
+                                    >
+                                        ⚡ Google Gemini 2.5 Flash (Default)
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={selectedProvider === 'openai' ? 'default' : 'outline'}
+                                        onClick={() => setSelectedProvider('openai')}
+                                        className="text-xs"
+                                    >
+                                        🟢 OpenAI GPT-4o (Clinical Reasoning)
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <Button onClick={() => handleRunPipeline()} disabled={loading} className="w-full md:w-auto">
                                 {loading ? (
                                     <>
                                         <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                        Orchestrating AI Sub-Agents...
+                                        Synthesizing with {selectedProvider === 'openai' ? 'OpenAI GPT-4o' : 'Google Gemini'}...
                                     </>
                                 ) : (
                                     <>
-                                        <Zap className="mr-2 h-4 w-4" /> Execute Multi-Agent Pipeline
+                                        <Zap className="mr-2 h-4 w-4" /> Execute Multi-Agent Pipeline ({selectedProvider === 'openai' ? 'GPT-4o' : 'Gemini'})
                                     </>
                                 )}
                             </Button>
