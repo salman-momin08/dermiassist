@@ -10,6 +10,7 @@
 
 # testing
 /coverage
+.pytest_cache/
 
 # production / build
 /build
@@ -17,6 +18,15 @@
 /out/
 *.tsbuildinfo
 next-env.d.ts
+
+# python virtual environment & caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
 
 # misc
 .DS_Store

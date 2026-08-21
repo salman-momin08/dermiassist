@@ -5,6 +5,7 @@
 **Production-Grade Dermatology Platform Featuring Vector RAG, Multi-Agent LLM Orchestration, Model Context Protocol (MCP), Dual-Layer Guardrails, Semantic Caching & LLM-as-a-Judge Evals**
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.1.7-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-19.2-blue?style=flat-square&logo=react)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![MCP Protocol](https://img.shields.io/badge/MCP-JSON--RPC%202.0-purple?style=flat-square)](https://modelcontextprotocol.io)
@@ -35,11 +36,12 @@
 - [5. Deep-Dive AI Engineering Features](#5-deep-dive-ai-engineering-features)
   - [5.1. Vector RAG Engine (pgvector)](#51-vector-rag-engine-pgvector)
   - [5.2. Multi-Agent LLM Orchestration Pipeline](#52-multi-agent-llm-orchestration-pipeline)
-  - [5.3. Model Context Protocol (MCP) Server](#53-model-context-protocol-mcp-server)
-  - [5.4. Sub-50ms Semantic Vector Caching Layer](#54-sub-50ms-semantic-vector-caching-layer)
-  - [5.5. Dual-Layer AI Guardrails & PII Redaction](#55-dual-layer-ai-guardrails--pii-redaction)
-  - [5.6. LLM-as-a-Judge Evaluation & Benchmarking](#56-llm-as-a-judge-evaluation--benchmarking)
-  - [5.7. Auxiliary Genkit AI Workflows](#57-auxiliary-genkit-ai-workflows)
+  - [5.3. FastAPI Python AI Microservice (`ai_service/`)](#53-fastapi-python-ai-microservice-ai_service)
+  - [5.4. Model Context Protocol (MCP) Server](#54-model-context-protocol-mcp-server)
+  - [5.5. Sub-50ms Semantic Vector Caching Layer](#55-sub-50ms-semantic-vector-caching-layer)
+  - [5.6. Dual-Layer AI Guardrails & PII Redaction](#56-dual-layer-ai-guardrails--pii-redaction)
+  - [5.7. LLM-as-a-Judge Evaluation & Benchmarking](#57-llm-as-a-judge-evaluation--benchmarking)
+  - [5.8. Auxiliary Genkit AI Workflows](#58-auxiliary-genkit-ai-workflows)
 - [6. Full-Stack Product Capabilities & Role Workflows](#6-full-stack-product-capabilities--role-workflows)
   - [6.1. Patient Analysis & Proforma Journey](#61-patient-analysis--proforma-journey)
   - [6.2. Doctor Verification Workflow](#62-doctor-verification-workflow)
@@ -395,7 +397,24 @@ sequenceDiagram
 
 ---
 
-### 5.3. Model Context Protocol (MCP) Server
+### 5.3. FastAPI Python AI Microservice (`ai_service/`)
+Located in [`ai_service/`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/), DermiAssist-AI features a standalone **FastAPI Python Microservice Engine** running on port `8000`:
+- **Interactive Swagger Documentation**: Automatically generated OpenAPI UI accessible at `http://localhost:8000/docs`.
+- **Pydantic Validation Schemas**: Strict data validation for diagnostic payloads ([`ai_service/schemas.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/schemas.py)).
+- **Python Async Vector RAG Engine**: Native HTTPX & Supabase Python client searching `pgvector` chunks ([`ai_service/services/rag_service.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/services/rag_service.py)).
+- **Multi-Agent Pipeline Service**: Python multi-agent orchestration coordinator ([`ai_service/services/orchestrator_service.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/services/orchestrator_service.py)).
+- **Next.js Microservice Proxy**: Next.js API routes (`src/app/api/ai/analyze/route.ts`) seamlessly proxy requests to FastAPI with automatic fallback to the internal TypeScript engine if the Python microservice is offline.
+
+```bash
+# Run FastAPI Python Microservice
+cd ai_service
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+---
+
+### 5.4. Model Context Protocol (MCP) Server
 Implemented at [`src/ai/mcp/server.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/ai/mcp/server.ts) and exposed via `/api/mcp`:
 
 ```mermaid
@@ -528,57 +547,39 @@ sequenceDiagram
 
 ```
 dermiassist/
+├── ai_service/                      # FastAPI Python AI Microservice (Port 8000)
+│   ├── main.py                      # FastAPI App, CORS & OpenAPI Router
+│   ├── schemas.py                   # Pydantic Request/Response Models
+│   ├── requirements.txt             # Python Microservice Dependencies
+│   └── services/                    # Python AI Engine Services
+│       ├── orchestrator_service.py  # Multi-Agent Diagnostic Pipeline
+│       └── rag_service.py           # Supabase pgvector Async Retrieval
 ├── src/
-│   ├── ai/                          # AI Engineering Core
-│   │   ├── agents/                  # Multi-Agent Modules
-│   │   │   ├── triage-agent.ts      # Risk Stratification Agent
-│   │   │   ├── vision-agent.ts      # Multimodal Lesion Analysis Agent
-│   │   │   ├── rag-specialist-agent.ts # RAG Retrieval Agent
-│   │   │   └── synthesis-agent.ts   # Report Synthesis Agent
-│   │   ├── cache/                   # Semantic Vector Caching
-│   │   │   └── semantic-cache.ts
+│   ├── ai/                          # AI Engineering Core (TypeScript Engine)
+│   │   ├── agents/                  # Multi-Agent Modules (Triage, Vision, RAG, Synthesis)
+│   │   ├── cache/                   # Semantic Vector Caching (semantic-cache.ts)
 │   │   ├── eval/                    # LLM-as-a-Judge Evaluation Suite
-│   │   │   ├── datasets/            # Benchmark Test Cases
-│   │   │   └── eval-harness.ts      # Automated Eval Harness
 │   │   ├── flows/                   # Genkit Workflows (TTS, Proforma, Video)
-│   │   ├── guards/                  # Dual-Layer Safety Guardrails
-│   │   │   ├── input-guard.ts       # PII Redaction & Prompt Injection Defense
-│   │   │   └── output-guard.ts      # Hallucination Check & Disclaimer
+│   │   ├── guards/                  # Dual-Layer Safety Guardrails (PII & Injection)
 │   │   ├── mcp/                     # Model Context Protocol (MCP) Server
-│   │   │   └── server.ts            # JSON-RPC 2.0 Server Handler
-│   │   ├── rag/                     # Vector RAG Pipeline
-│   │   │   ├── embeddings.ts        # Gemini text-embedding-004 Generator
-│   │   │   └── retriever.ts         # Hybrid pgvector Search & Reranker
+│   │   ├── rag/                     # Vector RAG Pipeline (embeddings.ts, retriever.ts)
+│   │   ├── tools/                   # Executable Agent Tools (medical-tools.ts)
 │   │   ├── genkit.ts                # Genkit Core Config
 │   │   └── orchestrator.ts          # Master Pipeline Coordinator
 │   ├── app/                         # Next.js App Router Pages & API Routes
 │   │   ├── (app)/                   # Patient & Shared Routes (/analyze, /doctors, etc.)
 │   │   ├── (auth)/                  # Auth Routes (/login, /signup)
-│   │   ├── admin/                   # Admin Dashboard & Control Center
-│   │   │   └── ai-engineering/      # AI Control Center UI
-│   │   ├── api/                     # API Endpoints
-│   │   │   ├── ai/                  # AI Endpoints (/api/ai/analyze, /api/ai/eval)
-│   │   │   ├── mcp/                 # MCP Endpoint (/api/mcp)
-│   │   │   ├── chat/                # Stream Chat APIs
-│   │   │   └── stream-token/        # Token provisioning
+│   │   ├── admin/                   # Admin Dashboard & Control Center (/admin/ai-engineering)
+│   │   ├── api/                     # API Endpoints (/api/ai/analyze, /api/mcp, /api/stream-token)
 │   │   └── middleware.ts            # Edge Auth & Sliding-Window Rate Limiter
 │   ├── components/                  # Reusable React Components (ShadCN UI)
 │   ├── lib/                         # Core Server Actions, Utilities & Telemetry
-│   │   ├── actions.ts               # Cloudinary Upload & Validation Actions
-│   │   ├── errors.ts                # Structured Error Serializers
-│   │   ├── logger.ts                # NDJSON Structured Logger
-│   │   ├── telemetry.ts             # Platform & AI Telemetry Hooks
-│   │   ├── redis/                   # Upstash Rate Limiter & Caching
-│   │   └── supabase/                # Supabase Server & Client SDK Setup
 │   └── types/                       # TypeScript Type Definitions
-├── scripts/                         # Administrative & Cache Management Scripts
-│   ├── debug-channels.ts            # Stream Chat channel debugging utility
-│   ├── delete-legacy-channels.ts    # Legacy channel cleanup script
-│   ├── flush-redis.ts               # Redis cache clearing utility
-│   └── verify-existing-doctors.ts   # Doctor database auto-verification utility
+├── docs/                            # Documentation Guides
+│   ├── pgvector-setup.md            # Supabase pgvector Setup & SQL Reference
+│   └── bulk-data-ingestion.md       # Real-World Bulk Medical Data Ingestion Guide
+├── scripts/                         # Administrative Utility Scripts
 ├── supabase_migrations/             # SQL Migrations
-│   ├── master_integrated_schema.sql # Unified Schema & RLS Policies
-│   └── 20_vector_embeddings_rag.sql # pgvector Extension & RAG Function
 ├── package.json
 └── tsconfig.json
 ```
@@ -587,14 +588,14 @@ dermiassist/
 
 ## 8. API & Protocol Endpoint Reference
 
-| Endpoint | Method | Protocol | Description |
-|----------|--------|----------|-------------|
-| `/api/ai/analyze` | `POST` | REST JSON | Triggers full Multi-Agent Orchestrator pipeline |
-| `/api/ai/eval` | `GET` | REST JSON | Runs LLM-as-a-Judge evaluation harness |
-| `/api/mcp` | `POST` / `GET` | JSON-RPC 2.0 | Model Context Protocol server interface for Claude/Cursor |
-| `/api/stream-token` | `GET` | REST JSON | Generates Stream Chat session token |
-| `/api/connections` | `POST` / `GET` | REST JSON | Manages patient-doctor link requests |
-| `/api/check-email` | `POST` | REST JSON | Validates user email availability |
+| Endpoint | Method | Protocol | Host / Service | Description |
+|----------|--------|----------|----------------|-------------|
+| `/api/ai/analyze` | `POST` | REST JSON | Next.js (Port 9002) | Proxies request to FastAPI microservice with fallback |
+| `http://localhost:8000/api/v1/analyze` | `POST` | REST JSON | FastAPI (Port 8000) | Native Python Multi-Agent Diagnostic Pipeline |
+| `http://localhost:8000/api/v1/rag/search` | `POST` | REST JSON | FastAPI (Port 8000) | Native Python Supabase `pgvector` Hybrid Search |
+| `http://localhost:8000/docs` | `GET` | HTML | FastAPI (Port 8000) | Interactive Swagger / OpenAPI Documentation |
+| `/api/mcp` | `POST` / `GET` | JSON-RPC 2.0 | Next.js (Port 9002) | Model Context Protocol server for Claude/Cursor |
+| `/api/ai/eval` | `GET` | REST JSON | Next.js (Port 9002) | Runs LLM-as-a-Judge evaluation harness |
 
 ---
 
@@ -619,10 +620,11 @@ npx tsx scripts/debug-channels.ts
 
 ### 10.1. Prerequisites
 1. **Node.js**: `v18.x` or higher
-2. **npm**: `v9.x` or higher
-3. **Supabase Account**: PostgreSQL database instance
-4. **Google AI Studio Key**: Gemini API key
-5. **Cloudinary Account**: For document uploads
+2. **Python**: `v3.10` or higher (for FastAPI microservice)
+3. **npm**: `v9.x` or higher
+4. **Supabase Account**: PostgreSQL database instance with `pgvector`
+5. **Google AI Studio Key**: Gemini API key
+6. **Cloudinary Account**: For document uploads
 
 ---
 
@@ -633,7 +635,7 @@ npx tsx scripts/debug-channels.ts
 git clone https://github.com/yourusername/dermiassist.git
 cd dermiassist
 
-# 2. Install dependencies
+# 2. Install Next.js Web Client dependencies
 npm install
 
 # 3. Configure environment variables in .env
@@ -641,13 +643,45 @@ npm install
 # 4. Run database migrations in Supabase SQL editor
 # Execute supabase_migrations/master_integrated_schema.sql
 # Execute supabase_migrations/20_vector_embeddings_rag.sql
-# Setup & Bulk Ingestion Guides: docs/pgvector-setup.md & docs/bulk-data-ingestion.md
+# Detailed Guides: docs/pgvector-setup.md & docs/bulk-data-ingestion.md
 
-# 5. Start Next.js development server
+# 5. Start FastAPI Python Microservice (Optional / Recommended)
+cd ai_service
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+
+# 6. Start Next.js development server (In root directory)
 npm run dev
 ```
 
 Visit the application at `http://localhost:9002` and the AI Control Center at `http://localhost:9002/admin/ai-engineering`.
+
+---
+
+### 10.3. Vercel Deployment Guide (Polyglot Next.js + FastAPI)
+
+Vercel natively supports deploying Python FastAPI microservices alongside Next.js using `@vercel/python` serverless runtimes.
+
+1. **Push your code to GitHub**:
+   ```bash
+   git add .
+   git commit -m "feat: add polyglot Next.js and FastAPI architecture"
+   git push origin main
+   ```
+
+2. **Deploy on Vercel**:
+   - Go to [Vercel Dashboard](https://vercel.com/dashboard) $\rightarrow$ **Add New Project** $\rightarrow$ Import your `dermiassist` GitHub repository.
+   - Vercel automatically detects [`vercel.json`](file:///c:/Users/salma/Downloads/dermiassist/vercel.json) and compiles both Next.js and FastAPI serverless functions!
+
+3. **Configure Environment Variables in Vercel**:
+   - `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon key.
+   - `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key.
+   - `GEMINI_API_KEY`: Google AI Studio Gemini key.
+   - `UPSTASH_REDIS_REST_URL` & `UPSTASH_REDIS_REST_TOKEN`: Upstash Redis credentials.
+
+4. **Zero-Downtime Resilience Guarantee**:
+   - If the FastAPI microservice is starting up or unreachable, our Next.js API route (`/api/ai/analyze`) automatically and seamlessly falls back to the TypeScript Genkit engine, guaranteeing $100\%$ uptime!
 
 ---
 

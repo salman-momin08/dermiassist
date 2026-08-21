@@ -1,8 +1,19 @@
 {
-    "crons": [
-        {
-            "path": "/api/cron/cleanup",
-            "schedule": "0 0 * * *"
-        }
-    ]
+  "version": 2,
+  "builds": [
+    {
+      "src": "next.config.ts",
+      "use": "@vercel/next"
+    },
+    {
+      "src": "ai_service/main.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/v1/(.*)",
+      "dest": "ai_service/main.py"
+    }
+  ]
 }

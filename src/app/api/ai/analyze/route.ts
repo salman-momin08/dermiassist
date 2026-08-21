@@ -13,6 +13,32 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // 1. Try FastAPI Python Microservice (Port 8000)
+        try {
+            const fastApiUrl = process.env.FASTAPI_SERVICE_URL || 'http://localhost:8000';
+            const fastApiResponse = await fetch(`${fastApiUrl}/api/v1/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    symptoms,
+                    image_url: imageUrl,
+                    body_location: bodyLocation,
+                }),
+                signal: AbortSignal.timeout(3000), // 3s timeout
+            });
+
+            if (fastApiResponse.ok) {
+                const fastApiData = await fastApiResponse.json();
+                return NextResponse.json({
+                    ...fastApiData,
+                    microservice: 'FastAPI (Python)',
+                });
+            }
+        } catch {
+            // FastAPI offline -> Seamless fallback to TypeScript Genkit Engine
+        }
+
+        // 2. TypeScript Multi-Agent Orchestrator Fallback Engine
         const result = await executeMultiAgentPipeline({
             symptoms,
             imageUrl,
@@ -21,7 +47,10 @@ export async function POST(request: NextRequest) {
             userId,
         });
 
-        return NextResponse.json(result);
+        return NextResponse.json({
+            ...result,
+            microservice: 'Next.js (TypeScript Engine)',
+        });
     } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Internal pipeline error';
         return NextResponse.json({ error: message }, { status: 500 });
