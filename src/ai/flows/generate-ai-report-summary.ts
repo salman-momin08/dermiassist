@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
+import { AIOutputError } from '@/lib/errors';
 
 const GenerateAiReportSummaryInputSchema = z.object({
   report: z.string().describe('The complete AI skin analysis report.'),
@@ -61,7 +62,10 @@ const generateAiReportSummaryFlow = ai.defineFlow(
     outputSchema: GenerateAiReportSummaryOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const { output } = await prompt(input);
+    if (!output) {
+      throw new AIOutputError('Model returned null output', { flow: 'generateAiReportSummaryFlow' });
+    }
+    return output;
   }
 );

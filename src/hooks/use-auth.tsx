@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -33,7 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [userData, setUserData] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
-    const supabase = createClient();
+    // Stable reference — createClient() already returns a singleton, but
+    // calling it inside the component body creates a new *call* each render.
+    // useMemo ensures the reference itself is stable across HMR cycles.
+    const supabase = useMemo(() => createClient(), []);
 
     const fetchUserData = useCallback(async (supabaseUser: User) => {
         try {
@@ -63,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const currentUserRef = useRef<string | null>(null);
 
     useEffect(() => {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any, session: any) => {
             const isNewUser = session?.user?.id !== currentUserRef.current;
 
             // Only block the UI on initial load, sign out, or if a completely new user signs in.
@@ -86,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         return () => subscription.unsubscribe();
+    // supabase is now a stable useMemo ref — safe to include
     }, [supabase, fetchUserData]);
 
     const forceReload = useCallback(async () => {

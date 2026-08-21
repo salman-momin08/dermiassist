@@ -127,16 +127,19 @@ export const PATCH = RateLimitMiddleware.strict(async (request: NextRequest) => 
         // 2. If accepted, initialize Stream Chat Channel
         if (status === 'accepted') {
             const crypto = require('crypto');
-            const serverClient = StreamChat.getInstance(apiKey, apiSecret);
+            const serverClient = StreamChat.getInstance(apiKey, apiSecret, {
+                timeout: 15000,
+            });
 
             // Create a deterministic, non-guessable channel ID
             const sortedIds = [connection.doctor_id, connection.patient_id].sort();
             const hash = crypto.createHash('sha256')
                 .update(`${process.env.CHAT_SECRET_SALT || 'dermiassist_salt'}:${sortedIds[0]}:${sortedIds[1]}`)
                 .digest('hex');
-            const channelId = `consult_${hash}`;
+            // Stream Chat max 64 chars: "consult_" (8) + 48 hex = 56 total
+            const channelId = `consult_${hash.substring(0, 48)}`;
 
-            const channel = serverClient.channel('consultation', channelId, {
+            const channel = serverClient.channel('messaging', channelId, {
                 members: [connection.patient_id, connection.doctor_id],
                 created_by_id: connection.doctor_id
             });

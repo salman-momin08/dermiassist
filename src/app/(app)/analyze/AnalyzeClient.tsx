@@ -43,6 +43,7 @@ import { textToSpeech } from "@/ai/flows/text-to-speech";
 import { uploadFile } from "@/lib/actions";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { sanitizeConditionName } from "@/ai/guards/condition-guard";
 
 
 type Step = 'upload' | 'proforma' | 'analyzing' | 'error';
@@ -87,8 +88,8 @@ export default function AnalyzeClient() {
     const prefilledImage = searchParams.get('image');
 
     if (prefilledCondition && prefilledImage) {
-      // Basic sanitization: remove any HTML tags from the prefilled condition
-      const sanitizedCondition = prefilledCondition.replace(/<[^>]*>?/gm, '');
+      // Sanitize condition name from URL params — strips HTML/XSS vectors
+      const sanitizedCondition = sanitizeConditionName(prefilledCondition);
       setDetectedCondition(sanitizedCondition);
       setPreview(prefilledImage);
       setStep('proforma');
@@ -310,13 +311,10 @@ export default function AnalyzeClient() {
 
     setIsAudioLoading(text);
     try {
-      const { audioBase64 } = await textToSpeech({ text });
-      const uploadResult = await uploadFile(null, audioBase64);
-      if (!uploadResult.success || !uploadResult.url) {
-        throw new Error(uploadResult.message || "Audio upload failed.");
-      }
-      setAudioCache(prev => ({ ...prev, [text]: uploadResult.url! }));
-      const audio = new Audio(uploadResult.url);
+      const { audioUrl } = await textToSpeech({ text });
+      
+      setAudioCache(prev => ({ ...prev, [text]: audioUrl }));
+      const audio = new Audio(audioUrl);
       setPlayingAudio({ audio, text });
       audio.play();
       audio.onended = onEnded;

@@ -11,6 +11,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
+import { AIOutputError } from '@/lib/errors';
 
 const GenerateProformaInputSchema = z.object({
   conditionName: z.string().describe('The name of the skin condition to generate questions for.'),
@@ -52,7 +53,10 @@ const generateProformaFlow = ai.defineFlow(
     outputSchema: GenerateProformaOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const { output } = await prompt(input);
+    if (!output) {
+      throw new AIOutputError('Model returned null output', { flow: 'generateProformaFlow' });
+    }
+    return output;
   }
 );

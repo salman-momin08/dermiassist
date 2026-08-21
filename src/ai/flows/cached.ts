@@ -13,10 +13,12 @@ import {
     hashImageDataUri,
     getDetectDiseaseNameCacheKey,
     getFinalEvaluationCacheKey,
-    truncateDataUri,
 } from '@/lib/redis/ai-cache';
 import { detectDiseaseName as originalDetectDiseaseName, type DetectDiseaseNameInput, type DetectDiseaseNameOutput } from '@/ai/flows/detect-disease-name';
 import { finalEvaluation as originalFinalEvaluation, type FinalEvaluationInput, type FinalEvaluationOutput } from '@/ai/flows/final-evaluation';
+import { logger } from '@/lib/logger';
+import { trackCacheHit, trackCacheMiss } from '@/lib/redis/cache';
+import { RateLimitError } from '@/lib/errors';
 
 /**
  * Cached version of detectDiseaseName with rate limiting
@@ -28,27 +30,25 @@ export async function detectDiseaseNameCached(
     input: DetectDiseaseNameInput,
     userId?: string
 ): Promise<DetectDiseaseNameOutput> {
-    // Generate image hash
     const imageHash = hashImageDataUri(input.photoDataUri);
     const cacheKey = getDetectDiseaseNameCacheKey(imageHash);
 
-    console.log(`[AI Cache] Detect Disease - Image hash: ${imageHash.substring(0, 16)}...`);
+    logger.debug('ai_cache.detect_disease.start', { imageHashPrefix: imageHash.substring(0, 16), userId });
 
-    // Try cache first, then call API if needed
     const result = await getCacheOrSet<DetectDiseaseNameOutput>(
         cacheKey,
         async () => {
-            console.log(`[AI Cache] 🔴 CACHE MISS - Calling Gemini API for disease detection`);
-            console.log(`[AI Cache] Image: ${truncateDataUri(input.photoDataUri)}`);
-
+            logger.info('ai_cache.detect_disease.miss', { imageHashPrefix: imageHash.substring(0, 16) });
+            trackCacheMiss();
             const apiResult = await originalDetectDiseaseName(input);
-
-            console.log(`[AI Cache] ✅ Gemini API returned: ${apiResult.conditionName}`);
+            logger.info('ai_cache.detect_disease.api_returned', { conditionName: apiResult.conditionName });
             return apiResult;
         },
         { ttl: CacheTTL.AI_ANALYSIS } // 30 days
     );
 
+    // If result came back immediately (no miss logged), it was a cache hit
+    trackCacheHit();
     return result;
 }
 
@@ -64,7 +64,6 @@ export async function finalEvaluationCached(
     input: FinalEvaluationInput,
     userId?: string
 ): Promise<FinalEvaluationOutput> {
-    // Check rate limit if userId provided
     if (userId) {
         const rateLimitResult = await checkRateLimit({
             limit: RateLimitPresets.AI_ANALYSIS.limit,
@@ -74,34 +73,41 @@ export async function finalEvaluationCached(
         });
 
         if (!rateLimitResult.success) {
-            throw new Error(
+            const minutesUntilReset = Math.ceil((rateLimitResult.reset - Date.now()) / 1000 / 60);
+            throw new RateLimitError(
                 `Rate limit exceeded. You can make ${rateLimitResult.limit} AI analyses per hour. ` +
-                `Please try again in ${Math.ceil((rateLimitResult.reset - Date.now()) / 1000 / 60)} minutes.`
+                `Please try again in ${minutesUntilReset} minutes.`,
+                {
+                    endpoint: 'ai-final-evaluation',
+                    identifier: userId,
+                    retryAfter: rateLimitResult.retryAfter,
+                }
             );
         }
     }
-    // Generate image hash and cache key
+
     const imageHash = hashImageDataUri(input.photoDataUri);
     const cacheKey = getFinalEvaluationCacheKey(imageHash, input.userAnswers);
 
-    console.log(`[AI Cache] Final Evaluation - Image hash: ${imageHash.substring(0, 16)}...`);
+    logger.debug('ai_cache.final_eval.start', { imageHashPrefix: imageHash.substring(0, 16), userId });
 
-    // Try cache first, then call API if needed
     const result = await getCacheOrSet<FinalEvaluationOutput>(
         cacheKey,
         async () => {
-            console.log(`[AI Cache] 🔴 CACHE MISS - Calling Gemini API for final evaluation`);
-            console.log(`[AI Cache] Initial condition: ${input.initialCondition}`);
-            console.log(`[AI Cache] User answers length: ${input.userAnswers.length} chars`);
-
+            logger.info('ai_cache.final_eval.miss', {
+                imageHashPrefix: imageHash.substring(0, 16),
+                initialCondition: input.initialCondition,
+                answersLength: input.userAnswers.length,
+            });
+            trackCacheMiss();
             const apiResult = await originalFinalEvaluation(input);
-
-            console.log(`[AI Cache] ✅ Gemini API returned: ${apiResult.conditionName}`);
+            logger.info('ai_cache.final_eval.api_returned', { conditionName: apiResult.conditionName });
             return apiResult;
         },
         { ttl: CacheTTL.AI_ANALYSIS } // 30 days
     );
 
+    trackCacheHit();
     return result;
 }
 

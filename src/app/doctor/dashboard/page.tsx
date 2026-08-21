@@ -70,7 +70,7 @@ export default function DoctorDashboardPage() {
             if (appointmentsError) {
                 toast({ title: "Error", description: "Could not fetch appointments.", variant: "destructive" });
             } else if (appointmentsData) {
-                const mapped: Appointment[] = appointmentsData.map(item => ({
+                const mapped: Appointment[] = appointmentsData.map((item: any) => ({
                     id: item.id,
                     patientId: item.patient_id,
                     patientName: item.patient_name,

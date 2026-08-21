@@ -110,7 +110,7 @@ export default function DoctorAppointmentsPage() {
                 schema: 'public',
                 table: 'appointments',
                 filter: `doctor_id=eq.${user.id}`
-            }, (payload) => {
+            }, (payload: any) => {
                 fetchAppointments(); // Re-fetch on any change for simplicity
             })
             .subscribe();

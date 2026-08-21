@@ -341,16 +341,10 @@ export default function AnalysisDetailPage() {
                 targetLanguage: language,
             });
 
-            // Upload audio to Cloudinary
-            const uploadResult = await uploadFile(null, result.audioBase64);
-            if (!uploadResult.success || !uploadResult.url) {
-                throw new Error(uploadResult.message || "Audio upload failed.");
-            }
-
             const initialMessage: ExplanationMessage = { sender: 'bot', text: result.explanationText };
             const newExplanation: Explanation = {
                 explanationText: result.explanationText,
-                audioUrl: uploadResult.url,
+                audioUrl: result.audioUrl,
                 chatHistory: [initialMessage]
             };
 
@@ -434,14 +428,10 @@ export default function AnalysisDetailPage() {
 
         setIsAudioLoading(text);
         try {
-            const { audioBase64 } = await textToSpeech({ text });
-            const uploadResult = await uploadFile(null, audioBase64);
-            if (!uploadResult.success || !uploadResult.url) {
-                throw new Error(uploadResult.message || "Audio upload failed.");
-            }
+            const { audioUrl } = await textToSpeech({ text });
 
-            setAudioCache(prev => ({ ...prev, [text]: uploadResult.url! }));
-            const audio = new Audio(uploadResult.url);
+            setAudioCache(prev => ({ ...prev, [text]: audioUrl }));
+            const audio = new Audio(audioUrl);
             setPlayingAudio({ audio, text });
             audio.play();
             audio.onended = () => setPlayingAudio(null);

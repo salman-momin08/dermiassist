@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './use-auth';
 import { createClient } from '@/lib/supabase/client';
 
@@ -39,7 +38,8 @@ export function useAnalyses() {
     const { user } = useAuth();
     const [analyses, setAnalyses] = useState<AnalysisReport[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const supabase = createClient();
+    // Stable reference — prevents a new Supabase client on every render
+    const supabase = useMemo(() => createClient(), []);
 
     useEffect(() => {
         if (!user) {
@@ -62,7 +62,7 @@ export function useAnalyses() {
                 // Ignore silent fetch errors on load
             } else if (data) {
                 // Map snake_case DB to camelCase Interface
-                const mappedAnalyses: AnalysisReport[] = data.map(item => ({
+                const mappedAnalyses: AnalysisReport[] = data.map((item: any) => ({
                     id: item.id,
                     userId: item.user_id,
                     userName: item.user_name,
@@ -89,16 +89,44 @@ export function useAnalyses() {
         fetchAnalyses();
 
         // Supabase Realtime Subscription
+        // Use optimistic updates from the payload to avoid a full refetch on every change.
+        const mapRow = (item: any): AnalysisReport => ({
+            id: item.id,
+            userId: item.user_id,
+            userName: item.user_name,
+            conditionName: item.condition_name,
+            condition: item.condition_description || item.condition_name,
+            date: item.created_at,
+            severity: item.severity,
+            image: item.image,
+            recommendations: item.recommendations,
+            dos: item.dos,
+            donts: item.donts,
+            submittedInfo: {
+                initialCondition: item.submitted_info?.initialCondition,
+                otherConsiderations: item.submitted_info?.otherConsiderations,
+                proformaAnswers: item.submitted_info?.proformaAnswers,
+            },
+            explanations: item.explanations,
+        });
+
         const channel = supabase
-            .channel('analyses-changes')
+            .channel(`analyses-changes-${user.id}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'analyses',
-                filter: `user_id=eq.${user.id}`
-            }, (payload) => {
-                // Simple approach: re-fetch on any change
-                fetchAnalyses();
+                filter: `user_id=eq.${user.id}`,
+            }, (payload: any) => {
+                if (payload.eventType === 'INSERT') {
+                    setAnalyses(prev => [mapRow(payload.new), ...prev]);
+                } else if (payload.eventType === 'DELETE') {
+                    setAnalyses(prev => prev.filter(a => a.id !== payload.old.id));
+                } else if (payload.eventType === 'UPDATE') {
+                    setAnalyses(prev =>
+                        prev.map(a => a.id === payload.new.id ? mapRow(payload.new) : a)
+                    );
+                }
             })
             .subscribe();
 
@@ -200,9 +228,5 @@ export function useAnalyses() {
         await supabase.from('analyses').delete().eq('id', id);
     }, [supabase]);
 
-    const forceAnalysisReload = useCallback(async (analysisId: string) => {
-        // Handled by realtime subscription usually, but logic remains same if manual
-    }, []);
-
-    return { analyses, addAnalysis, getAnalysisById, updateAnalysis, deleteAnalysis, isLoading, forceAnalysisReload };
+    return { analyses, addAnalysis, getAnalysisById, updateAnalysis, deleteAnalysis, isLoading };
 }

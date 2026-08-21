@@ -24,7 +24,7 @@ export type ExplainReportMultimodalInput = z.infer<typeof ExplainReportMultimoda
 
 const ExplainReportMultimodalOutputSchema = z.object({
   explanationText: z.string().describe('The simplified explanation of the report in the target language.'),
-  audioBase64: z.string().describe("The text-to-speech audio of the explanation, as a base64 encoded string."),
+  audioUrl: z.string().describe("The secure URL to the text-to-speech audio of the explanation."),
 });
 export type ExplainReportMultimodalOutput = z.infer<typeof ExplainReportMultimodalOutputSchema>;
 
@@ -120,10 +120,18 @@ const explainReportMultimodalFlow = ai.defineFlow(
     );
 
     const wavBase64 = await toWav(audioBuffer);
+    
+    // Import uploadFile here to avoid circular dependencies if any
+    const { uploadFile } = await import('@/lib/actions');
+    const uploadResult = await uploadFile(null, wavBase64, { folder: 'explanations' });
+    
+    if (!uploadResult.success || !uploadResult.url) {
+      throw new Error(uploadResult.message || "Audio upload failed on server.");
+    }
 
     return {
       explanationText: explanationText,
-      audioBase64: wavBase64,
+      audioUrl: uploadResult.url,
     };
   }
 );

@@ -11,6 +11,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { AIOutputError } from '@/lib/errors';
 
 const GenerateChatSummaryInputSchema = z.object({
   reportConditionName: z.string().describe('The name of the diagnosed skin condition from the report.'),
@@ -59,6 +60,9 @@ const generateChatSummaryFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await prompt(input);
-    return output!;
+    if (!output) {
+      throw new AIOutputError('Model returned null output', { flow: 'generateChatSummaryFlow' });
+    }
+    return output;
   }
 );

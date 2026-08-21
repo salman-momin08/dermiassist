@@ -64,10 +64,3 @@ export const CacheTTL = {
     RATE_LIMIT_WINDOW: 60,    // 1 minute
 } as const;
 
-/**
- * Generate a cache key pattern for bulk operations
- * @param pattern - Pattern with wildcards (e.g., "user:*:profile")
- */
-export function getCachePattern(pattern: string): string {
-    return pattern;
-}

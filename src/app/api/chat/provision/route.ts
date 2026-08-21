@@ -27,17 +27,20 @@ export async function POST(request: NextRequest) {
 
         const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY!;
         const apiSecret = process.env.STREAM_API_SECRET!;
-        const serverClient = StreamChat.getInstance(apiKey, apiSecret);
+        const serverClient = StreamChat.getInstance(apiKey, apiSecret, {
+            timeout: 15000,
+        });
 
         // Create a deterministic, non-guessable channel ID
         const sortedIds = [user.id, patientId].sort();
         const hash = crypto.createHash('sha256')
             .update(`${process.env.CHAT_SECRET_SALT || 'dermiassist_salt'}:${sortedIds[0]}:${sortedIds[1]}`)
             .digest('hex');
-        const channelId = `consult_${hash}`;
+        // Stream Chat max 64 chars: "consult_" (8) + 48 hex = 56 total
+        const channelId = `consult_${hash.substring(0, 48)}`;
 
         // Provision the secure consultation channel
-        const channel = serverClient.channel('consultation', channelId, {
+        const channel = serverClient.channel('messaging', channelId, {
             created_by_id: user.id,
             members: [user.id, patientId],
         });

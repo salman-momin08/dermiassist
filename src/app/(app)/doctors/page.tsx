@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, ShieldCheck, Star, Loader2, CalendarIcon, Upload, User, Info, MessageSquare, UserPlus, Clock } from "lucide-react";
+import { MapPin, ShieldCheck, Star, Loader2, CalendarIcon, Upload, User, Info, MessageSquare, UserPlus, Clock, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -14,6 +14,7 @@ import { useAnalyses, type AnalysisReport } from '@/hooks/use-analyses';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
+import { useDebounce } from '@/hooks/use-debounce';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -106,6 +107,8 @@ export default function DoctorsPage() {
     const [isError, setIsError] = useState(false);
     const [connectionRequests, setConnectionRequests] = useState<any[]>([]);
     const [isConnectingMap, setIsConnectingMap] = useState<Record<string, boolean>>({});
+    const [searchQuery, setSearchQuery] = useState("");
+    const debouncedSearch = useDebounce(searchQuery, 500);
     const router = useRouter();
 
     // State for the appointment request form
@@ -125,7 +128,7 @@ export default function DoctorsPage() {
             try {
                 // Fetch Doctors using cache
                 const { getCachedDoctorList } = await import('@/lib/redis/doctor-cache');
-                const data = await getCachedDoctorList({ verified: true });
+                const data = await getCachedDoctorList({ verified: true, search: debouncedSearch || undefined });
 
                 if (data && data.length > 0) {
                     const fetchedDoctors: Doctor[] = data.map(item => ({
@@ -184,7 +187,7 @@ export default function DoctorsPage() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [supabase, toast, user]);
+    }, [supabase, toast, user, debouncedSearch]);
 
     const handleFormChange = (field: keyof AppointmentFormState, value: any) => {
         setFormState(prev => ({ ...prev, [field]: value }));
@@ -355,10 +358,20 @@ export default function DoctorsPage() {
                 <h1 className="text-3xl font-bold tracking-tight font-headline">
                     Find a Certified Doctor
                 </h1>
-                <p className="text-muted-foreground max-w-2xl">
+                <p className="text-muted-foreground max-w-2xl mb-4">
                     Browse our network of professional dermatologists and book an appointment.
                     Connect to start a direct chat.
                 </p>
+                
+                <div className="relative w-full max-w-md mt-4">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        placeholder="Search by name or specialty..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 w-full"
+                    />
+                </div>
             </div>
 
             {isLoadingDoctors ? (

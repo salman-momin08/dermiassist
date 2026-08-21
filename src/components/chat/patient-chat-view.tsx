@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +12,7 @@ import 'stream-chat-react/dist/css/v2/index.css';
 import { CustomMessage } from '@/components/chat/custom-message';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
 
@@ -39,7 +40,11 @@ const ChatEventListeners = () => {
         };
     }, [client, handleEvent]);
 
-    return <MessageList Message={(props) => <CustomMessage {...props} deletedMessages={deletedMessages} />} />;
+    const MessageComponent = useCallback((props: any) => (
+        <CustomMessage {...props} deletedMessages={deletedMessages} />
+    ), [deletedMessages]);
+
+    return <MessageList Message={MessageComponent} />;
 };
 
 const ChatSkeleton = () => (
@@ -139,88 +144,61 @@ const CustomChannelHeader = () => {
     );
 };
 
+import { getStreamClient, connectStreamUser } from '@/lib/stream';
+
+// ... (skipping some lines) ...
+
 export default function PatientChatView() {
     const { user, userData, loading: authLoading } = useAuth();
     const { theme } = useTheme();
     const [chatClient, setChatClient] = useState<StreamChat | null>(null);
     const [isConnecting, setIsConnecting] = useState(true);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
 
     useEffect(() => {
         if (authLoading || !user || !userData) {
             return;
         }
 
-        if (!apiKey) {
-            setError("Chat service is not configured. Please contact support.");
-            setIsConnecting(false);
-            return;
-        }
-
-        const client = StreamChat.getInstance(apiKey);
-
         const setupClient = async () => {
+            setIsConnecting(true);
+            setError(null);
             try {
-                // If already connected to the correct user, skip re-connection
-                if (client.userID === user.id) {
-                    setChatClient(client);
-                    setIsConnecting(false);
-                    return;
-                }
-
-                // Ensure any previous connection is closed if it was a different user
-                if (client.userID) {
-                    await client.disconnectUser();
-                }
-
-                const response = await fetch('/api/stream-token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user.id }),
+                // First, ensure all channels are synced with the database
+                setIsSyncing(true);
+                await fetch('/api/chat/sync', { method: 'POST' }).catch(err => {
+                    console.error("Failed to sync chat channels:", err);
                 });
+                setIsSyncing(false);
 
-                if (!response.ok) {
-                    const { message } = await response.json();
-                    throw new Error(message || "Failed to get chat token.");
-                }
-
-                const { token } = await response.json();
-
-                await client.connectUser(
-                    {
-                        id: user.id,
-                        name: userData.displayName || 'Anonymous User',
-                        image: userData.photoURL,
-                        role: 'patient',
-                    },
-                    token
-                );
+                const client = await connectStreamUser({
+                    id: user.id,
+                    name: userData.displayName || 'Anonymous User',
+                    image: userData.photoURL,
+                    role: 'patient',
+                });
 
                 setChatClient(client);
             } catch (err: any) {
+                console.error("Chat setup failed:", err);
                 setError(err.message || "An error occurred while connecting to the chat service.");
             } finally {
                 setIsConnecting(false);
+                setIsSyncing(false);
             }
         };
 
         setupClient();
+    }, [user, userData, authLoading, retryCount]);
 
-        return () => {
-            if (client) {
-                client.disconnectUser();
-                setChatClient(null);
-            }
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, userData, authLoading]);
+    const filters = useMemo(() => ({ type: 'messaging', members: { $in: [user?.id || ''] } }), [user?.id]);
+    const sort = useMemo(() => ({ last_message_at: -1 as const }), []);
 
     if (authLoading || !user || isConnecting) {
         return <ChatSkeleton />;
     }
-
-    const filters = { type: 'consultation', members: { $in: [user.id] } };
-    const sort = { last_message_at: -1 as const };
 
     return (
         <div className="container mx-auto p-4 md:p-8 h-[calc(100vh-128px)] flex flex-col relative">
@@ -229,10 +207,17 @@ export default function PatientChatView() {
                 <p className="text-muted-foreground">Communicate directly and securely with your healthcare providers.</p>
             </div>
 
-            {!isConnecting && error && (
-                <div className="flex flex-grow items-center justify-center text-center p-4">
-                    <p className="text-destructive font-semibold">Chat Unavailable</p>
-                    <p className="text-muted-foreground">{error}</p>
+            {error && (
+                <div className="flex flex-col flex-grow items-center justify-center text-center p-4">
+                    <div className="rounded-full bg-destructive/10 p-4 mb-4">
+                        <MessageSquare className="h-8 w-8 text-destructive" />
+                    </div>
+                    <p className="text-xl font-semibold">Chat Unavailable</p>
+                    <p className="text-muted-foreground mt-2 mb-6 max-w-sm">{error}</p>
+                    <Button onClick={() => setRetryCount(prev => prev + 1)} variant="outline" className="flex gap-2">
+                        <Loader2 className={cn("h-4 w-4", isConnecting && "animate-spin")} />
+                        Try Again
+                    </Button>
                 </div>
             )}
 

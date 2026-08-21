@@ -22,16 +22,16 @@ export function AppHeader() {
 
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", roles: ["patient"] },
-    { href: "/my-analyses", label: "My Analyses", roles: ["patient"] },
+    { href: "/my-analyses", label: "Analyses", roles: ["patient"] },
     { href: "/appointments", label: "Appointments", roles: ["patient"] },
-    { href: "/doctors", label: "Find a Doctor", roles: ["patient"] },
-    { href: "/chat", label: "My Doctor", roles: ["patient"] },
-    { href: "/my-requests", label: "My Requests", roles: ["patient", "doctor"] },
+    { href: "/doctors", label: "Doctors", roles: ["patient"] },
+    { href: "/chat", label: "Chat", roles: ["patient"] },
+    { href: "/my-requests", label: "Requests", roles: ["patient", "doctor"] },
     { href: "/contact", label: "Contact", roles: ["patient", "doctor"] },
     { href: "/doctor/dashboard", label: "Dashboard", roles: ["doctor"] },
     { href: "/doctor/appointments", label: "Appointments", roles: ["doctor"] },
     { href: "/doctor/cases", label: "Patient Cases", roles: ["doctor"] },
-    { href: "/chat", label: "My Patients", roles: ["doctor"] },
+    { href: "/chat", label: "Patients", roles: ["doctor"] },
     { href: "/admin/dashboard", label: "Dashboard", roles: ["admin"] },
     { href: "/admin/requests", label: "Requests", roles: ["admin"] },
   ];

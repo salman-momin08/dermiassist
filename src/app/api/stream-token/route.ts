@@ -37,7 +37,9 @@ export const POST = RateLimitMiddleware.strict(async (request: NextRequest) => {
     }
 
     // Initialize server client
-    const serverClient = StreamChat.getInstance(apiKey, apiSecret);
+    const serverClient = StreamChat.getInstance(apiKey, apiSecret, {
+        timeout: 15000,
+    });
 
     // Lock the user metadata server-side so clients cannot impersonate names or roles
     await serverClient.upsertUser({

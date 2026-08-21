@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "set NODE_OPTIONS=--no-deprecation && next dev --turbopack -p 9002",
+    "dev": "set NODE_OPTIONS=--no-deprecation && next dev -p 9002",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",
@@ -12,9 +12,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@genkit-ai/core": "^1.29.0",
-    "@genkit-ai/google-genai": "^1.29.0",
-    "@genkit-ai/next": "^1.29.0",
+    "@genkit-ai/core": "^1.30.1",
+    "@genkit-ai/google-genai": "^1.30.1",
+    "@genkit-ai/next": "^1.30.1",
     "@hookform/resolvers": "^5.2.2",
     "@novu/nextjs": "^3.14.0",
     "@novu/node": "^2.6.6",
@@ -53,7 +53,7 @@
     "dotenv": "^17.3.1",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.34.3",
-    "genkit": "^1.29.0",
+    "genkit": "^1.30.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.0",
     "lucide-react": "^0.575.0",
@@ -80,7 +80,7 @@
     "@types/react-dom": "^19",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.5.12",
-    "genkit-cli": "^1.29.0",
+    "genkit-cli": "^0.0.2",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19",
     "typescript": "^5"

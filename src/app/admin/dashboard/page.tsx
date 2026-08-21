@@ -96,7 +96,7 @@ export default function AdminDashboardPage() {
                     variant: "destructive"
                 });
             } else {
-                const formattedUsers = (usersData || []).map(item => ({
+                const formattedUsers = (usersData || []).map((item: any) => ({
                     ...item,
                     name: item.display_name || 'Unknown',
                     joined: item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A',

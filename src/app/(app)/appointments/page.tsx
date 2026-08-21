@@ -70,7 +70,7 @@ export default function AppointmentsPage() {
                 console.error("Error fetching appointments:", error);
                 toast({ title: "Error", description: "Could not fetch appointments.", variant: "destructive" });
             } else if (data) {
-                const mapped: Appointment[] = data.map(item => ({
+                const mapped: Appointment[] = data.map((item: any) => ({
                     id: item.id,
                     doctorName: item.doctor_name || 'Unknown Doctor',
                     appointmentDate: item.appointment_date,

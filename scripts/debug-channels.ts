@@ -1,0 +1,42 @@
+import { StreamChat } from 'stream-chat';
+import * as dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
+const apiSecret = process.env.STREAM_API_SECRET;
+
+async function run() {
+    if (!apiKey || !apiSecret) {
+        console.error('Missing keys');
+        process.exit(1);
+    }
+    const client = StreamChat.getInstance(apiKey, apiSecret, { timeout: 15000 });
+    
+    // Fetch all channels
+    try {
+        const channels = await client.queryChannels(
+            { type: { $in: ['messaging', 'consultation'] } }, 
+            {}, 
+            { limit: 50 }
+        );
+        
+        console.log(`Found ${channels.length} channels`);
+        
+        const out = channels.map(c => ({
+            cid: c.cid,
+            type: c.type,
+            id: c.id,
+            members: Object.keys(c.state.members),
+            messageCount: c.state.messages.length
+        }));
+        require('fs').writeFileSync('channels.json', JSON.stringify(out, null, 2));
+        console.log('Saved to channels.json');
+    } catch (e: any) {
+        console.error("Stream API Error:", e.message || e);
+    }
+    process.exit(0);
+}
+
+run();

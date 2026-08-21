@@ -11,6 +11,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
+import { AIOutputError } from '@/lib/errors';
 
 const ProformaChatInputSchema = z.object({
   conditionName: z.string().describe('The name of the detected skin condition.'),
@@ -57,7 +58,10 @@ const proformaChatFlow = ai.defineFlow(
     outputSchema: ProformaChatOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const { output } = await prompt(input);
+    if (!output) {
+      throw new AIOutputError('Model returned null output', { flow: 'proformaChatFlow' });
+    }
+    return output;
   }
 );

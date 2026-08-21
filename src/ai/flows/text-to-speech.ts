@@ -20,10 +20,10 @@ const TextToSpeechInputSchema = z.object({
 export type TextToSpeechInput = z.infer<typeof TextToSpeechInputSchema>;
 
 const TextToSpeechOutputSchema = z.object({
-  audioBase64: z
+  audioUrl: z
     .string()
     .describe(
-      "The text-to-speech audio of the text, as a base64 encoded string."
+      "The secure URL to the text-to-speech audio of the text."
     ),
 });
 export type TextToSpeechOutput = z.infer<typeof TextToSpeechOutputSchema>;
@@ -92,9 +92,16 @@ const textToSpeechFlow = ai.defineFlow(
     );
 
     const wavBase64 = await toWav(audioBuffer);
+    
+    const { uploadFile } = await import('@/lib/actions');
+    const uploadResult = await uploadFile(null, wavBase64, { folder: 'tts' });
+    
+    if (!uploadResult.success || !uploadResult.url) {
+      throw new Error(uploadResult.message || "Failed to upload TTS audio.");
+    }
 
     return {
-      audioBase64: wavBase64,
+      audioUrl: uploadResult.url,
     };
   }
 );

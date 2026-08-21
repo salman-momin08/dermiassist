@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
+import { AIOutputError } from '@/lib/errors';
 
 const GenerateCaseFileSummaryInputSchema = z.object({
   patientName: z.string().describe("The patient's full name."),
@@ -73,7 +74,10 @@ const generateCaseFileSummaryFlow = ai.defineFlow(
     outputSchema: GenerateCaseFileSummaryOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const { output } = await prompt(input);
+    if (!output) {
+      throw new AIOutputError('Model returned null output', { flow: 'generateCaseFileSummaryFlow' });
+    }
+    return output;
   }
 );

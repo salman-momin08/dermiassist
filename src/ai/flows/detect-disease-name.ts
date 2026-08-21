@@ -1,5 +1,5 @@
-
 'use server';
+
 
 /**
  * @fileOverview An AI flow to detect only the name of a skin condition from an image.
@@ -9,8 +9,9 @@
  * - DetectDiseaseNameOutput - The return type for the detectDiseaseName function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'zod';
+import { ai } from '@/ai/genkit';
+import { z } from 'zod';
+import { AIOutputError } from '@/lib/errors';
 
 const DetectDiseaseNameInputSchema = z.object({
   photoDataUri: z
@@ -50,8 +51,11 @@ const detectDiseaseNameFlow = ai.defineFlow(
     inputSchema: DetectDiseaseNameInputSchema,
     outputSchema: DetectDiseaseNameOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input) => {
+    const { output } = await prompt(input);
+    if (!output) {
+      throw new AIOutputError('Model returned null output', { flow: 'detectDiseaseNameFlow' });
+    }
+    return output;
   }
 );
