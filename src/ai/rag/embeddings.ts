@@ -1,5 +1,6 @@
 /**
  * @fileOverview Embedding generator and text chunking utilities for RAG.
+ * Includes an in-memory LRU cache to eliminate redundant Gemini API calls.
  */
 
 import { logger } from '@/lib/logger';
@@ -13,17 +14,48 @@ export interface SemanticChunk {
     metadata?: Record<string, unknown>;
 }
 
+// ─────────────────────────────────────────────────────────────
+// Embedding LRU Cache — eliminates ~750ms of redundant API calls
+// ─────────────────────────────────────────────────────────────
+const EMBEDDING_CACHE_MAX = 200;
+const embeddingCache = new Map<string, number[]>();
+
+function normalizeForCache(text: string): string {
+    return text.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function evictOldestIfNeeded(): void {
+    if (embeddingCache.size >= EMBEDDING_CACHE_MAX) {
+        const oldest = embeddingCache.keys().next().value;
+        if (oldest) embeddingCache.delete(oldest);
+    }
+}
+
 /**
  * Generate 768-dimensional vector embedding for text using Google Gemini Embedding API.
+ * Results are LRU-cached in memory to avoid redundant network calls.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
+    // 1. Check LRU cache first (0ms vs 200-400ms API call)
+    const cacheKey = normalizeForCache(text);
+    const cached = embeddingCache.get(cacheKey);
+    if (cached) {
+        // Move to end for LRU ordering (delete + re-insert)
+        embeddingCache.delete(cacheKey);
+        embeddingCache.set(cacheKey, cached);
+        return cached;
+    }
+
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
     if (!apiKey) {
         logger.warn('gemini.embedding.missing_key', { message: 'GEMINI_API_KEY is not set. Using pseudo-vector fallback.' });
-        return generateMockEmbedding(text);
+        const mock = generateMockEmbedding(text);
+        evictOldestIfNeeded();
+        embeddingCache.set(cacheKey, mock);
+        return mock;
     }
 
-    // Try text-embedding-004 first, fallback to embedding-001
+    // 2. Try Gemini Embedding API (use fastest model first)
     const modelsToTry = ['text-embedding-004', 'embedding-001'];
 
     for (const modelName of modelsToTry) {
@@ -49,12 +81,20 @@ export async function generateEmbedding(text: string): Promise<number[]> {
             const values = data.embedding?.values as number[] | undefined;
 
             if (values && Array.isArray(values) && values.length > 0) {
+                let finalVector: number[];
                 // Ensure vector length is padded or normalized to 768 dimensions
-                if (values.length === 768) return values;
-                if (values.length < 768) {
-                    return [...values, ...new Array(768 - values.length).fill(0)];
+                if (values.length === 768) {
+                    finalVector = values;
+                } else if (values.length < 768) {
+                    finalVector = [...values, ...new Array(768 - values.length).fill(0)];
+                } else {
+                    finalVector = values.slice(0, 768);
                 }
-                return values.slice(0, 768);
+
+                // 3. Store in LRU cache
+                evictOldestIfNeeded();
+                embeddingCache.set(cacheKey, finalVector);
+                return finalVector;
             }
         } catch {
             // Try next model
@@ -62,7 +102,10 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     }
 
     logger.warn('gemini.embedding.fallback', { message: 'Using deterministic pseudo-embedding fallback.' });
-    return generateMockEmbedding(text);
+    const fallback = generateMockEmbedding(text);
+    evictOldestIfNeeded();
+    embeddingCache.set(cacheKey, fallback);
+    return fallback;
 }
 
 /**

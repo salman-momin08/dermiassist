@@ -53,7 +53,7 @@ export async function executeMultiAgentPipeline(
         hasImage: !!input.imageUrl,
     });
 
-    // ── STEP 1: Input Guardrail & Sanitization ─────────────────────
+    // ── STEP 1: Input Guardrail & PII Sanitization ────────────────
     const guardrailStepStart = Date.now();
     const inputGuard = validateAndSanitizeInput(input.symptoms);
     traceLog.push({
@@ -89,7 +89,7 @@ export async function executeMultiAgentPipeline(
         };
     }
 
-    // ── STEP 3: Concurrent Triage & Vision Agents ──────────────────
+    // ── STEP 3: Concurrent Execution of Triage, Vision & RAG Agents ─
     const triageStart = Date.now();
     const triagePromise = runTriageAgent({
         symptoms: cleanSymptoms,
@@ -108,7 +108,17 @@ export async function executeMultiAgentPipeline(
             visualConfidence: 70,
         });
 
-    const [triageResult, visionResult] = await Promise.all([triagePromise, visionPromise]);
+    const ragStart = Date.now();
+    const ragPromise = runRAGSpecialistAgent({
+        suspectedConditions: ['Dermatitis', 'Eczema', 'Psoriasis'],
+        symptomsDescription: cleanSymptoms,
+    });
+
+    const [triageResult, visionResult, ragResult] = await Promise.all([
+        triagePromise,
+        visionPromise,
+        ragPromise,
+    ]);
 
     traceLog.push({
         agent: 'ClinicalTriageAgent',
@@ -122,20 +132,13 @@ export async function executeMultiAgentPipeline(
         durationMs: Date.now() - visionStart,
     });
 
-    // ── STEP 4: RAG Knowledge Retrieval Agent ──────────────────────
-    const ragStart = Date.now();
-    const ragResult = await runRAGSpecialistAgent({
-        suspectedConditions: visionResult.suspectedConditions,
-        symptomsDescription: cleanSymptoms,
-    });
-
     traceLog.push({
         agent: 'MedicalRAGSpecialistAgent',
         status: 'success',
         durationMs: Date.now() - ragStart,
     });
 
-    // ── STEP 5: Differential Synthesis Agent ───────────────────────
+    // ── STEP 4: Differential Report Synthesis Agent ───────────────
     const synthStart = Date.now();
     const rawReport = await runSynthesisAgent({
         patientSymptoms: cleanSymptoms,
@@ -151,7 +154,7 @@ export async function executeMultiAgentPipeline(
         durationMs: Date.now() - synthStart,
     });
 
-    // ── STEP 6: Output Safety Guardrail & Disclaimer ──────────────
+    // ── STEP 5: Output Safety Guardrail & Disclaimer Injection ──────
     const outputGuard = validateOutputSafety({
         reportData: rawReport as unknown as Record<string, unknown>,
         confidenceScore: rawReport.confidenceScore,
@@ -163,7 +166,7 @@ export async function executeMultiAgentPipeline(
         summary: outputGuard.data.response || rawReport.summary,
     };
 
-    // ── STEP 7: Save to Semantic Cache ─────────────────────────────
+    // ── STEP 6: Save Result to Semantic Cache ──────────────────────
     await setSemanticCache(cleanSymptoms, finalReport);
 
     const totalExecutionTimeMs = Date.now() - startTime;

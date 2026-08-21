@@ -1,7 +1,9 @@
 /**
  * @fileOverview Multimodal Vision Lesion Agent.
- * Analyzes skin lesion photos using Gemini 1.5/2.5 Vision models,
+ * Analyzes skin lesion photos using Gemini 2.5 Vision model,
  * extracting clinical morphological characteristics (ABCDE criteria, lesion type, skin tone).
+ *
+ * Performance: maxOutputTokens=512, temperature=0.2 for fast, deterministic visual analysis.
  */
 
 import { ai } from '@/ai/genkit';
@@ -16,7 +18,7 @@ export type VisionInput = z.infer<typeof VisionInputSchema>;
 
 export const VisionOutputSchema = z.object({
     lesionType: z.string().describe('Primary morphological classification (e.g. Macule, Papule, Plaque, Vesicle, Nodule).'),
-    colorProfile: z.array(z.string()).describe('Dominant colors observed (e.g., erythematous red, hyperpigmented brown, central clearing).'),
+    colorProfile: z.array(z.string()).describe('Dominant colors observed.'),
     borderCharacteristics: z.enum(['well-demarcated', 'irregular', 'scaly-border', 'diffuse']).describe('Border clarity.'),
     suspectedConditions: z.array(z.string()).describe('Top visual differential possibilities.'),
     visualConfidence: z.number().min(0).max(100).describe('Visual feature detection confidence score.'),
@@ -27,12 +29,15 @@ const visionPrompt = ai.definePrompt({
     name: 'multimodalVisionPrompt',
     input: { schema: VisionInputSchema },
     output: { schema: VisionOutputSchema },
-    prompt: `You are an Expert Dermatopathologist & Clinical Imaging Specialist.
-Analyze the provided skin lesion image and extract precise dermatological descriptors:
-1. Primary Lesion Type (Macule, Papule, Plaque, Vesicle, Pustule, Nodule, Scale).
-2. Color Profile (Erythematous, Hyperpigmented, Violaceous, Hypopigmented).
-3. Border Clarity (Well-demarcated vs Irregular vs Diffuse).
-4. Top Visual Differential Possibilities (e.g., Acne, Eczema, Psoriasis, Tinea, Seborrheic Keratosis).
+    config: {
+        maxOutputTokens: 512,
+        temperature: 0.2,
+    },
+    prompt: `You are a Dermatopathologist. Analyze the skin lesion image and extract:
+1. Lesion Type (Macule, Papule, Plaque, Vesicle, Pustule, Nodule, Scale)
+2. Color Profile (Erythematous, Hyperpigmented, Violaceous, Hypopigmented)
+3. Border Clarity (Well-demarcated, Irregular, Diffuse)
+4. Top Differential Possibilities
 
 Body Location: {{#if bodyLocation}}{{{bodyLocation}}}{{else}}Unspecified{{/if}}
 Image URL: {{{imageUrl}}}

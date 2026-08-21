@@ -34,6 +34,7 @@ export function AppHeader() {
     { href: "/chat", label: "Patients", roles: ["doctor"] },
     { href: "/admin/dashboard", label: "Dashboard", roles: ["admin"] },
     { href: "/admin/requests", label: "Requests", roles: ["admin"] },
+    { href: "/admin/ai-engineering", label: "AI Control Center", roles: ["admin"] },
   ];
 
   const getFilteredLinks = (userRole: typeof role) => {

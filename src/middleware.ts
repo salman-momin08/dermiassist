@@ -48,6 +48,14 @@ const RATE_LIMIT_EXCLUDED_API_PATHS = new Set<string>([
     // Add any internal health / readiness check routes here
 ]);
 
+/**
+ * API path prefixes excluded from rate limiting.
+ * Auth callbacks and internal health routes don't need rate limiting.
+ */
+const RATE_LIMIT_EXCLUDED_PREFIXES = [
+    '/api/auth',
+];
+
 function isProtectedRoute(pathname: string): boolean {
     return PROTECTED_PREFIXES.some(prefix => pathname.startsWith(prefix));
 }
@@ -104,7 +112,11 @@ export async function middleware(request: NextRequest) {
     }
 
     // ── 3. API rate limiting ─────────────────────────────────
-    if (pathname.startsWith('/api/') && !RATE_LIMIT_EXCLUDED_API_PATHS.has(pathname)) {
+    if (
+        pathname.startsWith('/api/') &&
+        !RATE_LIMIT_EXCLUDED_API_PATHS.has(pathname) &&
+        !RATE_LIMIT_EXCLUDED_PREFIXES.some(prefix => pathname.startsWith(prefix))
+    ) {
         // Prefer authenticated user ID for per-user fairness;
         // fall back to IP for unauthenticated API calls.
         const forwardedFor = request.headers.get('x-forwarded-for');

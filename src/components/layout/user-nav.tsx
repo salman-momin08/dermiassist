@@ -70,6 +70,13 @@ export function UserNav({ name, email, role }: UserNavProps) {
               <span>Profile</span>
             </Link>
           </DropdownMenuItem>
+          {role === 'admin' && (
+            <DropdownMenuItem asChild>
+              <Link href="/admin/ai-engineering">
+                <span>⚡ AI Control Center</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut}>

@@ -2,6 +2,8 @@
  * @fileOverview Differential Synthesis Agent.
  * Combines findings from Triage, Vision, and RAG Specialist agents
  * into a structured, comprehensive dermatological analysis report.
+ *
+ * Performance: maxOutputTokens=1024, temperature=0.3 for fast, deterministic completions.
  */
 
 import { ai } from '@/ai/genkit';
@@ -48,19 +50,20 @@ const synthesisPrompt = ai.definePrompt({
     name: 'differentialSynthesisPrompt',
     input: { schema: SynthesisInputSchema },
     output: { schema: FinalReportSchema },
-    prompt: `You are an Expert Medical Synthesizer & Senior Dermatologist.
-Your task is to compile findings from our specialized diagnostic sub-agents (Triage, Vision Analysis, and RAG Knowledge Retrieval) into a final structured medical assessment report.
+    config: {
+        maxOutputTokens: 1024,
+        temperature: 0.3,
+    },
+    prompt: `You are an Expert Dermatologist. Compile findings into a structured medical report.
 
-Inputs:
-Patient Symptoms: {{{patientSymptoms}}}
-Triage Assessment: Risk Level = {{{triage.riskLevel}}}, Summary = {{{triage.clinicalRecommendation}}}
-Vision Findings: Lesion = {{{vision.lesionType}}}, Suspected = {{{vision.suspectedConditions}}}
+Patient: {{{patientSymptoms}}}
+Triage: {{{triage.riskLevel}}} — {{{triage.clinicalRecommendation}}}
+Vision: {{{vision.lesionType}}}, Suspected: {{{vision.suspectedConditions}}}
 
-GROUNDED CLINICAL GUIDELINES (Use these exact references for recommendations & citations):
+CLINICAL REFERENCES:
 {{{ragGroundingText}}}
 
-Generate a structured report adhering strictly to the required JSON schema. Include citations from the grounded text.
-`,
+Output JSON matching the schema. Include citations from the references above.`,
 });
 
 export async function runSynthesisAgent(input: z.infer<typeof SynthesisInputSchema>): Promise<FinalReport> {

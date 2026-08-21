@@ -1,7 +1,12 @@
 /**
  * @fileOverview Semantic Cache Layer.
- * Provides vector-similarity & normalized hash caching using Upstash Redis / In-Memory store
+ * Provides vector-similarity & normalized hash caching using In-Memory store
  * to return sub-50ms cached AI responses for recurring diagnostic queries.
+ *
+ * Optimizations:
+ *  - Exact match returns instantly without generating an embedding vector
+ *  - TTL-based expiry (30 min) prevents stale results
+ *  - LRU eviction when cache exceeds max entries
  */
 
 import { generateEmbedding } from '@/ai/rag/embeddings';
@@ -15,6 +20,8 @@ interface CacheEntry<T> {
 
 const IN_MEMORY_CACHE = new Map<string, CacheEntry<unknown>>();
 const SIMILARITY_THRESHOLD = 0.92;
+const CACHE_MAX_ENTRIES = 100;
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 /**
  * Compute cosine similarity between two vector arrays.
@@ -34,21 +41,47 @@ function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 /**
+ * Evict expired entries from the cache.
+ */
+function evictExpired(): void {
+    const now = Date.now();
+    for (const [key, entry] of IN_MEMORY_CACHE.entries()) {
+        if (now - entry.createdAt > CACHE_TTL_MS) {
+            IN_MEMORY_CACHE.delete(key);
+        }
+    }
+}
+
+/**
  * Retrieve cached output if a semantically similar query exists.
+ * Fast path: exact normalized string match returns instantly without embedding generation.
  */
 export async function getSemanticCache<T>(query: string): Promise<T | null> {
     const normalizedQuery = query.trim().toLowerCase();
-    
-    // Quick exact string match check
-    if (IN_MEMORY_CACHE.has(normalizedQuery)) {
-        const entry = IN_MEMORY_CACHE.get(normalizedQuery)!;
-        logger.info('ai.cache.hit.exact', { queryLength: query.length });
-        return entry.data as T;
+
+    // Fast path: exact string match — NO embedding API call needed (0ms)
+    const exactEntry = IN_MEMORY_CACHE.get(normalizedQuery);
+    if (exactEntry) {
+        // Check TTL
+        if (Date.now() - exactEntry.createdAt > CACHE_TTL_MS) {
+            IN_MEMORY_CACHE.delete(normalizedQuery);
+        } else {
+            logger.info('ai.cache.hit.exact', { queryLength: query.length });
+            return exactEntry.data as T;
+        }
     }
 
-    // Semantic Vector Similarity Match check
+    // Slow path: Semantic Vector Similarity Match (requires embedding)
+    // Only run if cache has entries to compare against
+    if (IN_MEMORY_CACHE.size === 0) {
+        logger.info('ai.cache.miss');
+        return null;
+    }
+
     try {
+        evictExpired();
         const queryEmbedding = await generateEmbedding(query);
+
         for (const [cachedKey, entry] of IN_MEMORY_CACHE.entries()) {
             const similarity = cosineSimilarity(queryEmbedding, entry.embedding);
             if (similarity >= SIMILARITY_THRESHOLD) {
@@ -81,8 +114,8 @@ export async function setSemanticCache<T>(query: string, data: T): Promise<void>
             createdAt: Date.now(),
         });
 
-        // Limit cache size to 100 entries
-        if (IN_MEMORY_CACHE.size > 100) {
+        // LRU eviction: remove oldest entry if over limit
+        if (IN_MEMORY_CACHE.size > CACHE_MAX_ENTRIES) {
             const firstKey = IN_MEMORY_CACHE.keys().next().value;
             if (firstKey) IN_MEMORY_CACHE.delete(firstKey);
         }
