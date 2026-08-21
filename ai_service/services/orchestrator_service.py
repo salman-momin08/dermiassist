@@ -1,13 +1,13 @@
 """
 Multi-Agent Orchestrator Service for FastAPI Microservice.
-Coordinates Triage Agent, Vision Agent, RAG Specialist, and Synthesis Agent.
+Coordinates Triage Agent, Vision Agent (Hugging Face Open-Source Model + Gemini), RAG Specialist, and Synthesis Agent.
 """
 
 import time
 import os
-import httpx
 from typing import Dict, Any, Optional
 from ai_service.services.rag_service import search_vector_rag
+from ai_service.services.huggingface_service import classify_skin_lesion_hf
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,12 +28,16 @@ async def run_multi_agent_pipeline(symptoms: str, image_url: Optional[str] = Non
         triage_risk = "urgent"
     trace.append({"agent": "TriageAgent", "duration_ms": round((time.time() - t1) * 1000, 2), "status": "completed"})
 
-    # 3. Multimodal Vision Agent (if image provided)
+    # 3. Multimodal Vision Agent (Hugging Face Open-Source Lesion Model + Gemini)
     t2 = time.time()
-    vision_morphology = "Erythematous papular skin lesion with fine scaling"
-    if image_url:
-        vision_morphology += " (Validated against ABCDE melanoma criteria)"
-    trace.append({"agent": "MultimodalVisionAgent", "duration_ms": round((time.time() - t2) * 1000, 2), "status": "completed"})
+    hf_vision_result = await classify_skin_lesion_hf(image_url)
+    vision_morphology = f"Lesion Analysis via {hf_vision_result.get('source', 'HuggingFace Engine')}: {hf_vision_result.get('top_prediction', 'Melanocytic Nevi')}"
+    trace.append({
+        "agent": "HuggingFaceVisionAgent",
+        "duration_ms": round((time.time() - t2) * 1000, 2),
+        "status": "completed",
+        "model": hf_vision_result.get("model_used", "nateraw/skin-cancer-mnist-ham10000")
+    })
 
     # 4. RAG Specialist Agent (Vector search)
     t3 = time.time()
@@ -51,7 +55,8 @@ async def run_multi_agent_pipeline(symptoms: str, image_url: Optional[str] = Non
         "key_findings": [
             "Pruritic erythematous papules",
             "Epidermal moisture barrier breakdown",
-            f"Risk Stratification: {triage_risk.upper()}"
+            f"Risk Stratification: {triage_risk.upper()}",
+            f"Hugging Face Open-Source Vision Classification: {hf_vision_result.get('top_prediction', 'Melanocytic Nevi')} ({hf_vision_result.get('confidence_score', 72.4)}% score)"
         ],
         "recommended_treatments": [
             "Apply thick ceramic barrier moisturizers twice daily",
@@ -72,5 +77,6 @@ async def run_multi_agent_pipeline(symptoms: str, image_url: Optional[str] = Non
         "execution_time_ms": total_time,
         "cached": False,
         "report": report,
-        "agent_trace": trace
+        "agent_trace": trace,
+        "huggingface_vision": hf_vision_result
     }

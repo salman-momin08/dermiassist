@@ -1,6 +1,6 @@
 """
 DermiAssist-AI FastAPI Python Microservice Application.
-Provides RESTful AI endpoints, RAG search, Tool Execution, and MCP Server.
+Provides RESTful AI endpoints, RAG search, Tool Execution, MCP Server, and Hugging Face Open-Source Model Integrations.
 """
 
 from fastapi import FastAPI, HTTPException
@@ -13,10 +13,11 @@ from ai_service.schemas import (
 )
 from ai_service.services.rag_service import search_vector_rag
 from ai_service.services.orchestrator_service import run_multi_agent_pipeline
+from ai_service.services.huggingface_service import classify_skin_lesion_hf, generate_bge_embedding_hf
 
 app = FastAPI(
-    title="DermiAssist-AI Python Microservice",
-    description="Enterprise AI Engineering Microservice providing Multi-Agent Orchestration, Vector RAG Retrieval, MCP Protocol, and Agent Tools.",
+    title="DermiAssist-AI Polyglot Python Microservice",
+    description="Enterprise AI Engineering Microservice providing Multi-Agent Orchestration, Vector RAG Retrieval, MCP Protocol, Agent Tools, and Hugging Face Open-Source Models.",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -37,6 +38,7 @@ async def health_check():
         "status": "online",
         "service": "DermiAssist-AI FastAPI Engine",
         "version": "2.0.0",
+        "huggingface": "enabled",
         "docs": "/docs"
     }
 
@@ -50,6 +52,24 @@ async def analyze_symptoms(request: AnalysisRequest):
             body_location=request.body_location
         )
         return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/huggingface/classify-lesion", tags=["Hugging Face Open-Source Models"])
+async def classify_lesion_huggingface(image_url: str = ""):
+    """Classify skin lesion photo using Hugging Face Open-Source Lesion Classifier (HAM10000)."""
+    try:
+        res = await classify_skin_lesion_hf(image_url)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/huggingface/embed", tags=["Hugging Face Open-Source Models"])
+async def embed_huggingface(text: str):
+    """Generate 768-dim vector embedding using BAAI/bge-small-en-v1.5 via Hugging Face."""
+    try:
+        vector = await generate_bge_embedding_hf(text)
+        return {"success": True, "model": "BAAI/bge-small-en-v1.5", "dimensions": len(vector), "vector": vector[:10]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -118,7 +138,8 @@ async def handle_mcp_jsonrpc(payload: dict):
             "result": {
                 "tools": [
                     {"name": "analyze_skin_condition", "description": "FastAPI Multi-Agent Diagnostic Engine"},
-                    {"name": "search_medical_knowledge", "description": "Supabase pgvector Hybrid Search"}
+                    {"name": "search_medical_knowledge", "description": "Supabase pgvector Hybrid Search"},
+                    {"name": "classify_skin_lesion_hf", "description": "Hugging Face Open-Source Lesion Classifier"}
                 ]
             }
         }
