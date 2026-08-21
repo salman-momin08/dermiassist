@@ -45,14 +45,17 @@ html {
     --chart-5: 12.4 87.5% 62.9%;
     --radius: 0.75rem;
 
-    /* Stream Chat Light Theme variables */
+    /* Stream Chat Official Tokens - Light */
     --str-chat__primary-color: hsl(var(--primary));
-    --str-chat__light-grey: hsl(var(--background));
-    --str-chat__primary-color-alpha-15: hsla(var(--primary), 0.15);
-    --str-chat__border-color: hsl(var(--border));
-    --str-chat__white-smoke: hsl(var(--secondary));
+    --str-chat__active-primary-color: hsl(var(--primary));
+    --str-chat__surface-color: hsl(var(--card));
+    --str-chat__secondary-surface-color: hsl(var(--muted));
     --str-chat__background-color: hsl(var(--card));
+    --str-chat__border-color: hsl(var(--border));
     --str-chat__text-color: hsl(var(--foreground));
+    --str-chat__primary-surface-color: hsla(var(--primary), 0.12);
+    --str-chat__own-message-bubble-color: hsl(var(--primary));
+    --str-chat__other-message-bubble-color: hsl(var(--muted));
   }
 
   .dark {
@@ -81,14 +84,17 @@ html {
     --chart-4: 27 87% 67%;
     --chart-5: 12.4 87.5% 62.9%;
 
-     /* Stream Chat Dark Theme variables */
+    /* Stream Chat Official Tokens - Dark */
     --str-chat__primary-color: hsl(var(--primary));
-    --str-chat__light-grey: hsl(var(--background));
-    --str-chat__primary-color-alpha-15: hsla(var(--primary), 0.15);
-    --str-chat__border-color: hsl(var(--border));
-    --str-chat__white-smoke: hsl(var(--secondary));
+    --str-chat__active-primary-color: hsl(var(--primary));
+    --str-chat__surface-color: hsl(var(--card));
+    --str-chat__secondary-surface-color: hsl(var(--muted));
     --str-chat__background-color: hsl(var(--card));
+    --str-chat__border-color: hsl(var(--border));
     --str-chat__text-color: hsl(var(--foreground));
+    --str-chat__primary-surface-color: hsla(var(--primary), 0.2);
+    --str-chat__own-message-bubble-color: hsl(var(--primary));
+    --str-chat__other-message-bubble-color: hsl(var(--muted));
   }
 }
 
@@ -99,4 +105,154 @@ html {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Stream Chat Specificity Cascades (Clean CSS, No !important)
+   ───────────────────────────────────────────────────────────── */
+
+.str-chat {
+    background-color: transparent;
+    color: hsl(var(--foreground));
+    font-family: inherit;
+}
+
+.str-chat .str-chat__channel-list,
+.str-chat .str-chat__channel-list-messenger {
+    background-color: hsl(var(--card));
+    border-right: 1px solid hsl(var(--border));
+}
+
+.str-chat .str-chat__channel-preview-messenger {
+    border-bottom: 1px solid hsl(var(--border) / 0.4);
+    transition: background-color 0.2s ease;
+    padding: 12px 14px;
+}
+
+.str-chat .str-chat__channel-preview-messenger:hover {
+    background-color: hsl(var(--accent) / 0.1);
+}
+
+.str-chat .str-chat__channel-preview-messenger--active {
+    background-color: hsl(var(--primary) / 0.15);
+    border-left: 3px solid hsl(var(--primary));
+}
+
+.str-chat .str-chat__channel-preview-messenger--name,
+.str-chat .str-chat__channel-preview-title {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+}
+
+.str-chat .str-chat__channel-preview-messenger--last-message {
+    color: hsl(var(--muted-foreground));
+}
+
+.str-chat .str-chat__main-panel,
+.str-chat .str-chat__thread,
+.str-chat .str-chat__list {
+    background-color: hsl(var(--card));
+}
+
+.str-chat .str-chat__header-livestream,
+.str-chat .str-chat__channel-header {
+    background-color: hsl(var(--card));
+    border-bottom: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+    padding: 12px 16px;
+}
+
+.str-chat .str-chat__channel-header-title {
+    color: hsl(var(--foreground));
+    font-weight: 700;
+}
+
+.str-chat .str-chat__channel-header-info {
+    color: hsl(var(--muted-foreground));
+}
+
+.str-chat .str-chat__message-simple-text-inner {
+    border-radius: 1rem;
+    padding: 10px 14px;
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+
+.str-chat .str-chat__message--me .str-chat__message-simple-text-inner {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border-bottom-right-radius: 0.25rem;
+}
+
+.str-chat .str-chat__message--other .str-chat__message-simple-text-inner {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    border-bottom-left-radius: 0.25rem;
+    border: 1px solid hsl(var(--border));
+}
+
+.str-chat .str-chat__message-simple-timestamp {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.7rem;
+}
+
+.str-chat .str-chat__date-separator {
+    color: hsl(var(--muted-foreground));
+    margin: 16px 0;
+}
+
+.str-chat .str-chat__date-separator-line {
+    background-color: hsl(var(--border));
+}
+
+.str-chat .str-chat__message-input,
+.str-chat .str-chat__input-flat {
+    background-color: hsl(var(--card));
+    border-top: 1px solid hsl(var(--border));
+    padding: 12px 16px;
+}
+
+.str-chat .str-chat__textarea textarea,
+.str-chat .str-chat__input-flat--textarea {
+    background-color: hsl(var(--muted) / 0.5);
+    color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border));
+    border-radius: 9999px;
+    padding: 10px 18px;
+    font-size: 0.875rem;
+    box-shadow: none;
+}
+
+.str-chat .str-chat__textarea textarea:focus,
+.str-chat .str-chat__input-flat--textarea:focus {
+    border-color: hsl(var(--primary));
+    outline: none;
+}
+
+.str-chat .str-chat__send-button,
+.str-chat .str-chat__input-flat--send-button {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border-radius: 9999px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s ease;
+}
+
+.str-chat .str-chat__send-button:hover,
+.str-chat .str-chat__input-flat--send-button:hover {
+    transform: scale(1.05);
+}
+
+.str-chat .str-chat__load-more-button {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border));
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    padding: 6px 14px;
+    margin: 8px auto;
 }
