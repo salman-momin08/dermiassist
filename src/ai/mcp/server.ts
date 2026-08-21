@@ -7,6 +7,7 @@
 import { executeMultiAgentPipeline } from '@/ai/orchestrator';
 import { retrieveMedicalContext } from '@/ai/rag/retriever';
 import { runAIEvalHarness } from '@/ai/eval/eval-harness';
+import { checkDrugInteractionsTool, queryDoctorAvailabilityTool } from '@/ai/tools/medical-tools';
 import { logger } from '@/lib/logger';
 
 // ── MCP Protocol Specifications (JSON-RPC 2.0) ─────────────────
@@ -69,9 +70,32 @@ export const REGISTERED_MCP_TOOLS: MCPTool[] = [
             type: 'object',
             properties: {
                 query: { type: 'string', description: 'Dermatological query or disease category to search.' },
-                categoryFilter: { type: 'string', description: 'Optional condition category filter (Acne, Eczema, Psoriasis, Fungal, Melanoma).' },
+                categoryFilter: { type: 'string', description: 'Optional condition category filter (Acne, Eczema, Psoriasis, Fungal, Melanoma, Rosacea, Vitiligo, Alopecia).' },
             },
             required: ['query'],
+        },
+    },
+    {
+        name: 'check_drug_interactions',
+        description: 'Verifies safety, contraindications, and timing warnings between topical and oral skin medications.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                topicalMedication: { type: 'string', description: 'Topical drug name (e.g., Adapalene, Benzoyl Peroxide, Tretinoin).' },
+                oralMedication: { type: 'string', description: 'Optional oral drug name (e.g., Isotretinoin, Doxycycline).' },
+            },
+            required: ['topicalMedication'],
+        },
+    },
+    {
+        name: 'query_doctor_availability',
+        description: 'Queries database for verified dermatologists and open appointment consultation slots.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                specialty: { type: 'string', description: 'Filter by specialty.' },
+                city: { type: 'string', description: 'Filter by city.' },
+            },
         },
     },
     {
@@ -101,6 +125,12 @@ export const REGISTERED_MCP_RESOURCES: MCPResource[] = [
         uri: 'medical://guidelines/psoriasis',
         name: 'Psoriasis Vulgaris Diagnostic Framework',
         description: 'National Psoriasis Foundation clinical practice guidelines.',
+        mimeType: 'text/markdown',
+    },
+    {
+        uri: 'medical://guidelines/melanoma',
+        name: 'Malignant Melanoma ABCDE Diagnostic Protocol',
+        description: 'Skin Cancer Foundation early detection and biopsy guidelines.',
         mimeType: 'text/markdown',
     },
 ];
@@ -160,12 +190,7 @@ export async function handleMCPRequest(request: JSONRPCRequest): Promise<JSONRPC
                         jsonrpc: '2.0',
                         id,
                         result: {
-                            content: [
-                                {
-                                    type: 'text',
-                                    text: JSON.stringify(pipelineResult, null, 2),
-                                },
-                            ],
+                            content: [{ type: 'text', text: JSON.stringify(pipelineResult, null, 2) }],
                         },
                     };
                 }
@@ -180,12 +205,37 @@ export async function handleMCPRequest(request: JSONRPCRequest): Promise<JSONRPC
                         jsonrpc: '2.0',
                         id,
                         result: {
-                            content: [
-                                {
-                                    type: 'text',
-                                    text: JSON.stringify(ragResult, null, 2),
-                                },
-                            ],
+                            content: [{ type: 'text', text: JSON.stringify(ragResult, null, 2) }],
+                        },
+                    };
+                }
+
+                if (toolName === 'check_drug_interactions') {
+                    const topicalMedication = String(toolArgs.topicalMedication || '');
+                    const oralMedication = toolArgs.oralMedication ? String(toolArgs.oralMedication) : undefined;
+
+                    const interactionResult = await checkDrugInteractionsTool({ topicalMedication, oralMedication });
+
+                    return {
+                        jsonrpc: '2.0',
+                        id,
+                        result: {
+                            content: [{ type: 'text', text: JSON.stringify(interactionResult, null, 2) }],
+                        },
+                    };
+                }
+
+                if (toolName === 'query_doctor_availability') {
+                    const specialty = toolArgs.specialty ? String(toolArgs.specialty) : undefined;
+                    const city = toolArgs.city ? String(toolArgs.city) : undefined;
+
+                    const doctorResult = await queryDoctorAvailabilityTool({ specialty, city });
+
+                    return {
+                        jsonrpc: '2.0',
+                        id,
+                        result: {
+                            content: [{ type: 'text', text: JSON.stringify(doctorResult, null, 2) }],
                         },
                     };
                 }
@@ -196,12 +246,7 @@ export async function handleMCPRequest(request: JSONRPCRequest): Promise<JSONRPC
                         jsonrpc: '2.0',
                         id,
                         result: {
-                            content: [
-                                {
-                                    type: 'text',
-                                    text: JSON.stringify(evalReport, null, 2),
-                                },
-                            ],
+                            content: [{ type: 'text', text: JSON.stringify(evalReport, null, 2) }],
                         },
                     };
                 }

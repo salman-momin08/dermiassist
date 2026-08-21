@@ -48,15 +48,27 @@ export default function AIEngineeringDashboard() {
         }
     };
 
-    const handleTestMCP = async (method: string) => {
+    const handleTestMCP = async (method: string, toolName?: string) => {
         setMcpLoading(true);
         try {
             let payload: any = { jsonrpc: '2.0', id: Date.now(), method };
             if (method === 'tools/call') {
-                payload.params = {
-                    name: 'search_medical_knowledge',
-                    arguments: { query: 'Eczema management', categoryFilter: 'Eczema' },
-                };
+                if (toolName === 'check_drug_interactions') {
+                    payload.params = {
+                        name: 'check_drug_interactions',
+                        arguments: { topicalMedication: 'Benzoyl Peroxide', oralMedication: 'Isotretinoin' },
+                    };
+                } else if (toolName === 'query_doctor_availability') {
+                    payload.params = {
+                        name: 'query_doctor_availability',
+                        arguments: { specialty: 'General Dermatology' },
+                    };
+                } else {
+                    payload.params = {
+                        name: 'search_medical_knowledge',
+                        arguments: { query: 'Eczema management', categoryFilter: 'Eczema' },
+                    };
+                }
             }
             const res = await fetch('/api/mcp', {
                 method: 'POST',
@@ -224,8 +236,14 @@ export default function AIEngineeringDashboard() {
                                 <Button onClick={() => handleTestMCP('resources/list')} disabled={mcpLoading} variant="outline">
                                     List Resources (`resources/list`)
                                 </Button>
-                                <Button onClick={() => handleTestMCP('tools/call')} disabled={mcpLoading} className="bg-purple-600 hover:bg-purple-700 text-white">
+                                <Button onClick={() => handleTestMCP('tools/call', 'search_medical_knowledge')} disabled={mcpLoading} className="bg-purple-600 hover:bg-purple-700 text-white">
                                     Call `search_medical_knowledge` Tool
+                                </Button>
+                                <Button onClick={() => handleTestMCP('tools/call', 'check_drug_interactions')} disabled={mcpLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                                    Call `check_drug_interactions` Tool
+                                </Button>
+                                <Button onClick={() => handleTestMCP('tools/call', 'query_doctor_availability')} disabled={mcpLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                                    Call `query_doctor_availability` Tool
                                 </Button>
                             </div>
 

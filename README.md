@@ -641,6 +641,7 @@ npm install
 # 4. Run database migrations in Supabase SQL editor
 # Execute supabase_migrations/master_integrated_schema.sql
 # Execute supabase_migrations/20_vector_embeddings_rag.sql
+# Setup & Bulk Ingestion Guides: docs/pgvector-setup.md & docs/bulk-data-ingestion.md
 
 # 5. Start Next.js development server
 npm run dev
