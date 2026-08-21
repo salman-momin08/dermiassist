@@ -7,7 +7,8 @@ Hugging Face (MedQA, MedQuAD, PubMedQA, ISIC 2019) for RAG vector stores.
 import os
 import json
 import logging
-from typing import List, Dict, Any
+import importlib
+from typing import List, Dict, Any, Optional
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("DatasetIngestion")
@@ -18,6 +19,15 @@ DERMATOLOGY_KEYWORDS = [
     "plaque", "macule", "dermoscopy", "dermatology", "pruritus", "alopecia",
     "urticaria", "carcinoma", "basal cell", "squamous cell", "nevus"
 ]
+
+def get_load_dataset_fn() -> Optional[Any]:
+    """Dynamically resolves load_dataset from datasets library if installed."""
+    try:
+        datasets_mod = importlib.import_module("datasets")
+        return getattr(datasets_mod, "load_dataset", None)
+    except ImportError:
+        logger.info("The 'datasets' package is not installed in the current environment. Run: pip install datasets")
+        return None
 
 def is_dermatology_relevant(text: str) -> bool:
     """Check if the text contains any dermatological clinical terms."""
@@ -32,9 +42,13 @@ def ingest_pubmed_qa(sample_size: int = 50) -> List[Dict[str, Any]]:
     Load and filter PubMedQA dataset for dermatology research context.
     Dataset: pubmed_qa (pqa_labeled)
     """
+    load_dataset = get_load_dataset_fn()
+    if not load_dataset:
+        logger.warning("PubMedQA ingestion skipped ('datasets' not installed). Run: pip install datasets")
+        return []
+
     logger.info("Fetching PubMedQA dataset from Hugging Face...")
     try:
-        from datasets import load_dataset
         ds = load_dataset("pubmed_qa", "pqa_labeled", split="train", streaming=True)
         
         extracted_chunks = []
@@ -58,7 +72,7 @@ def ingest_pubmed_qa(sample_size: int = 50) -> List[Dict[str, Any]]:
         logger.info(f"Successfully extracted {len(extracted_chunks)} dermatology PubMedQA research chunks.")
         return extracted_chunks
     except Exception as e:
-        logger.warning(f"PubMedQA streaming skipped: {e}. Using pre-compiled sample.")
+        logger.warning(f"PubMedQA streaming skipped: {e}.")
         return []
 
 
@@ -67,9 +81,13 @@ def ingest_med_quad(sample_size: int = 50) -> List[Dict[str, Any]]:
     Load and filter MedQuAD NIH Medical QA dataset.
     Dataset: lavita/MedQuAD
     """
+    load_dataset = get_load_dataset_fn()
+    if not load_dataset:
+        logger.warning("MedQuAD ingestion skipped ('datasets' not installed). Run: pip install datasets")
+        return []
+
     logger.info("Fetching MedQuAD dataset from Hugging Face...")
     try:
-        from datasets import load_dataset
         ds = load_dataset("lavita/MedQuAD", split="train", streaming=True)
         
         extracted_chunks = []
@@ -110,7 +128,7 @@ def export_to_rag_json(output_path: str = "src/ai/rag/datasets/huggingface-medic
             json.dump(all_chunks, f, indent=2, ensure_ascii=False)
         logger.info(f"Exported {len(all_chunks)} total grounded chunks to {output_path}")
     else:
-        logger.info("No new chunks downloaded or datasets package offline.")
+        logger.info("Dataset export completed (no new streams or offline).")
 
 
 if __name__ == "__main__":
