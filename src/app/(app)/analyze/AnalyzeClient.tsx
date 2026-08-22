@@ -50,11 +50,14 @@ import { sanitizeConditionName } from "@/ai/guards/condition-guard";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { compressImage } from "@/lib/image-compressor";
+import { SUPPORTED_LANGUAGES, getLocalizedText, SupportedLanguage } from "@/lib/translation-service";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Globe } from "lucide-react";
 
 type Step = 'upload' | 'proforma' | 'analyzing' | 'error';
 type ChatMessage = { sender: 'ai' | 'user'; text: string; timestamp?: string };
 
-const MAX_QUESTIONS = 5;
+const MAX_SAFETY_QUESTIONS = 12; // Generous runaway safeguard allowing 10+ questions as needed
 const SpeechRecognition = typeof window !== 'undefined' ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition : null;
 
 const QUICK_SUGGESTIONS = [
@@ -77,6 +80,7 @@ export default function AnalyzeClient() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [userResponse, setUserResponse] = useState("");
   const [questionCount, setQuestionCount] = useState(0);
+  const [confidenceScore, setConfidenceScore] = useState(40);
 
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -90,6 +94,9 @@ export default function AnalyzeClient() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Language & Localization state
+  const [currentLang, setCurrentLang] = useState<string>('en');
+
   // Speech & Audio state
   const recognitionRef = useRef<typeof SpeechRecognition | null>(null);
   const [isListening, setIsListening] = useState(false);
@@ -97,6 +104,49 @@ export default function AnalyzeClient() {
   const [playingAudio, setPlayingAudio] = useState<{ audio: HTMLAudioElement; text: string } | null>(null);
   const [isAudioLoading, setIsAudioLoading] = useState<string | null>(null);
   const [audioCache, setAudioCache] = useState<Record<string, string>>({});
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    if (!SpeechRecognition) {
+      toast({
+        title: "Voice Dictation Not Supported",
+        description: "Your browser does not support Web Speech Recognition. Please type your response.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = currentLang === 'en' ? 'en-US' : currentLang;
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = (e: any) => {
+        console.warn("Speech error:", e);
+        setIsListening(false);
+      };
+      recognition.onresult = (e: any) => {
+        const transcript = e.results[0][0].transcript;
+        if (transcript) {
+          setUserResponse(prev => (prev ? `${prev} ${transcript}` : transcript));
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn("Speech recognition initialization error:", err);
+      setIsListening(false);
+    }
+  };
 
   // Auto-scroll down smoothly to latest message
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -213,10 +263,26 @@ export default function AnalyzeClient() {
   ) => {
     setIsLoading(true);
     try {
-      const { nextQuestion } = await proformaChat({
+      const { nextQuestion, isComplete, confidenceScore: modelConfidence } = await proformaChat({
         conditionName: conditionName,
         conversationHistory: historyString,
       });
+
+      if (modelConfidence && typeof modelConfidence === 'number') {
+        setConfidenceScore(Math.max(40, Math.min(98, modelConfidence)));
+      } else {
+        setConfidenceScore(prev => Math.min(96, prev + 10));
+      }
+
+      // Check if the AI model reached diagnostic closure after adequate context
+      if (isComplete && questionCount >= 3) {
+        toast({
+          title: "Diagnostic Confidence Reached",
+          description: "The AI diagnostician has gathered thorough clinical context to generate your comprehensive report.",
+        });
+        handleFinalEvaluation(currentHistory);
+        return;
+      }
 
       const newAiMsg: ChatMessage = {
         sender: 'ai',
@@ -255,7 +321,7 @@ export default function AnalyzeClient() {
 
     const newCount = questionCount + 1;
 
-    if (newCount >= MAX_QUESTIONS) {
+    if (newCount >= MAX_SAFETY_QUESTIONS) {
       handleFinalEvaluation(newHistory);
     } else {
       const historyString = newHistory.map(m => `${m.sender === 'ai' ? 'AI' : 'User'}: ${m.text}`).join('\n');
@@ -266,11 +332,12 @@ export default function AnalyzeClient() {
   const startProforma = (conditionName: string) => {
     const welcomeMsg: ChatMessage = {
       sender: 'ai',
-      text: `I've analyzed your image and identified the primary differential as **${conditionName}**. To generate your personalized clinical report, I'll ask a few quick questions regarding your symptoms and health context.`,
+      text: `I've analyzed your image and identified the primary differential as **${conditionName}**. To generate your personalized clinical report, I'll ask a few targeted diagnostic questions to calibrate accuracy.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setChatHistory([welcomeMsg]);
     setQuestionCount(0);
+    setConfidenceScore(45);
     getNextQuestion(conditionName, `AI: Initial detection is ${conditionName}.`, [welcomeMsg]);
   };
 
@@ -462,44 +529,66 @@ export default function AnalyzeClient() {
           <span>{step === 'upload' ? 'Back to Dashboard' : 'Start New Analysis'}</span>
         </Button>
 
-        {step === 'proforma' && (
-          <div className="flex items-center gap-3">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2 bg-card/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-border/80 shadow-sm transition-all hover:border-primary/40">
-                    <Volume2 className="h-4 w-4 text-primary animate-pulse" />
-                    <Label htmlFor="speech-mode" className="text-xs font-semibold cursor-pointer select-none">
-                      Voice Readout
-                    </Label>
-                    <Switch
-                      id="speech-mode"
-                      checked={speechMode}
-                      onCheckedChange={setSpeechMode}
-                      className="data-[state=checked]:bg-primary"
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Read AI questions aloud automatically</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {questionCount >= 1 && (
-              <Button
-                variant="gradient"
-                size="sm"
-                onClick={() => handleFinalEvaluation()}
-                disabled={isLoading}
-                className="gap-1.5 text-xs font-semibold rounded-xl shadow-sm hover:shadow-md"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                <span>Complete Assessment</span>
-              </Button>
-            )}
+        {/* Global Multi-Language & Telehealth Controls */}
+        <div className="flex items-center gap-2.5">
+          {/* 12+ Language Selector */}
+          <div className="flex items-center gap-1.5 bg-card/80 backdrop-blur-md px-2.5 py-1 rounded-xl border border-border/80 shadow-sm">
+            <Globe className="h-3.5 w-3.5 text-primary" />
+            <Select value={currentLang} onValueChange={setCurrentLang}>
+              <SelectTrigger className="h-7 border-none bg-transparent text-xs font-semibold px-1 focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end" className="max-h-72">
+                {SUPPORTED_LANGUAGES.map(lang => (
+                  <SelectItem key={lang.code} value={lang.code} className="text-xs">
+                    <span className="mr-2">{lang.flag}</span>
+                    <span>{lang.nativeName}</span>
+                    <span className="text-muted-foreground ml-1.5 text-[10px]">({lang.name})</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        )}
+
+          {step === 'proforma' && (
+            <>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-2 bg-card/80 backdrop-blur-md px-3 py-1 rounded-xl border border-border/80 shadow-sm transition-all hover:border-primary/40">
+                      <Volume2 className="h-3.5 w-3.5 text-primary animate-pulse" />
+                      <Label htmlFor="speech-mode" className="text-xs font-semibold cursor-pointer select-none hidden sm:inline">
+                        {getLocalizedText(currentLang, 'voiceReadout')}
+                      </Label>
+                      <Switch
+                        id="speech-mode"
+                        checked={speechMode}
+                        onCheckedChange={setSpeechMode}
+                        className="data-[state=checked]:bg-primary h-4 w-8"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Read AI questions aloud automatically</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              {questionCount >= 1 && (
+                <Button
+                  variant="gradient"
+                  size="sm"
+                  onClick={() => handleFinalEvaluation()}
+                  disabled={isLoading}
+                  className="gap-1.5 text-xs font-semibold rounded-xl shadow-sm hover:shadow-md"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  <span>{getLocalizedText(currentLang, 'completeAssessment')}</span>
+                </Button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Main Analysis Card */}
@@ -514,10 +603,10 @@ export default function AnalyzeClient() {
                 <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shadow-inner">
                   <Sparkles className="h-4 w-4" />
                 </div>
-                <span>Dermatological Clinical Consultation</span>
+                <span>{getLocalizedText(currentLang, 'title')}</span>
               </CardTitle>
               <CardDescription className="text-xs md:text-sm text-muted-foreground">
-                {step === 'upload' && "Upload a clear photo to initiate AI condition detection and guided diagnostic triage."}
+                {step === 'upload' && getLocalizedText(currentLang, 'subtitle')}
                 {step === 'proforma' && "Answer follow-up diagnostic questions to calibrate accuracy and evaluate potential root causes."}
                 {step === 'analyzing' && "Generating clinical synthesis with ICD-10 coding and medical guidelines..."}
                 {step === 'error' && "An error occurred during evaluation."}
@@ -526,23 +615,28 @@ export default function AnalyzeClient() {
 
             {step === 'proforma' && detectedCondition && (
               <div className="flex items-center gap-2 bg-primary/10 text-primary border border-primary/20 rounded-xl px-3.5 py-1.5 text-xs font-semibold backdrop-blur-sm shadow-sm">
-                <span className="text-muted-foreground font-normal">Primary Differential:</span>
+                <span className="text-muted-foreground font-normal">{getLocalizedText(currentLang, 'primaryDiff')}:</span>
                 <span className="font-bold underline decoration-primary/40 underline-offset-2">{detectedCondition}</span>
               </div>
             )}
           </div>
 
-          {/* Progress bar during proforma */}
+          {/* Dynamic Diagnostic Confidence Progress Bar */}
           {step === 'proforma' && (
             <div className="mt-4 space-y-2">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-muted-foreground">Consultation Calibration</span>
-                <span className="text-primary font-bold">Step {Math.min(questionCount + 1, MAX_QUESTIONS)} of {MAX_QUESTIONS}</span>
+              <div className="flex justify-between items-center text-xs font-semibold">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Clinical Calibration (Question {questionCount + 1})</span>
+                </span>
+                <span className="text-primary font-bold">
+                  Diagnostic Certainty: {confidenceScore}%
+                </span>
               </div>
-              <div className="w-full bg-muted/60 rounded-full h-2 overflow-hidden border border-border/40">
+              <div className="w-full bg-muted/60 rounded-full h-2.5 overflow-hidden border border-border/40 p-0.5">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-teal-400 rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${(Math.min(questionCount + 1, MAX_QUESTIONS) / MAX_QUESTIONS) * 100}%` }}
+                  className="h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-400 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${confidenceScore}%` }}
                 />
               </div>
             </div>
@@ -784,7 +878,7 @@ export default function AnalyzeClient() {
               <div className="px-5 py-2.5 border-t border-border/60 bg-muted/20 flex gap-2 overflow-x-auto scrollbar-none items-center">
                 <span className="text-[11px] text-muted-foreground font-semibold shrink-0 mr-1 flex items-center gap-1">
                   <Sparkles className="h-3 w-3 text-primary" />
-                  Quick answers:
+                  {getLocalizedText(currentLang, 'quickAnswers')}
                 </span>
                 {QUICK_SUGGESTIONS.map((chip, i) => (
                   <button
@@ -803,7 +897,7 @@ export default function AnalyzeClient() {
               <div className="relative flex items-center max-w-3xl mx-auto">
                 <Input
                   ref={inputRef}
-                  placeholder={isListening ? "Listening to your voice... (Speak now)" : "Type your symptom details or response..."}
+                  placeholder={isListening ? "Listening to your voice... (Speak now)" : getLocalizedText(currentLang, 'placeholder')}
                   value={userResponse}
                   onChange={(e) => setUserResponse(e.target.value)}
                   onKeyDown={(e) => {
@@ -825,7 +919,7 @@ export default function AnalyzeClient() {
                         <Button
                           size="icon"
                           variant={isListening ? 'destructive' : 'ghost'}
-                          onClick={handleMicClick}
+                          onClick={toggleListening}
                           disabled={isLoading}
                           className={cn(
                             "h-9 w-9 rounded-xl transition-all",

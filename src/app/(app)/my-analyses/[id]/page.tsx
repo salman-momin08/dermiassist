@@ -8,9 +8,12 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit, Languages, Mic, Send, Bot, User, Volume2, Stethoscope, MapPin, Download } from "lucide-react";
+import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit, Languages, Mic, Send, Bot, User, Volume2, Stethoscope, MapPin, Download, Sun, ShieldCheck, Database } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { downloadFhirJson } from "@/lib/fhir-exporter";
+import { calculateUVProtection, FITZPATRICK_PROFILES, FitzpatrickSkinType } from "@/lib/uv-tracker";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { visualProgressAnalysis } from '@/ai/flows/visual-progress-analysis';
@@ -536,6 +539,39 @@ export default function AnalysisDetailPage() {
         }
     };
 
+    const [skinType, setSkinType] = useState<FitzpatrickSkinType>('type3');
+    const [currentUvIndex, setCurrentUvIndex] = useState(6);
+    const uvAdvice = calculateUVProtection(currentUvIndex, skinType, true);
+
+    const handleDownloadFhir = () => {
+        if (!analysis) return;
+        try {
+            downloadFhirJson({
+                patientName: userData?.displayName || user?.email || 'Patient',
+                conditionName: analysis.conditionName,
+                summary: analysis.condition,
+                dos: analysis.dos,
+                donts: analysis.donts,
+                recommendations: analysis.recommendations,
+                otherConsiderations: analysis.submittedInfo?.otherConsiderations,
+                photoUrlOrDataUri: analysis.image,
+                recordedDate: analysis.date ? new Date(analysis.date).toISOString() : new Date().toISOString(),
+                severity: 'Moderate',
+            });
+            toast({
+                title: "HL7 FHIR Bundle Exported",
+                description: "Standard FHIR R4 JSON document downloaded successfully.",
+            });
+        } catch (err) {
+            console.error("FHIR export failed:", err);
+            toast({
+                title: "Export Failed",
+                description: "Could not export FHIR bundle.",
+                variant: "destructive"
+            });
+        }
+    };
+
     const resetProgressDialog = () => {
         setProgressImage(null);
         setProgressSummary(null);
@@ -1014,10 +1050,73 @@ export default function AnalysisDetailPage() {
                                     ) : (
                                         <>
                                             <Download className="mr-2 h-4 w-4" />
-                                            Download Report
+                                            Download PDF
                                         </>
                                     )}
                                 </Button>
+
+                                <Button variant="outline" className="w-full text-xs font-semibold gap-1.5 border-primary/40 hover:bg-primary/5" onClick={handleDownloadFhir}>
+                                    <Database className="h-4 w-4 text-primary" />
+                                    Export HL7 FHIR (JSON)
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* DermiAssist 2.0: Solar UV Photoprotection & Sun Safety Widget */}
+                    <Card className="border-amber-500/30 bg-card shadow-sm">
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base flex items-center gap-2 font-headline">
+                                    <Sun className="h-5 w-5 text-amber-500 animate-spin-slow" />
+                                    <span>Solar UV Protection</span>
+                                </CardTitle>
+                                <Badge variant="outline" className="text-xs font-bold border-amber-500/40 text-amber-500 bg-amber-500/10">
+                                    UV {uvAdvice.uvIndex} ({uvAdvice.riskCategory})
+                                </Badge>
+                            </div>
+                            <CardDescription className="text-xs">
+                                Tailored photoprotection guidelines for active skin lesions.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3.5 text-xs">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="skin-type-select" className="text-[11px] font-semibold text-muted-foreground">Fitzpatrick Skin Phototype</Label>
+                                <Select value={skinType} onValueChange={(val) => setSkinType(val as FitzpatrickSkinType)}>
+                                    <SelectTrigger id="skin-type-select" className="h-8 text-xs">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.values(FITZPATRICK_PROFILES).map(p => (
+                                            <SelectItem key={p.id} value={p.id} className="text-xs">
+                                                {p.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-muted/40 border border-border/60">
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground font-medium">Safe Unprotected Sun</p>
+                                    <p className="text-sm font-bold text-foreground">{uvAdvice.safeMinutesWithoutSunscreen} mins</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground font-medium">Recommended SPF</p>
+                                    <p className="text-sm font-bold text-amber-600 dark:text-amber-400">{uvAdvice.recommendedSPF}</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <p className="font-semibold text-foreground text-[11px] flex items-center gap-1">
+                                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                                    <span>Key Protection Measures:</span>
+                                </p>
+                                <ul className="list-disc pl-4 space-y-1 text-muted-foreground text-[11px]">
+                                    {uvAdvice.protectiveMeasures.map((measure, idx) => (
+                                        <li key={idx}>{measure}</li>
+                                    ))}
+                                </ul>
                             </div>
                         </CardContent>
                     </Card>

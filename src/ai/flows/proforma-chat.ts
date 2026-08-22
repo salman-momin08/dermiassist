@@ -21,6 +21,8 @@ export type ProformaChatInput = z.infer<typeof ProformaChatInputSchema>;
 
 const ProformaChatOutputSchema = z.object({
   nextQuestion: z.string().describe('The next single, relevant question to ask the user.'),
+  isComplete: z.boolean().optional().describe('True if the model has gathered sufficient clinical confidence to conclude the proforma.'),
+  confidenceScore: z.number().min(0).max(100).optional().describe('Diagnostic confidence percentage (0-100) based on gathered patient history.'),
 });
 export type ProformaChatOutput = z.infer<typeof ProformaChatOutputSchema>;
 
@@ -52,30 +54,47 @@ const proformaChatFlow = ai.defineFlow(
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const response = await ai.generate({
+          output: { schema: ProformaChatOutputSchema },
           system: `You are an expert board-certified dermatologist AI conducting a real-time clinical diagnostic proforma.
 The primary differential identified from visual analysis is **${input.conditionName}**.
 
-Your objective is to ask ONE thoughtful, highly relevant clinical follow-up question to investigate:
-- Specific morphological symptoms, progression, and timeline.
-- Sensations (itching severity, burning, soreness, bleeding).
-- Potential triggers, lifestyle factors, contact exposures, or medications.
-- Personal or family dermatological/allergic history.
-- Response to any previous treatments.
+Your objective is to clinically evaluate the patient's presentation through intelligent, dynamic inquiry:
+- Investigate specific morphological symptoms, progression, and timeline.
+- Assess sensations (itching severity, burning, soreness, bleeding).
+- Identify potential triggers, lifestyle factors, contact exposures, or medications.
+- Review personal or family dermatological/allergic history.
+- Evaluate response to previous topical/systemic treatments.
 
-Rules:
-1. Formulate the question strictly based on the patient's conversation history.
-2. Never repeat a question or topic already answered by the patient.
-3. Tailor the medical inquiry specifically to the nuances of ${input.conditionName}.
-4. Ask only ONE clear, compassionate question without extra introductory or concluding chatter.`,
+You decide dynamically how many questions to ask based on diagnostic ambiguity. Simple, classic presentations may need 3-4 questions, whereas complex, overlapping rashes may require 6-10 questions to achieve high diagnostic certainty.
+
+Output JSON format:
+{
+  "nextQuestion": "Single clear, compassionate clinical question (or closing statement if complete)",
+  "isComplete": true/false (Set true ONLY when you have high diagnostic certainty across timeline, sensations, and triggers),
+  "confidenceScore": number (0-100 reflecting your cumulative diagnostic confidence based on the history gathered)
+}`,
           prompt: `Conversation History so far:
 ${input.conversationHistory}
 
-Based on the above patient history and the suspected condition (${input.conditionName}), ask the single most important next clinical question:`,
+Based on the patient's conversation history and suspected condition (${input.conditionName}), determine the next clinical step:`,
         });
 
-        const generatedText = response.text?.trim().replace(/^["']|["']$/g, '');
-        if (generatedText && generatedText.length > 8) {
-          return { nextQuestion: generatedText };
+        if (response.output) {
+          return {
+            nextQuestion: response.output.nextQuestion,
+            isComplete: Boolean(response.output.isComplete),
+            confidenceScore: typeof response.output.confidenceScore === 'number' ? response.output.confidenceScore : 75,
+          };
+        }
+
+        // Fallback text parsing if raw string returned
+        const rawText = response.text?.trim().replace(/^["']|["']$/g, '') || '';
+        if (rawText.length > 5) {
+          return {
+            nextQuestion: rawText,
+            isComplete: false,
+            confidenceScore: 70,
+          };
         }
       } catch (err: any) {
         lastError = err;
