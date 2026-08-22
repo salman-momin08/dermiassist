@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import asyncio
 import importlib
 from typing import TypedDict, List, Dict, Any, Optional
 from dotenv import load_dotenv
@@ -89,7 +90,9 @@ Do not provide any other information, summary, or recommendations. Return ONLY t
             "data": base64_data
         }
 
-        response = model.generate_content([prompt, image_part])
+        # generate_content is a blocking sync call — offload to a thread so it
+        # doesn't block the FastAPI event loop and serialize concurrent requests.
+        response = await asyncio.to_thread(model.generate_content, [prompt, image_part])
         condition_name = response.text.strip().replace("*", "").replace("\n", " ")
         # Clean up any quotes
         condition_name = re.sub(r'^["\']|["\']$', '', condition_name).strip()
@@ -159,7 +162,7 @@ Based on the above patient history and the suspected condition ({condition_name}
             raise RuntimeError("Gemini model not initialized")
         
         full_prompt = f"{system_instruction}\n\n{user_prompt}"
-        response = model.generate_content(full_prompt)
+        response = await asyncio.to_thread(model.generate_content, full_prompt)
         question = response.text.strip().replace('"', '').replace("'", "")
         
         return {
@@ -236,9 +239,9 @@ Return ONLY valid JSON."""
                 mime_type = "image/png"
             contents.append({"mime_type": mime_type, "data": base64_data})
 
-        response = model.generate_content(contents)
+        response = await asyncio.to_thread(model.generate_content, contents)
         text = response.text.strip()
-        
+
         # Clean JSON markdown if wrapped
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
@@ -368,7 +371,7 @@ Rules:
     try:
         model = _get_gemini_model("gemini-2.5-flash")
         if model:
-            res = model.generate_content(prompt)
+            res = await asyncio.to_thread(model.generate_content, prompt)
             text = res.text.strip()
             # Extract JSON array
             match = re.search(r'\[.*\]', text, re.DOTALL)
