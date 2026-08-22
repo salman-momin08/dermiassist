@@ -3,6 +3,7 @@
 
 import { AppHeader } from "@/components/layout/header";
 import { AppFooter } from "@/components/layout/footer";
+import { AppSidebar } from "@/components/layout/sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -49,11 +50,14 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <AppHeader />
-      <main className="flex-1 bg-muted/40">
-        {children}
-      </main>
+      <div className="flex-1 flex">
+        <AppSidebar />
+        <main className="flex-1 min-w-0 bg-muted/40">
+          {children}
+        </main>
+      </div>
       <AppFooter />
     </div>
   );

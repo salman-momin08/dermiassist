@@ -1,6 +1,7 @@
 ﻿"use client"
 
 import { useState, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,12 @@ import { createClient } from "@/lib/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { indianStates } from "@/lib/indian-states";
-import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
+// react-easy-crop is only needed once the user opens the crop flow, so it's
+// split into its own client-only chunk instead of shipping on every profile-page visit.
+const ImageCropDialog = dynamic(
+    () => import("@/components/ui/image-crop-dialog").then(m => m.ImageCropDialog),
+    { ssr: false }
+);
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
@@ -373,12 +379,14 @@ export default function ProfilePage() {
 
     return (
         <>
-            <ImageCropDialog
-                open={isCropDialogOpen}
-                onOpenChange={setIsCropDialogOpen}
-                imageSrc={imageToCrop}
-                onCropComplete={handleCropComplete}
-            />
+            {isCropDialogOpen && (
+                <ImageCropDialog
+                    open={isCropDialogOpen}
+                    onOpenChange={setIsCropDialogOpen}
+                    imageSrc={imageToCrop}
+                    onCropComplete={handleCropComplete}
+                />
+            )}
             <div className="container mx-auto p-4 md:p-8 max-w-4xl">
                 <div className="space-y-2 mb-8">
                     <h1 className="text-3xl font-bold tracking-tight font-headline">
