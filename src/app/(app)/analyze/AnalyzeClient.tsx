@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,8 +25,13 @@ import {
   User,
   Send,
   Mic,
+  MicOff,
   Volume2,
   VolumeX,
+  Sparkles,
+  CheckCircle2,
+  FileText,
+  RotateCcw,
 } from "lucide-react";
 import Image from "next/image";
 import { detectDiseaseNameCached as detectDiseaseName } from "@/ai/flows/cached";
@@ -34,24 +39,31 @@ import { finalEvaluationCached as finalEvaluation } from "@/ai/flows/cached";
 import { proformaChat } from "@/ai/flows/proforma-chat";
 import { useToast } from "@/hooks/use-toast";
 import { useAnalyses } from "@/hooks/use-analyses";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { textToSpeech } from "@/ai/flows/text-to-speech";
-import { uploadFile } from "@/lib/actions";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { sanitizeConditionName } from "@/ai/guards/condition-guard";
-
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 type Step = 'upload' | 'proforma' | 'analyzing' | 'error';
-type ChatMessage = { sender: 'ai' | 'user'; text: string };
+type ChatMessage = { sender: 'ai' | 'user'; text: string; timestamp?: string };
 
 const MAX_QUESTIONS = 5;
 const SpeechRecognition = typeof window !== 'undefined' ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition : null;
 
+const QUICK_SUGGESTIONS = [
+  "Severe itching & redness",
+  "Mild discomfort, no pain",
+  "Started 2-3 days ago",
+  "No known allergies",
+  "Spreading gradually",
+  "No previous history"
+];
 
 export default function AnalyzeClient() {
   const searchParams = useSearchParams();
@@ -68,11 +80,14 @@ export default function AnalyzeClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const { toast } = useToast();
   const { addAnalysis } = useAnalyses();
   const { user, userData } = useAuth();
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Speech & Audio state
   const recognitionRef = useRef<typeof SpeechRecognition | null>(null);
@@ -82,13 +97,23 @@ export default function AnalyzeClient() {
   const [isAudioLoading, setIsAudioLoading] = useState<string | null>(null);
   const [audioCache, setAudioCache] = useState<Record<string, string>>({});
 
+  // Auto-scroll down smoothly to latest message
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'nearest' });
+    }
+  }, []);
 
+  useEffect(() => {
+    scrollToBottom('smooth');
+  }, [chatHistory, isLoading, isListening, scrollToBottom]);
+
+  // Handle URL query parameters for prefilled conditions
   useEffect(() => {
     const prefilledCondition = searchParams.get('condition');
     const prefilledImage = searchParams.get('image');
 
     if (prefilledCondition && prefilledImage) {
-      // Sanitize condition name from URL params — strips HTML/XSS vectors
       const sanitizedCondition = sanitizeConditionName(prefilledCondition);
       setDetectedCondition(sanitizedCondition);
       setPreview(prefilledImage);
@@ -97,13 +122,7 @@ export default function AnalyzeClient() {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
-    }
-  }, [chatHistory]);
-
-  // Setup Speech Recognition
+  // Setup Web Speech Recognition
   useEffect(() => {
     if (!SpeechRecognition) return;
     const recognition = new SpeechRecognition();
@@ -112,23 +131,34 @@ export default function AnalyzeClient() {
     recognition.lang = 'en-US';
 
     recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setUserResponse(transcript);
-      // Automatically send the response when speech is recognized
-      handleUserResponse(transcript);
-    };
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
-      if (event.error === 'not-allowed') {
-        toast({ title: "Permission Denied", description: "Please enable microphone access in your browser settings.", variant: "destructive" });
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) {
+        setUserResponse(transcript);
+        handleUserResponse(transcript);
       }
       setIsListening(false);
     };
-    recognition.onend = () => setIsListening(false);
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      if (event.error === 'not-allowed') {
+        toast({
+          title: "Permission Denied",
+          description: "Please enable microphone access in your browser.",
+          variant: "destructive"
+        });
+      }
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
     recognitionRef.current = recognition;
   }, [toast]);
 
-  // Effect to automatically play new AI messages in speech mode
+  // Automatically play AI voice if speech mode is enabled
   useEffect(() => {
     if (speechMode && chatHistory.length > 0) {
       const lastMessage = chatHistory[chatHistory.length - 1];
@@ -138,37 +168,56 @@ export default function AnalyzeClient() {
     }
   }, [chatHistory, speechMode, isLoading]);
 
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      setFile(selectedFile);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(selectedFile);
+      processFile(selectedFile);
     }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile && droppedFile.type.startsWith('image/')) {
+      processFile(droppedFile);
+    } else {
+      toast({
+        title: "Invalid file",
+        description: "Please upload an image file (PNG, JPG, JPEG, WEBP).",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const processFile = (fileToProcess: File) => {
+    setFile(fileToProcess);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreview(reader.result as string);
+    };
+    reader.readAsDataURL(fileToProcess);
   };
 
   const handleImageSubmit = async () => {
     if (!file || !preview) {
-      toast({ title: "No image selected", description: "Please upload an image.", variant: "destructive" });
+      toast({ title: "No image selected", description: "Please upload a photo of the skin lesion.", variant: "destructive" });
       return;
     }
 
     setIsLoading(true);
-    setLoadingMessage("Detecting condition...");
+    setLoadingMessage("Analyzing image & detecting condition...");
     setError(null);
 
     try {
       const { conditionName } = await detectDiseaseName({ photoDataUri: preview }, user?.id);
-      setDetectedCondition(conditionName);
+      const sanitizedName = sanitizeConditionName(conditionName);
+      setDetectedCondition(sanitizedName);
       setStep('proforma');
-      startProforma(conditionName);
+      startProforma(sanitizedName);
     } catch (err: any) {
       console.error("Initial analysis failed:", err);
-      const errorMessage = err.message || "Failed to analyze the image. The AI may be unable to identify a condition. Please try another photo.";
+      const errorMessage = err.message || "Failed to analyze the image. The AI may be unable to identify a condition. Please try another clear photo.";
       setError(errorMessage);
       setStep('error');
     } finally {
@@ -178,73 +227,108 @@ export default function AnalyzeClient() {
   };
 
   const startProforma = (conditionName: string) => {
-    setChatHistory([{
+    const welcomeMsg: ChatMessage = {
       sender: 'ai',
-      text: `I've identified the condition as likely being **${conditionName}**. To give you a more detailed report, I need to ask a few questions. Let's start with this:`
-    }]);
-    getNextQuestion(conditionName, 'AI: Hello!');
+      text: `I've analyzed your image and identified the primary differential as **${conditionName}**. To generate your personalized clinical report, I'll ask a few quick questions regarding your symptoms and health context.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setChatHistory([welcomeMsg]);
+    setQuestionCount(0);
+    getNextQuestion(conditionName, `AI: Initial detection is ${conditionName}.`, [welcomeMsg]);
   };
 
-  const getNextQuestion = async (conditionName: string, history: string) => {
+  const getNextQuestion = async (
+    conditionName: string,
+    historyString: string,
+    currentHistory: ChatMessage[]
+  ) => {
     setIsLoading(true);
     try {
       const { nextQuestion } = await proformaChat({
         conditionName: conditionName,
-        conversationHistory: history,
+        conversationHistory: historyString,
       });
-      setChatHistory(prev => [...prev, { sender: 'ai', text: nextQuestion }]);
+
+      const newAiMsg: ChatMessage = {
+        sender: 'ai',
+        text: nextQuestion,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      setChatHistory(prev => [...prev, newAiMsg]);
       setQuestionCount(prev => prev + 1);
     } catch (err) {
       console.error("Failed to get next question:", err);
-      setChatHistory(prev => [...prev, { sender: 'ai', text: "I'm having trouble thinking of the next question. Let's proceed with the final analysis." }]);
-      handleFinalEvaluation();
+      const fallbackMsg: ChatMessage = {
+        sender: 'ai',
+        text: "I have gathered enough clinical context. Let's proceed to generate your comprehensive medical assessment.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      const updatedHistory = [...currentHistory, fallbackMsg];
+      setChatHistory(updatedHistory);
+      handleFinalEvaluation(updatedHistory);
     } finally {
       setIsLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
   };
 
   const handleUserResponse = (responseText?: string) => {
-    const textToSend = responseText || userResponse;
-    if (!textToSend.trim() || !detectedCondition) return;
+    const textToSend = (responseText ?? userResponse).trim();
+    if (!textToSend || !detectedCondition || isLoading) return;
 
-    const newHistory = [...chatHistory, { sender: 'user' as const, text: textToSend }];
+    const userMsg: ChatMessage = {
+      sender: 'user',
+      text: textToSend,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    const newHistory = [...chatHistory, userMsg];
     setChatHistory(newHistory);
     setUserResponse("");
 
-    if (questionCount >= MAX_QUESTIONS) {
-      handleFinalEvaluation();
+    const newCount = questionCount + 1;
+
+    if (newCount >= MAX_QUESTIONS) {
+      handleFinalEvaluation(newHistory);
     } else {
       const historyString = newHistory.map(m => `${m.sender === 'ai' ? 'AI' : 'User'}: ${m.text}`).join('\n');
-      getNextQuestion(detectedCondition, historyString);
+      getNextQuestion(detectedCondition, historyString, newHistory);
     }
   };
 
-  const handleFinalEvaluation = async () => {
+  const handleFinalEvaluation = async (historyToEvaluate?: ChatMessage[]) => {
     if (!user || !userData) {
-      toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
+      toast({ title: "Authentication Required", description: "Please sign in to save your report.", variant: "destructive" });
       return;
     }
     if (!preview || !detectedCondition) {
-      toast({ title: "Missing Information", description: "Critical analysis data is missing.", variant: "destructive" });
+      toast({ title: "Missing Information", description: "Analysis specimen or condition name is missing.", variant: "destructive" });
       return;
     }
 
+    const evaluationHistory = historyToEvaluate || chatHistory;
+
     setStep('analyzing');
     setIsLoading(true);
-    setLoadingMessage("Performing final evaluation...");
+    setLoadingMessage("Synthesizing clinical findings & guidelines...");
     setError(null);
 
     try {
-      const answersString = chatHistory.map(a => `${a.sender === 'ai' ? 'Q' : 'A'}: ${a.text}`).join('\n\n');
-      const proformaAnswers = chatHistory.reduce((acc, curr, index) => {
-        if (curr.sender === 'ai' && index > 0) {
-          const nextMessage = chatHistory[index + 1];
+      const answersString = evaluationHistory.map(a => `${a.sender === 'ai' ? 'Doctor/AI' : 'Patient'}: ${a.text}`).join('\n\n');
+      
+      const proformaAnswers: { question: string; answer: string }[] = [];
+      for (let i = 0; i < evaluationHistory.length; i++) {
+        if (evaluationHistory[i].sender === 'ai' && i > 0) {
+          const nextMessage = evaluationHistory[i + 1];
           if (nextMessage && nextMessage.sender === 'user') {
-            acc.push({ question: curr.text, answer: nextMessage.text });
+            proformaAnswers.push({
+              question: evaluationHistory[i].text,
+              answer: nextMessage.text
+            });
           }
         }
-        return acc;
-      }, [] as { question: string; answer: string }[]);
+      }
 
       const result = await finalEvaluation({
         photoDataUri: preview,
@@ -252,11 +336,11 @@ export default function AnalyzeClient() {
         userAnswers: answersString,
       }, user?.id);
 
-      const newReport = await addAnalysis(user.id, userData.displayName || "Anonymous", {
+      const newReport = await addAnalysis(user.id, userData.displayName || "Patient", {
         condition: result.condition,
         conditionName: result.conditionName,
         image: preview,
-        recommendations: result.recommendations + "\n\n**Note:** Such AI-generated reports may have flaws. Please consult an actual dermatologist for better results.",
+        recommendations: result.recommendations + "\n\n**Notice:** This AI clinical synthesis provides decision support and triage insights. Please consult a board-certified dermatologist for definitive histological verification.",
         dos: result.dos,
         donts: result.donts,
         submittedInfo: {
@@ -266,26 +350,35 @@ export default function AnalyzeClient() {
         },
       });
 
-      toast({ title: "Analysis Complete", description: "Your detailed report is ready.", duration: 3000 });
+      toast({ title: "Analysis Complete", description: "Your comprehensive clinical assessment is ready.", duration: 3000 });
       router.push(`/my-analyses/${newReport.id}`);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("Final evaluation failed:", err);
-      setError("An unexpected error occurred during the final analysis. Please try again.");
+      setError(err?.message || "An unexpected error occurred during report synthesis. Please try again.");
       setStep('error');
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
   const handleMicClick = () => {
-    if (!recognitionRef.current) return;
+    if (!recognitionRef.current) {
+      toast({ title: "Speech Recognition Unavailable", description: "Speech recognition is not supported in this browser.", variant: "destructive" });
+      return;
+    }
     if (isListening) {
       recognitionRef.current.stop();
+      setIsListening(false);
     } else {
-      recognitionRef.current.start();
-      setSpeechMode(true); // Activate speech mode on first mic use
-      setIsListening(true);
+      try {
+        recognitionRef.current.start();
+        setSpeechMode(true);
+        setIsListening(true);
+      } catch (err) {
+        console.error("Speech start error:", err);
+        setIsListening(false);
+      }
     }
   };
 
@@ -312,20 +405,18 @@ export default function AnalyzeClient() {
     setIsAudioLoading(text);
     try {
       const { audioUrl } = await textToSpeech({ text });
-      
       setAudioCache(prev => ({ ...prev, [text]: audioUrl }));
       const audio = new Audio(audioUrl);
       setPlayingAudio({ audio, text });
       audio.play();
       audio.onended = onEnded;
-    } catch (error) {
-      console.error("Failed to play audio:", error);
+    } catch (err) {
+      console.error("Failed to play audio:", err);
       toast({ title: "Audio Error", description: "Could not play the message audio.", variant: "destructive" });
     } finally {
       setIsAudioLoading(null);
     }
   }, [audioCache, playingAudio, toast]);
-
 
   const resetState = () => {
     if (searchParams.get('condition')) {
@@ -339,181 +430,422 @@ export default function AnalyzeClient() {
       setQuestionCount(0);
       setError(null);
       setLoadingMessage("");
+      if (playingAudio) {
+        playingAudio.audio.pause();
+        setPlayingAudio(null);
+      }
     }
   };
 
-  const renderBackButton = () => (
-    <div className="mb-6">
-      <Button variant="outline" onClick={resetState}>
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        {searchParams.get('condition') ? "Back to Dashboard" : "Start Over"}
-      </Button>
-    </div>
-  );
-
   return (
-    <div className="container mx-auto p-4 md:p-8">
-      {step !== 'upload' && renderBackButton()}
-      <div className="flex justify-center">
-        <Card className="w-full max-w-2xl">
-          <CardHeader>
-            <CardTitle className="font-headline text-2xl">New Skin Analysis</CardTitle>
-            <CardDescription>
-              {step === 'upload' && "Upload a photo to get started. Our AI will identify the condition and begin a guided consultation."}
-              {step === 'proforma' && "Please answer the AI's questions for a more accurate report."}
-              {step === 'analyzing' && "Hang tight! Our AI is preparing your detailed analysis."}
-              {step === 'error' && "An error occurred. Please try again."}
-            </CardDescription>
-          </CardHeader>
+    <div className="container mx-auto p-4 md:p-8 max-w-4xl">
+      {/* Navigation & Header */}
+      <div className="flex items-center justify-between mb-6">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={resetState}
+          className="gap-2 hover:bg-muted/80 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {step === 'upload' ? 'Back' : 'Start New Analysis'}
+        </Button>
 
-          {step === 'upload' && (
-            <>
-              <CardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="picture">Skin Condition Photo</Label>
-                  <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center cursor-pointer">
-                    {preview ? (
-                      <div className="relative inline-block">
-                        <Image src={preview} alt="Preview" width={200} height={200} className="mx-auto rounded-lg" />
-                        <Button variant="ghost" size="icon" className="absolute top-1 right-1 bg-background/50 hover:bg-background/80 rounded-full h-7 w-7" onClick={() => { setFile(null); setPreview(null); }}>
-                          <XCircle className="h-5 w-5" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <label htmlFor="picture" className="cursor-pointer">
-                        <div className="space-y-2">
-                          <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">Drag & drop an image here, or click to select one</p>
-                          <Input id="picture" type="file" className="hidden" accept="image/*" onChange={handleFileChange} disabled={isLoading} />
-                          <Button size="sm" asChild className="mt-2"><span>Upload Image</span></Button>
-                        </div>
-                      </label>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button onClick={handleImageSubmit} disabled={isLoading || !file} className="w-full">
-                  {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{loadingMessage}</> : "Start Analysis"}
-                </Button>
-              </CardFooter>
-            </>
-          )}
-
-          {step === 'proforma' && (
-            <>
-              <CardContent className="h-[50vh] flex flex-col p-0">
-                <div className="flex items-center justify-between p-4 border-b">
-                  <div className="flex items-center space-x-2">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Label htmlFor="speech-mode" className="flex items-center gap-2 cursor-pointer">
-                            <Volume2 className="h-4 w-4" />
-                            Speech Mode
-                          </Label>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Automatically play AI responses aloud.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+        {step === 'proforma' && (
+          <div className="flex items-center gap-3">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 bg-muted/60 px-3 py-1.5 rounded-full border border-border/60">
+                    <Volume2 className="h-4 w-4 text-primary" />
+                    <Label htmlFor="speech-mode" className="text-xs font-medium cursor-pointer">
+                      Voice Mode
+                    </Label>
                     <Switch
                       id="speech-mode"
                       checked={speechMode}
                       onCheckedChange={setSpeechMode}
                     />
                   </div>
-                </div>
-                <ScrollArea className="flex-grow p-6" ref={scrollAreaRef}>
-                  <div className="space-y-4">
-                    {chatHistory.map((msg, index) => (
-                      <div key={index} className={cn("flex items-start gap-3", msg.sender === 'user' ? 'justify-end' : 'justify-start')}>
-                        {msg.sender === 'ai' && (
-                          <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-                            <AvatarFallback><Bot size={18} /></AvatarFallback>
-                          </Avatar>
-                        )}
-                        <div className={cn("rounded-lg px-4 py-2 max-w-[80%]", msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                          <p className="text-sm">
-                            {msg.text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
-                              if (part.startsWith('**') && part.endsWith('**')) {
-                                return <strong key={i}>{part.slice(2, -2)}</strong>;
-                              }
-                              return part;
-                            })}
-                          </p>
-                          {msg.sender === 'ai' && index > 0 && (
-                            <div className="flex justify-end mt-1">
-                              <Button size="icon" variant="ghost" className={cn("h-6 w-6 shrink-0", playingAudio?.text === msg.text && "text-primary")} onClick={() => handlePlayMessageAudio(msg.text)} disabled={isAudioLoading === msg.text}>
-                                {isAudioLoading === msg.text ? <Loader2 className="h-4 w-4 animate-spin" /> : playingAudio?.text === msg.text ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        {msg.sender === 'user' && (
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback><User size={18} /></AvatarFallback>
-                          </Avatar>
-                        )}
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Read AI questions aloud automatically</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {questionCount >= 1 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleFinalEvaluation()}
+                disabled={isLoading}
+                className="gap-1.5 font-medium text-xs bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 shadow-none"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Finish & View Report
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Main Analysis Card */}
+      <Card className="shadow-lg border-border/80 overflow-hidden backdrop-blur-sm bg-card/95">
+        <CardHeader className="border-b bg-muted/30 pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle className="font-headline text-xl flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Dermatological Consultation & Analysis
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm mt-0.5">
+                {step === 'upload' && "Upload a clear photo to initiate AI condition detection and guided diagnostic triage."}
+                {step === 'proforma' && "Answer follow-up diagnostic questions to calibrate accuracy and rule out differential diagnoses."}
+                {step === 'analyzing' && "Generating clinical synthesis with ICD-10 coding and medical guidelines..."}
+                {step === 'error' && "An error occurred during evaluation."}
+              </CardDescription>
+            </div>
+
+            {step === 'proforma' && detectedCondition && (
+              <div className="flex items-center gap-2 bg-primary/10 text-primary border border-primary/20 rounded-full px-3 py-1 text-xs font-semibold">
+                <span>Detected:</span>
+                <span className="underline">{detectedCondition}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Progress bar during proforma */}
+          {step === 'proforma' && (
+            <div className="mt-4 space-y-1.5">
+              <div className="flex justify-between text-xs text-muted-foreground font-medium">
+                <span>Consultation Progress</span>
+                <span>Question {Math.min(questionCount + 1, MAX_QUESTIONS)} of {MAX_QUESTIONS}</span>
+              </div>
+              <Progress value={(Math.min(questionCount, MAX_QUESTIONS) / MAX_QUESTIONS) * 100} className="h-1.5" />
+            </div>
+          )}
+        </CardHeader>
+
+        {/* STEP 1: UPLOAD */}
+        {step === 'upload' && (
+          <>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={handleDrop}
+                  className={cn(
+                    "border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer flex flex-col items-center justify-center min-h-[260px]",
+                    isDragOver ? "border-primary bg-primary/5 scale-[1.01]" : "border-muted-foreground/25 hover:border-primary/60 hover:bg-muted/20",
+                    preview ? "border-solid border-border/80 p-4" : ""
+                  )}
+                >
+                  {preview ? (
+                    <div className="relative group flex flex-col items-center">
+                      <div className="relative rounded-lg overflow-hidden border border-border shadow-md">
+                        <Image
+                          src={preview}
+                          alt="Skin condition specimen"
+                          width={280}
+                          height={280}
+                          className="object-cover rounded-lg max-h-[260px] w-auto"
+                        />
                       </div>
-                    ))}
-                    {isLoading && (
-                      <div className="flex items-start gap-3">
-                        <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-                          <AvatarFallback><Bot size={18} /></AvatarFallback>
-                        </Avatar>
-                        <div className="rounded-lg px-4 py-2 bg-muted flex items-center">
-                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
-                <div className="p-4 border-t">
-                  <div className="relative">
-                    <Input
-                      placeholder={isListening ? "Listening..." : "Type your answer..."}
-                      value={userResponse}
-                      onChange={(e) => setUserResponse(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleUserResponse()}
-                      disabled={isLoading}
-                      className="pr-20"
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-1">
-                      <Button size="icon" variant={isListening ? 'destructive' : 'ghost'} onClick={handleMicClick} disabled={isLoading}>
-                        <Mic className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => handleUserResponse()} disabled={isLoading || !userResponse.trim()}>
-                        <Send className="h-4 w-4" />
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="mt-3 gap-1 text-xs shadow-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFile(null);
+                          setPreview(null);
+                        }}
+                      >
+                        <XCircle className="h-4 w-4" />
+                        Remove Image
                       </Button>
                     </div>
-                  </div>
+                  ) : (
+                    <label htmlFor="picture" className="cursor-pointer w-full flex flex-col items-center justify-center space-y-3 py-6">
+                      <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                        <Upload className="h-8 w-8" />
+                      </div>
+                      <div className="space-y-1 text-center">
+                        <p className="text-sm font-semibold text-foreground">
+                          Drag & drop your skin photo here, or <span className="text-primary underline">browse</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Supports JPEG, PNG, WEBP (High-resolution, well-lit photos give highest diagnostic accuracy)
+                        </p>
+                      </div>
+                      <Input
+                        id="picture"
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        disabled={isLoading}
+                      />
+                    </label>
+                  )}
                 </div>
-              </CardContent>
-            </>
-          )}
-
-          {(step === 'analyzing' || step === 'error') && (
-            <CardContent className="flex flex-col items-center justify-center h-48 gap-4">
-              {step === 'analyzing' && (
-                <>
-                  <WandSparkles className="h-12 w-12 animate-pulse text-primary" />
-                  <p className="text-muted-foreground">{loadingMessage || "Generating your final report..."}</p>
-                  <p className="text-xs text-muted-foreground">This can take up to a minute.</p>
-                </>
-              )}
-              {step === 'error' && error && (
-                <div className="flex flex-col items-center justify-center text-center text-destructive space-y-4 px-4 w-full">
-                  <AlertTriangle className="h-12 w-12 mx-auto flex-shrink-0" />
-                  <p className="text-sm break-words w-full">{error}</p>
-                  <Button onClick={resetState} className="w-full sm:w-auto">Try Again</Button>
-                </div>
-              )}
+              </div>
             </CardContent>
-          )}
-        </Card>
-      </div>
+            <CardFooter className="border-t bg-muted/10 p-4 flex justify-between">
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                HIPAA & ISO 27001 compliant encrypted pipeline
+              </div>
+              <Button
+                onClick={handleImageSubmit}
+                disabled={isLoading || !file || !preview}
+                className="gap-2 font-semibold shadow-md px-6"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {loadingMessage}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Start Guided Analysis
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </>
+        )}
+
+        {/* STEP 2: PROFORMA CONSULTATION CHAT */}
+        {step === 'proforma' && (
+          <div className="flex flex-col h-[65vh] min-h-[500px]">
+            {/* Specimen Banner */}
+            {preview && (
+              <div className="bg-muted/40 px-4 py-2.5 border-b flex items-center justify-between text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Image
+                    src={preview}
+                    alt="Specimen thumbnail"
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 rounded-md object-cover border border-border"
+                  />
+                  <span>Active Specimen Analysis</span>
+                </div>
+                <Badge variant="outline" className="text-[11px] font-normal border-primary/30 text-primary">
+                  Interactive Triage Mode
+                </Badge>
+              </div>
+            )}
+
+            {/* Chat message viewport with guaranteed auto-scroll */}
+            <ScrollArea className="flex-1 p-4 md:p-6 overflow-y-auto">
+              <div className="space-y-4 max-w-3xl mx-auto">
+                {chatHistory.map((msg, index) => {
+                  const isAi = msg.sender === 'ai';
+                  return (
+                    <div
+                      key={index}
+                      className={cn(
+                        "flex items-start gap-3 transition-opacity duration-300",
+                        isAi ? "justify-start" : "justify-end"
+                      )}
+                    >
+                      {isAi && (
+                        <Avatar className="h-8 w-8 border border-primary/20 bg-primary/10 text-primary shrink-0 mt-0.5">
+                          <AvatarFallback className="bg-primary text-primary-foreground font-bold">
+                            <Bot className="h-4 w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+
+                      <div
+                        className={cn(
+                          "rounded-2xl px-4 py-3 max-w-[85%] md:max-w-[75%] shadow-sm relative group",
+                          isAi
+                            ? "bg-muted/90 text-foreground border border-border/60 rounded-tl-sm"
+                            : "bg-primary text-primary-foreground rounded-tr-sm"
+                        )}
+                      >
+                        <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {msg.text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                              return <strong key={i} className={isAi ? "text-primary font-semibold" : "font-bold"}>{part.slice(2, -2)}</strong>;
+                            }
+                            return part;
+                          })}
+                        </div>
+
+                        {/* Message Meta & Audio Trigger */}
+                        <div className="flex items-center justify-between mt-2 pt-1 border-t border-border/20 text-[10px] opacity-75 gap-3">
+                          <span>{msg.timestamp || 'Just now'}</span>
+                          {isAi && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className={cn(
+                                "h-5 w-5 rounded-full hover:bg-background/50",
+                                playingAudio?.text === msg.text && "text-primary animate-pulse"
+                              )}
+                              onClick={() => handlePlayMessageAudio(msg.text)}
+                              disabled={isAudioLoading === msg.text}
+                            >
+                              {isAudioLoading === msg.text ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : playingAudio?.text === msg.text ? (
+                                <VolumeX className="h-3 w-3" />
+                              ) : (
+                                <Volume2 className="h-3 w-3" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {!isAi && (
+                        <Avatar className="h-8 w-8 border border-border shrink-0 mt-0.5">
+                          <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold">
+                            <User className="h-4 w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* AI Thinking Animation */}
+                {isLoading && (
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-8 w-8 border border-primary/20 bg-primary/10 text-primary shrink-0">
+                      <AvatarFallback className="bg-primary text-primary-foreground font-bold">
+                        <Bot className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="rounded-2xl rounded-tl-sm px-4 py-3 bg-muted/80 border border-border/60 flex items-center gap-2 text-xs text-muted-foreground shadow-sm">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <span>Formulating clinical inquiry...</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Bottom scroll sentinel */}
+                <div ref={messagesEndRef} className="h-1" />
+              </div>
+            </ScrollArea>
+
+            {/* Quick Answer Chips */}
+            {!isLoading && (
+              <div className="px-4 py-2 border-t bg-muted/20 flex gap-1.5 overflow-x-auto scrollbar-none">
+                <span className="text-[11px] text-muted-foreground self-center shrink-0 mr-1 font-medium">Suggestions:</span>
+                {QUICK_SUGGESTIONS.map((chip, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleUserResponse(chip)}
+                    className="text-xs shrink-0 bg-background hover:bg-primary/10 hover:text-primary border border-border/80 rounded-full px-3 py-1 transition-colors text-muted-foreground cursor-pointer"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Chat Input Bar */}
+            <div className="p-3 md:p-4 border-t bg-card">
+              <div className="relative flex items-center">
+                <Input
+                  ref={inputRef}
+                  placeholder={isListening ? "Listening to your voice..." : "Type your clinical answer or symptoms..."}
+                  value={userResponse}
+                  onChange={(e) => setUserResponse(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
+                      e.preventDefault();
+                      handleUserResponse();
+                    }
+                  }}
+                  disabled={isLoading}
+                  className={cn(
+                    "pr-24 py-6 bg-muted/30 focus-visible:ring-primary text-sm",
+                    isListening && "border-red-500 bg-red-50/10 placeholder:text-red-500 animate-pulse"
+                  )}
+                />
+                <div className="absolute right-2 flex items-center gap-1">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant={isListening ? 'destructive' : 'ghost'}
+                          onClick={handleMicClick}
+                          disabled={isLoading}
+                          className="h-8 w-8 rounded-full"
+                        >
+                          {isListening ? <MicOff className="h-4 w-4 animate-bounce" /> : <Mic className="h-4 w-4" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{isListening ? 'Stop listening' : 'Speak your answer'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
+                  <Button
+                    size="icon"
+                    onClick={() => handleUserResponse()}
+                    disabled={isLoading || !userResponse.trim()}
+                    className="h-8 w-8 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3 & 4: ANALYZING / ERROR STATES */}
+        {(step === 'analyzing' || step === 'error') && (
+          <CardContent className="flex flex-col items-center justify-center min-h-[340px] p-8 text-center">
+            {step === 'analyzing' && (
+              <div className="space-y-4 max-w-md flex flex-col items-center">
+                <div className="relative">
+                  <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center text-primary animate-pulse">
+                    <WandSparkles className="h-10 w-10 text-primary" />
+                  </div>
+                  <div className="absolute inset-0 rounded-full border-2 border-primary/40 border-t-transparent animate-spin" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-lg text-foreground">
+                    {loadingMessage || "Generating Clinical Synthesis"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Performing multimodal RAG cross-referencing, ICD-10 differential mapping, and clinical guideline synthesis.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {step === 'error' && error && (
+              <div className="space-y-4 max-w-md flex flex-col items-center text-destructive">
+                <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <AlertTriangle className="h-8 w-8 text-destructive" />
+                </div>
+                <div className="space-y-1 text-center">
+                  <h3 className="font-semibold text-base">Analysis Error</h3>
+                  <p className="text-xs text-muted-foreground break-words">{error}</p>
+                </div>
+                <Button onClick={resetState} variant="outline" className="gap-2 mt-2">
+                  <RotateCcw className="h-4 w-4" />
+                  Try Again
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
     </div>
   );
 }

@@ -21,6 +21,7 @@ export interface ReportPDFPayload {
     disclaimer: string;
     modelArchitecture?: string;
     generationLatencyMs?: number;
+    patientImage?: string;
 }
 
 /**
@@ -32,12 +33,12 @@ export function getReportVerificationUrl(analysisId: string): string {
 }
 
 /**
- * Generate formatted HTML template ready for html2pdf / jspdf rendering.
+ * Generate formatted HTML template ready for high-fidelity PDF rendering and printing.
  */
 export function generateReportHTML(data: ReportPDFPayload): string {
     const verificationUrl = getReportVerificationUrl(data.analysisId);
     const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(verificationUrl)}`;
-    const modelArch = data.modelArchitecture || 'Gemini 2.5 Flash + HAM10000 ResNet + Supabase pgvector RAG (HNSW)';
+    const modelArch = data.modelArchitecture;
     const generationTime = data.generationLatencyMs ? `${data.generationLatencyMs}ms` : '< 2.5s';
 
     return `
@@ -77,20 +78,28 @@ export function generateReportHTML(data: ReportPDFPayload): string {
             </p>
         </div>
 
-        <!-- PATIENT DEMOGRAPHICS & CLINICAL OVERVIEW -->
-        <div style="background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 20px;">
-            <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
-                <tr>
-                    <td style="padding: 4px 0; width: 33%;"><strong>Patient:</strong> ${data.patientName}</td>
-                    <td style="padding: 4px 0; width: 33%;"><strong>Primary Differential:</strong> <span style="color: #0f172a; font-weight: 700;">${data.conditionName}</span></td>
-                    <td style="padding: 4px 0; width: 33%;"><strong>ICD-10 Code:</strong> <span style="background: #e2e8f0; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-weight: 700;">${data.icdCode}</span></td>
-                </tr>
-                <tr>
-                    <td style="padding: 4px 0;"><strong>Severity Grade:</strong> <span style="color: ${data.severity === 'Severe' || data.severity === 'Critical' ? '#dc2626' : data.severity === 'Moderate' ? '#d97706' : '#16a34a'}; font-weight: 700;">${data.severity}</span></td>
-                    <td style="padding: 4px 0;"><strong>AI Calibration Score:</strong> <span style="font-weight: 700; color: #2563eb;">${data.confidenceScore}%</span></td>
-                    <td style="padding: 4px 0;"><strong>Verification Status:</strong> <span style="color: #16a34a; font-weight: 600;">✓ Grounded with Citations</span></td>
-                </tr>
-            </table>
+        <!-- PATIENT DEMOGRAPHICS & SPECIMEN IMAGE OVERVIEW -->
+        <div style="display: flex; gap: 16px; margin-bottom: 20px; align-items: stretch;">
+            ${data.patientImage ? `
+            <div style="width: 140px; flex-shrink: 0; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box;">
+                <img src="${data.patientImage}" alt="Submitted Lesion / Specimen" style="width: 120px; height: 110px; border-radius: 6px; object-fit: cover; border: 1px solid #e2e8f0; display: block;" />
+                <span style="font-size: 9px; color: #475569; margin-top: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;">Submitted Specimen</span>
+            </div>
+            ` : ''}
+            <div style="flex: 1; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; justify-content: center;">
+                <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 4px 0; width: 33%;"><strong>Patient:</strong> ${data.patientName}</td>
+                        <td style="padding: 4px 0; width: 33%;"><strong>Primary Differential:</strong> <span style="color: #0f172a; font-weight: 700;">${data.conditionName}</span></td>
+                        <td style="padding: 4px 0; width: 33%;"><strong>ICD-10 Code:</strong> <span style="background: #e2e8f0; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-weight: 700;">${data.icdCode}</span></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 4px 0;"><strong>Severity Grade:</strong> <span style="color: ${data.severity === 'Severe' || data.severity === 'Critical' ? '#dc2626' : data.severity === 'Moderate' ? '#d97706' : '#16a34a'}; font-weight: 700;">${data.severity}</span></td>
+                        <td style="padding: 4px 0;"><strong>AI Calibration Score:</strong> <span style="font-weight: 700; color: #2563eb;">${data.confidenceScore}%</span></td>
+                        <td style="padding: 4px 0;"><strong>Verification Status:</strong> <span style="color: #16a34a; font-weight: 600;">✓ Grounded with Citations</span></td>
+                    </tr>
+                </table>
+            </div>
         </div>
 
         <!-- CLINICAL SUMMARY -->

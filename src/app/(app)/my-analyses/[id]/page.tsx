@@ -488,6 +488,7 @@ export default function AnalysisDetailPage() {
                 disclaimer: 'DermiAssist-AI provides preliminary informational analysis using artificial intelligence and does NOT provide definitive medical diagnoses or replace evaluation by a licensed dermatologist. Always consult a qualified healthcare professional for medical advice.',
                 modelArchitecture: 'Gemini 2.5 Flash + HAM10000 ResNet + Supabase pgvector RAG (HNSW)',
                 generationLatencyMs: 1840,
+                patientImage: analysis.image,
             });
 
             // Open print window with formatted HTML for pixel-perfect PDF export
