@@ -4,15 +4,15 @@
 
 **Production-Grade Polyglot AI System Featuring Vector RAG, Multi-Agent LLM Orchestration, Model Context Protocol (MCP), Hugging Face HAM10000 Models, Hybrid BM25+Vector RRF Search, Token Budget Allocator, Circuit Breakers & Async Task Queues**
 
-[![Next.js](https://img.shields.io/badge/Next.js-15.1.7-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15.5-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-19.2-blue?style=flat-square&logo=react)](https://reactjs.org/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o-412991?style=flat-square&logo=openai)](https://openai.com/)
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-HAM10000-FFD21E?style=flat-square&logo=huggingface)](https://huggingface.co/)
 [![MCP Protocol](https://img.shields.io/badge/MCP-JSON--RPC%202.0-purple?style=flat-square)](https://modelcontextprotocol.io)
 [![Supabase](https://img.shields.io/badge/Supabase-pgvector-green?style=flat-square&logo=supabase)](https://supabase.com/)
-[![Genkit](https://img.shields.io/badge/Genkit-1.30.1-orange?style=flat-square)](https://firebase.google.com/docs/genkit)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4.1-338639?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
+[![Genkit](https://img.shields.io/badge/Genkit-1.41.0-orange?style=flat-square)](https://firebase.google.com/docs/genkit)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-338639?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
 
 </div>
 
@@ -361,14 +361,14 @@ stateDiagram-v2
 
 ### 5.1. Vector RAG Engine (pgvector)
 - **Database Schema**: `medical_knowledge_chunks` table storing clinical literature with a 768-dimensional `vector(768)` column (`supabase_migrations/20_vector_embeddings_rag.sql`).
-- **Embedding Generation**: Implemented in [`src/ai/rag/embeddings.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/ai/rag/embeddings.ts) using Google `text-embedding-004`.
+- **Embedding Generation**: Implemented in [`src/ai/rag/embeddings.ts`](src/ai/rag/embeddings.ts) using Google `text-embedding-004`.
 - **Stored Search Procedure**: Stored procedure `match_medical_knowledge` computes cosine similarity $1 - (\text{embedding} \Leftrightarrow \text{query\_embedding})$ with threshold filtering.
-- **RAG Retriever Module**: Implemented in [`src/ai/rag/retriever.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/ai/rag/retriever.ts) returning grounded context text and formatted citations (`[Source: American Academy of Dermatology Guidelines (ICD-10: L70.0)]`).
+- **RAG Retriever Module**: Implemented in [`src/ai/rag/retriever.ts`](src/ai/rag/retriever.ts) returning grounded context text and formatted citations (`[Source: American Academy of Dermatology Guidelines (ICD-10: L70.0)]`).
 
 ---
 
 ### 5.2. Multi-Agent LLM Orchestration Pipeline
-The multi-agent coordinator ([`src/ai/orchestrator.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/ai/orchestrator.ts)) runs 4 sub-agents:
+The multi-agent coordinator ([`src/ai/orchestrator.ts`](src/ai/orchestrator.ts)) runs 4 sub-agents:
 
 ```mermaid
 sequenceDiagram
@@ -408,11 +408,11 @@ sequenceDiagram
 ---
 
 ### 5.3. FastAPI Python AI Microservice (`ai_service/`)
-Located in [`ai_service/`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/), DermiAssist-AI features a standalone **FastAPI Python Microservice Engine** running on port `8000`:
+Located in [`ai_service/`](ai_service/), DermiAssist-AI features a standalone **FastAPI Python Microservice Engine** running on port `8000`:
 - **Interactive Swagger Documentation**: Automatically generated OpenAPI UI accessible at `http://localhost:8000/docs`.
-- **Pydantic Validation Schemas**: Strict data validation for diagnostic payloads ([`ai_service/schemas.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/schemas.py)).
-- **Python Async Vector RAG Engine**: Native HTTPX & Supabase Python client searching `pgvector` chunks ([`ai_service/services/rag_service.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/services/rag_service.py)).
-- **Multi-Agent Pipeline Service**: Python multi-agent orchestration coordinator ([`ai_service/services/orchestrator_service.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/services/orchestrator_service.py)).
+- **Pydantic Validation Schemas**: Strict data validation for diagnostic payloads ([`ai_service/schemas.py`](ai_service/schemas.py)).
+- **Python Async Vector RAG Engine**: Native HTTPX & Supabase Python client searching `pgvector` chunks ([`ai_service/services/rag_service.py`](ai_service/services/rag_service.py)).
+- **Multi-Agent Pipeline Service**: Python multi-agent orchestration coordinator ([`ai_service/services/orchestrator_service.py`](ai_service/services/orchestrator_service.py)).
 - **Next.js Microservice Proxy**: Next.js API routes (`src/app/api/ai/analyze/route.ts`) seamlessly proxy requests to FastAPI with automatic fallback to the internal TypeScript engine if the Python microservice is offline.
 
 ```bash
@@ -433,45 +433,45 @@ Integrated into the Python FastAPI microservice:
 ---
 
 ### 5.5. Real-Time Token Streaming Engine (Server-Sent Events / SSE)
-Implemented at [`src/app/api/ai/stream-analysis/route.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/app/api/ai/stream-analysis/route.ts):
+Implemented at [`src/app/api/ai/stream-analysis/route.ts`](src/app/api/ai/stream-analysis/route.ts):
 - Delivers diagnostic report tokens live to the UI chunk-by-chunk using Server-Sent Events (`text/event-stream`).
 - Reduces Time-to-First-Token (TTFT) to **$<100\text{ms}$**.
 
 ---
 
 ### 5.6. Longitudinal Lesion Healing Analytics & Progress Tracker
-Implemented at [`ai_service/services/healing_tracker.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/services/healing_tracker.py) and exposed via `POST /api/v1/analytics/track-healing`:
+Implemented at [`ai_service/services/healing_tracker.py`](ai_service/services/healing_tracker.py) and exposed via `POST /api/v1/analytics/track-healing`:
 - Compares sequential skin photos over time (e.g. Day 1 vs. Day 14 vs. Day 30) using Gemini 2.5 Vision and Hugging Face ResNet feature extraction.
 - Computes **Surface Area Reduction %**, **Erythema (Redness) Fading Index**, and **Healing Velocity Score**.
 
 ---
 
 ### 5.7. Enterprise Clinical PDF Generator with QR Verification
-Implemented at [`src/lib/pdf-generator.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/lib/pdf-generator.ts):
+Implemented at [`src/lib/pdf-generator.ts`](src/lib/pdf-generator.ts):
 - Generates high-resolution multi-page medical PDF reports with ICD-10 medical codes, grounded literature citations, doctor digital signatures, and an embedded cryptographic QR code linking to digital report verification.
 
 ---
 
 ### 5.8. Dynamic Token Budget Allocator
-Implemented at [`ai_service/utils/token_budget.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/utils/token_budget.py) and exposed via `POST /api/v1/system/token-budget`:
+Implemented at [`ai_service/utils/token_budget.py`](ai_service/utils/token_budget.py) and exposed via `POST /api/v1/system/token-budget`:
 - Enforces strict role-based token budgets ($512$ tokens for Triage, $1024$ for Vision, $2048$ for RAG Synthesis), preventing context window overflow and sub-word medical token explosion under BPE (`cl100k_base`).
 
 ---
 
 ### 5.9. Hybrid RAG Search (BM25 + Vector RRF)
-Implemented at [`ai_service/services/hybrid_search.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/services/hybrid_search.py) and exposed via `POST /api/v1/rag/hybrid-search`:
+Implemented at [`ai_service/services/hybrid_search.py`](ai_service/services/hybrid_search.py) and exposed via `POST /api/v1/rag/hybrid-search`:
 - Combines keyword match (PostgreSQL `tsvector`) with `pgvector` Cosine Distance Search using Reciprocal Rank Fusion ($RRF = \frac{1}{60 + r_{\text{BM25}}} + \frac{1}{60 + r_{\text{Vector}}}$), ensuring $100\%$ recall on clinical codes (`L20.9`, `ICD-10`).
 
 ---
 
 ### 5.10. Circuit Breaker Resilience & Async Task Workers
-- **Circuit Breaker** ([`ai_service/utils/circuit_breaker.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/utils/circuit_breaker.py)): Manages state transitions (`CLOSED` $\rightarrow$ `OPEN` $\rightarrow$ `HALF_OPEN`) with 30s reset timeout to prevent cascading thread exhaustion during API outages.
-- **Async Task Worker Pool** ([`ai_service/queue/task_worker.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/queue/task_worker.py)): Decouples heavy multi-agent synthesis from HTTP threads via background task queuing (`POST /api/v1/jobs/submit`).
+- **Circuit Breaker** ([`ai_service/utils/circuit_breaker.py`](ai_service/utils/circuit_breaker.py)): Manages state transitions (`CLOSED` $\rightarrow$ `OPEN` $\rightarrow$ `HALF_OPEN`) with 30s reset timeout to prevent cascading thread exhaustion during API outages.
+- **Async Task Worker Pool** ([`ai_service/queue/task_worker.py`](ai_service/queue/task_worker.py)): Decouples heavy multi-agent synthesis from HTTP threads via background task queuing (`POST /api/v1/jobs/submit`).
 
 ---
 
 ### 5.11. Model Context Protocol (MCP) Server
-Implemented at [`src/ai/mcp/server.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/ai/mcp/server.ts) and exposed via `/api/mcp`:
+Implemented at [`src/ai/mcp/server.ts`](src/ai/mcp/server.ts) and exposed via `/api/mcp`:
 
 ```mermaid
 graph TD
@@ -506,8 +506,8 @@ graph TD
 ---
 
 ### 5.13. Dual-Layer AI Guardrails & PII Redaction
-- **Input Guardrail** ([`src/ai/guards/input-guard.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/ai/guards/input-guard.ts)): Intercepts prompt injection attacks and redacts Social Security Numbers, credit cards, and phone numbers.
-- **Output Guardrail** ([`src/ai/guards/output-guard.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/ai/guards/output-guard.ts)): Flags low-confidence predictions ($<50\%$) and appends legal medical disclaimers.
+- **Input Guardrail** ([`src/ai/guards/input-guard.ts`](src/ai/guards/input-guard.ts)): Intercepts prompt injection attacks and redacts Social Security Numbers, credit cards, and phone numbers.
+- **Output Guardrail** ([`src/ai/guards/output-guard.ts`](src/ai/guards/output-guard.ts)): Flags low-confidence predictions ($<50\%$) and appends legal medical disclaimers.
 
 ---
 
@@ -686,7 +686,7 @@ npx tsx scripts/debug-channels.ts
 ## 10. Complete Environment & Setup Guide
 
 ### 10.1. Prerequisites
-1. **Node.js**: `v18.x` or higher
+1. **Node.js**: `v20.x` or higher (`v22.x`+ recommended — `@supabase/supabase-js` warns on Node 20 and will drop support for it in a future release)
 2. **Python**: `v3.10` or higher (for FastAPI microservice)
 3. **npm**: `v9.x` or higher
 4. **Supabase Account**: PostgreSQL database instance with `pgvector`
@@ -739,7 +739,7 @@ Vercel natively supports deploying Python FastAPI microservices alongside Next.j
 
 2. **Deploy on Vercel**:
    - Go to [Vercel Dashboard](https://vercel.com/dashboard) $\rightarrow$ **Add New Project** $\rightarrow$ Import your `dermiassist` GitHub repository.
-   - Vercel automatically detects [`vercel.json`](file:///c:/Users/salma/Downloads/dermiassist/vercel.json) and compiles both Next.js and FastAPI serverless functions!
+   - Vercel automatically detects [`vercel.json`](vercel.json) and compiles both Next.js and FastAPI serverless functions!
 
 3. **Configure Environment Variables in Vercel**:
    - `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
@@ -769,6 +769,6 @@ Vercel natively supports deploying Python FastAPI microservices alongside Next.j
 
 ## 12. Edge Security & Privacy Controls
 
-- **Edge Authentication**: Next.js Edge Middleware ([`src/middleware.ts`](file:///c:/Users/salma/Downloads/dermiassist/src/middleware.ts)) validates Supabase auth tokens server-side.
+- **Edge Authentication**: Next.js Edge Middleware ([`src/middleware.ts`](src/middleware.ts)) validates Supabase auth tokens server-side.
 - **Row Level Security**: PostgreSQL RLS policies enforce multi-tenant isolation.
 - **Strict PII Redaction**: Input guardrail redacts sensitive personal identifiers prior to external LLM processing.
