@@ -169,21 +169,23 @@ export default function AppointmentsPage() {
         }
     };
 
-    // Join window: 15 minutes before start to 90 minutes after
+    // Join window: from appointment start time to 30 minutes after
     const isJoinButtonEnabled = (appointmentDate?: string) => {
         if (!appointmentDate) return false;
         const apptTime = new Date(appointmentDate);
-        const diff = differenceInMinutes(apptTime, now); // positive = in future
-        return diff <= 15 && diff >= -90;
+        const diff = differenceInMinutes(apptTime, now); // positive = appointment is in the future
+        // Enabled when: appointment time has arrived (diff <= 0) AND within 30 min window (diff >= -30)
+        return diff <= 0 && diff >= -30;
     };
 
     const getJoinTooltip = (appointmentDate?: string) => {
         if (!appointmentDate) return 'Appointment not yet scheduled.';
         const apptTime = new Date(appointmentDate);
         const diff = differenceInMinutes(apptTime, now);
-        if (diff > 15) return `You can join 15 minutes before the start time.`;
-        if (diff < -90) return 'The time window to join has passed.';
-        return 'Join your video consultation now.';
+        if (diff > 0) return `You can join at the scheduled appointment time (${format(apptTime, 'h:mm a')}).`;
+        if (diff < -30) return 'The 30-minute consultation window has expired.';
+        const remaining = 30 + diff; // minutes left in window
+        return `Join now — ${remaining} minute${remaining !== 1 ? 's' : ''} remaining in the consultation window.`;
     };
 
     const handleDelete = async (id: string) => {
