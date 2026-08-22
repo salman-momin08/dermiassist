@@ -72,34 +72,34 @@ export function AppHeader() {
   const displayName = userData?.displayName || user?.user_metadata?.full_name || user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User';
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container relative flex h-16 items-center">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 overflow-hidden">
+      <div className="container relative flex h-16 items-center justify-between px-3 sm:px-6 md:px-8 max-w-full">
 
         {/* Left: Hamburger (mobile/tablet) + Logo */}
-        <div className="flex items-center gap-2 flex-1">
-          {authenticated && (
-            <div className="lg:hidden">
-              <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Open navigation menu">
-                    <Menu className="h-6 w-6" />
-                    <span className="sr-only">Open Menu</span>
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="flex flex-col w-72 p-0" aria-describedby={undefined}>
-                  <SheetHeader className="sr-only">
-                    <SheetTitle>Main Navigation Menu</SheetTitle>
-                  </SheetHeader>
+        <div className="flex items-center gap-2">
+          <div className="lg:hidden">
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg" aria-label="Open navigation menu">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Open Menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="flex flex-col w-[280px] sm:w-72 p-0 max-w-[85vw]" aria-describedby={undefined}>
+                <SheetHeader className="sr-only">
+                  <SheetTitle>Main Navigation Menu</SheetTitle>
+                </SheetHeader>
 
-                  {/* Sheet Header: Logo + Brand name */}
-                  <div className="flex items-center gap-2 px-4 py-3 border-b mr-10">
-                    <Logo className="h-6 w-6 flex-shrink-0" showText={false} />
-                    <span className="font-bold text-base font-headline">DermiAssist-AI</span>
-                  </div>
+                {/* Sheet Header: Logo + Brand name */}
+                <div className="flex items-center gap-2 px-4 py-4 border-b">
+                  <Logo className="h-6 w-6 flex-shrink-0" showText={false} />
+                  <span className="font-bold text-base font-headline">DermiAssist-AI</span>
+                </div>
 
-                  {/* Nav Links */}
-                  <nav className="flex flex-col gap-1 px-3 py-3 flex-1 overflow-y-auto" aria-label="Mobile Navigation">
-                    {filteredNavLinks.map(link => {
+                {/* Nav Links */}
+                <nav className="flex flex-col gap-1 px-3 py-3 flex-1 overflow-y-auto" aria-label="Mobile Navigation">
+                  {authenticated ? (
+                    filteredNavLinks.map(link => {
                       const isActive = pathname === link.href || (link.href !== '/' && pathname?.startsWith(link.href));
                       return (
                         <Link
@@ -107,7 +107,7 @@ export function AppHeader() {
                           href={link.href}
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
-                            "rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                            "rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
                             isActive
                               ? "bg-primary/10 text-primary font-semibold"
                               : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -117,43 +117,84 @@ export function AppHeader() {
                           {link.label}
                         </Link>
                       );
-                    })}
-                  </nav>
-
-                  {/* Sheet Footer: User Profile + Logout */}
-                  {!loading && authenticated && user && (
-                    <div className="border-t">
+                    })
+                  ) : (
+                    <>
                       <Link
-                        href={role === 'doctor' ? '/doctor/profile' : role === 'admin' ? '/admin/profile' : '/profile'}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors"
+                        href="/"
+                        className={cn(
+                          "rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
+                          pathname === '/' ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:bg-accent"
+                        )}
                         onClick={() => setIsSheetOpen(false)}
                       >
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          <AvatarImage src={userData?.photo_url || undefined} alt={displayName} />
-                          <AvatarFallback>{displayName.charAt(0).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-medium truncate">{displayName}</span>
-                          <span className="text-xs text-muted-foreground truncate">{user.email}</span>
-                        </div>
+                        Home
                       </Link>
-                      <button
-                        onClick={() => { setIsSheetOpen(false); signOut(); }}
-                        className="flex items-center gap-3 px-4 py-3 w-full text-left text-sm text-destructive hover:bg-destructive/10 transition-colors border-t"
+                      <Link
+                        href="/project-details"
+                        className={cn(
+                          "rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
+                          pathname === '/project-details' ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:bg-accent"
+                        )}
+                        onClick={() => setIsSheetOpen(false)}
                       >
-                        <LogOut className="h-4 w-4" />
-                        Log out
-                      </button>
-                    </div>
+                        Project Details
+                      </Link>
+                      <Link
+                        href="/contact"
+                        className={cn(
+                          "rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
+                          pathname === '/contact' ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:bg-accent"
+                        )}
+                        onClick={() => setIsSheetOpen(false)}
+                      >
+                        Contact
+                      </Link>
+                      <div className="pt-4 border-t mt-2 flex flex-col gap-2">
+                        <Button variant="outline" asChild className="w-full rounded-xl" onClick={() => setIsSheetOpen(false)}>
+                          <Link href="/login">Sign In</Link>
+                        </Button>
+                        <Button asChild className="w-full rounded-xl" onClick={() => setIsSheetOpen(false)}>
+                          <Link href="/signup">Get Started</Link>
+                        </Button>
+                      </div>
+                    </>
                   )}
-                </SheetContent>
-              </Sheet>
-            </div>
-          )}
+                </nav>
+
+                {/* Sheet Footer: User Profile + Logout */}
+                {!loading && authenticated && user && (
+                  <div className="border-t">
+                    <Link
+                      href={role === 'doctor' ? '/doctor/profile' : role === 'admin' ? '/admin/profile' : '/profile'}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors"
+                      onClick={() => setIsSheetOpen(false)}
+                    >
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarImage src={userData?.photo_url || undefined} alt={displayName} />
+                        <AvatarFallback>{displayName.charAt(0).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-medium truncate">{displayName}</span>
+                        <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+                      </div>
+                    </Link>
+                    <button
+                      onClick={() => { setIsSheetOpen(false); signOut(); }}
+                      className="flex items-center gap-3 px-4 py-3 w-full text-left text-sm text-destructive hover:bg-destructive/10 transition-colors border-t cursor-pointer"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>Log out</span>
+                    </button>
+                  </div>
+                )}
+              </SheetContent>
+            </Sheet>
+          </div>
 
           <Link href={getHomeHref()} className="flex items-center space-x-1.5 sm:space-x-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md p-1">
-            <Logo className="h-5 w-5 sm:h-7 sm:w-7 md:h-8 md:w-8" showText={false} />
-            <span className="text-sm sm:text-lg md:text-xl font-bold font-headline truncate max-w-[120px] sm:max-w-none">DermiAssist-AI</span>
+            <Logo className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8" showText={false} />
+            <span className="text-sm sm:text-lg md:text-xl font-bold font-headline truncate max-w-[130px] sm:max-w-none">DermiAssist-AI</span>
           </Link>
         </div>
 
@@ -184,7 +225,7 @@ export function AppHeader() {
         </div>
 
         {/* Right: Notifications + Theme toggle + UserNav (desktop) / Login buttons */}
-        <div className="flex items-center justify-end gap-2 flex-1">
+        <div className="flex items-center justify-end gap-1.5 sm:gap-2">
           {authenticated && user && (
             <div className="block">
               <NotificationInbox subscriberId={user.id} />
@@ -200,11 +241,11 @@ export function AppHeader() {
               <UserNav name={displayName} email={user.email || ''} role={role} />
             </div>
           ) : (
-            <nav className="space-x-2 hidden sm:flex">
-              <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm">
+            <nav className="space-x-1.5 sm:space-x-2 flex">
+              <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm px-2.5 sm:px-3">
                 <Link href="/login">Login</Link>
               </Button>
-              <Button size="sm" asChild className="text-xs sm:text-sm">
+              <Button size="sm" asChild className="text-xs sm:text-sm px-2.5 sm:px-3">
                 <Link href="/signup">Sign Up</Link>
               </Button>
             </nav>

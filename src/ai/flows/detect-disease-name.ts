@@ -27,9 +27,18 @@ const DetectDiseaseNameOutputSchema = z.object({
 });
 export type DetectDiseaseNameOutput = z.infer<typeof DetectDiseaseNameOutputSchema>;
 
+import { callPythonLangGraphDetect } from '@/lib/python-ai-client';
+
 export async function detectDiseaseName(
   input: DetectDiseaseNameInput
 ): Promise<DetectDiseaseNameOutput> {
+  // 1. Prioritize Python LangGraph Vision Agent
+  const langgraphRes = await callPythonLangGraphDetect(input.photoDataUri);
+  if (langgraphRes && langgraphRes.condition_name && langgraphRes.condition_name.trim().length > 2) {
+    return { conditionName: langgraphRes.condition_name.trim() };
+  }
+
+  // 2. Fallback to TypeScript Genkit flow
   return detectDiseaseNameFlow(input);
 }
 

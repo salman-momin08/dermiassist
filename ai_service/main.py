@@ -228,3 +228,70 @@ async def handle_mcp_jsonrpc(payload: dict):
         "id": req_id,
         "result": {"status": "executed", "method": method}
     }
+
+# =====================================================================
+# LangGraph Multi-Agent Diagnostic Endpoints
+# =====================================================================
+
+from ai_service.schemas import (
+    LangGraphDetectRequest, LangGraphDetectResponse,
+    LangGraphQuestionRequest, LangGraphQuestionResponse,
+    LangGraphEvalRequest, LangGraphEvalResponse
+)
+from ai_service.services.dermatology_graph import (
+    execute_langgraph_detect,
+    execute_langgraph_question,
+    execute_langgraph_evaluation
+)
+
+@app.post("/api/v1/langgraph/detect", response_model=LangGraphDetectResponse, tags=["LangGraph Multi-Agent Engine"])
+async def langgraph_detect_condition(request: LangGraphDetectRequest):
+    """Execute LangGraph vision agent to detect skin condition from image."""
+    try:
+        res = await execute_langgraph_detect(request.photo_data_uri)
+        return LangGraphDetectResponse(
+            condition_name=res.get("condition_name", "Dermatological Condition"),
+            turn_count=res.get("turn_count", 0),
+            error=res.get("error")
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/langgraph/next-question", response_model=LangGraphQuestionResponse, tags=["LangGraph Multi-Agent Engine"])
+async def langgraph_next_question(request: LangGraphQuestionRequest):
+    """Execute LangGraph dynamic proforma agent to generate the next personalized clinical question."""
+    try:
+        res = await execute_langgraph_question(
+            condition_name=request.condition_name,
+            conversation_history=request.conversation_history
+        )
+        return LangGraphQuestionResponse(
+            next_question=res.get("current_question", "Could you describe your symptoms in more detail?"),
+            turn_count=res.get("turn_count", 1),
+            error=res.get("error")
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/langgraph/evaluate", response_model=LangGraphEvalResponse, tags=["LangGraph Multi-Agent Engine"])
+async def langgraph_final_evaluation(request: LangGraphEvalRequest):
+    """Execute LangGraph synthesis agent to produce comprehensive clinical assessment."""
+    try:
+        res = await execute_langgraph_evaluation(
+            initial_condition=request.initial_condition,
+            user_answers=request.user_answers,
+            photo_data_uri=request.photo_data_uri
+        )
+        eval_data = res.get("final_evaluation", {})
+        return LangGraphEvalResponse(
+            conditionName=eval_data.get("conditionName", request.initial_condition),
+            condition=eval_data.get("condition", ""),
+            dos=eval_data.get("dos", []),
+            donts=eval_data.get("donts", []),
+            recommendations=eval_data.get("recommendations", ""),
+            otherConsiderations=eval_data.get("otherConsiderations", ""),
+            error=res.get("error")
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

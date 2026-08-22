@@ -104,17 +104,17 @@ export default function AIEngineeringDashboard() {
             </div>
 
             <Tabs defaultValue="orchestrator" className="w-full">
-                <TabsList className="grid grid-cols-4 max-w-2xl mb-6">
-                    <TabsTrigger value="orchestrator" className="flex items-center gap-2 text-xs md:text-sm">
+                <TabsList className="grid grid-cols-2 sm:grid-cols-4 max-w-2xl mb-6 h-auto p-1 gap-1">
+                    <TabsTrigger value="orchestrator" className="flex items-center gap-2 text-xs md:text-sm py-2">
                         <Zap className="h-4 w-4" /> Multi-Agent Engine
                     </TabsTrigger>
-                    <TabsTrigger value="mcp" className="flex items-center gap-2 text-xs md:text-sm">
+                    <TabsTrigger value="mcp" className="flex items-center gap-2 text-xs md:text-sm py-2">
                         <Terminal className="h-4 w-4" /> MCP Protocol
                     </TabsTrigger>
-                    <TabsTrigger value="evals" className="flex items-center gap-2 text-xs md:text-sm">
+                    <TabsTrigger value="evals" className="flex items-center gap-2 text-xs md:text-sm py-2">
                         <Award className="h-4 w-4" /> Benchmark Evals
                     </TabsTrigger>
-                    <TabsTrigger value="architecture" className="flex items-center gap-2 text-xs md:text-sm">
+                    <TabsTrigger value="architecture" className="flex items-center gap-2 text-xs md:text-sm py-2">
                         <Database className="h-4 w-4" /> RAG & Cache
                     </TabsTrigger>
                 </TabsList>

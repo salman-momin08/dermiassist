@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700" width="100%" height="100%" style="background:#0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <linearGradient id="seqBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="seqPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="seqEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <linearGradient id="seqAmber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <marker id="seqArrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+    </marker>
+    <marker id="seqArrowGreen" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#34d399" />
+    </marker>
+    <marker id="seqArrowPurple" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#c084fc" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="480" y="36" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="700">End-to-End Diagnostic Request Lifecycle</text>
+  <text x="480" y="58" text-anchor="middle" fill="#94a3b8" font-size="12">Sequence Flow: Patient Upload → Next.js Proxy → Python LangGraph → RAG → Report Generation</text>
+
+  <!-- Lifeline Headers -->
+  <!-- 1. Patient -->
+  <rect x="50" y="80" width="130" height="38" rx="8" fill="url(#seqBlue)"/>
+  <text x="115" y="104" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Patient (UI)</text>
+  <line x1="115" y1="118" x2="115" y2="660" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
+
+  <!-- 2. Next.js App -->
+  <rect x="230" y="80" width="140" height="38" rx="8" fill="url(#seqPurple)"/>
+  <text x="300" y="104" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Next.js Server API</text>
+  <line x1="300" y1="118" x2="300" y2="660" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
+
+  <!-- 3. Python FastAPI / LangGraph -->
+  <rect x="420" y="80" width="160" height="38" rx="8" fill="url(#seqEmerald)"/>
+  <text x="500" y="104" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Python LangGraph Engine</text>
+  <line x1="500" y1="118" x2="500" y2="660" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
+
+  <!-- 4. Gemini 2.5 Flash -->
+  <rect x="630" y="80" width="140" height="38" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="700" y="104" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">Gemini 2.5 Flash</text>
+  <line x1="700" y1="118" x2="700" y2="660" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
+
+  <!-- 5. Supabase pgvector -->
+  <rect x="800" y="80" width="120" height="38" rx="8" fill="url(#seqAmber)"/>
+  <text x="860" y="104" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Supabase DB</text>
+  <line x1="860" y1="118" x2="860" y2="660" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
+
+  <!-- Step 1: Upload & Client Compress -->
+  <rect x="75" y="135" width="80" height="30" rx="6" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
+  <text x="115" y="154" text-anchor="middle" fill="#93c5fd" font-size="10">Compress Photo</text>
+
+  <line x1="115" y1="180" x2="295" y2="180" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#seqArrow)"/>
+  <text x="200" y="173" text-anchor="middle" fill="#cbd5e1" font-size="10">1. POST /api/ai/analyze (photoDataUri)</text>
+
+  <!-- Step 2: Forward to LangGraph -->
+  <line x1="300" y1="210" x2="495" y2="210" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#seqArrow)"/>
+  <text x="400" y="203" text-anchor="middle" fill="#cbd5e1" font-size="10">2. POST /api/v1/langgraph/detect</text>
+
+  <!-- Step 3: Call Gemini Vision -->
+  <line x1="500" y1="240" x2="695" y2="240" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#seqArrow)"/>
+  <text x="600" y="233" text-anchor="middle" fill="#cbd5e1" font-size="10">3. Multimodal Vision Analysis</text>
+
+  <line x1="700" y1="270" x2="505" y2="270" stroke="#34d399" stroke-width="1.5" marker-end="url(#seqArrowGreen)"/>
+  <text x="600" y="263" text-anchor="middle" fill="#a7f3d0" font-size="10">Primary Differential: "Psoriasis"</text>
+
+  <line x1="500" y1="295" x2="305" y2="295" stroke="#34d399" stroke-width="1.5" marker-end="url(#seqArrowGreen)"/>
+  <text x="400" y="288" text-anchor="middle" fill="#a7f3d0" font-size="10">{ condition_name: "Psoriasis" }</text>
+
+  <line x1="300" y1="320" x2="120" y2="320" stroke="#34d399" stroke-width="1.5" marker-end="url(#seqArrowGreen)"/>
+  <text x="200" y="313" text-anchor="middle" fill="#a7f3d0" font-size="10">Render Welcome &amp; Differential Badge</text>
+
+  <!-- Step 4: Proforma Inquiry Loop Box -->
+  <rect x="75" y="345" width="670" height="150" rx="10" fill="#1e293b" fill-opacity="0.5" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="3"/>
+  <text x="90" y="365" fill="#c084fc" font-size="11" font-weight="700">LOOP: Dynamic Proforma Consultation (Up to 5 Turns)</text>
+
+  <line x1="115" y1="385" x2="295" y2="385" stroke="#c084fc" stroke-width="1.5" marker-end="url(#seqArrowPurple)"/>
+  <text x="200" y="378" text-anchor="middle" fill="#e9d5ff" font-size="10">Request Next Clinical Question</text>
+
+  <line x1="300" y1="410" x2="495" y2="410" stroke="#c084fc" stroke-width="1.5" marker-end="url(#seqArrowPurple)"/>
+  <text x="400" y="403" text-anchor="middle" fill="#e9d5ff" font-size="10">POST /api/v1/langgraph/next-question</text>
+
+  <line x1="500" y1="435" x2="695" y2="435" stroke="#c084fc" stroke-width="1.5" marker-end="url(#seqArrowPurple)"/>
+  <text x="600" y="428" text-anchor="middle" fill="#e9d5ff" font-size="10">Generate Contextual Clinical Question</text>
+
+  <line x1="700" y1="460" x2="120" y2="460" stroke="#34d399" stroke-width="1.5" marker-end="url(#seqArrowGreen)"/>
+  <text x="400" y="453" text-anchor="middle" fill="#a7f3d0" font-size="10">Deliver AI Follow-Up Question to Patient Chat</text>
+
+  <line x1="115" y1="485" x2="500" y2="485" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#seqArrow)"/>
+  <text x="300" y="478" text-anchor="middle" fill="#cbd5e1" font-size="10">Patient submits symptom answer (voice/text)</text>
+
+  <!-- Step 5: Final Evaluation Synthesis -->
+  <line x1="115" y1="520" x2="295" y2="520" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#seqArrow)"/>
+  <text x="200" y="513" text-anchor="middle" fill="#cbd5e1" font-size="10">Complete Assessment Clicked</text>
+
+  <line x1="300" y1="545" x2="495" y2="545" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#seqArrow)"/>
+  <text x="400" y="538" text-anchor="middle" fill="#cbd5e1" font-size="10">POST /api/v1/langgraph/evaluate</text>
+
+  <line x1="500" y1="570" x2="855" y2="570" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#seqArrow)"/>
+  <text x="680" y="563" text-anchor="middle" fill="#fde68a" font-size="10">pgvector Hybrid RAG Lookup (ICD-10 Guidelines)</text>
+
+  <line x1="860" y1="595" x2="505" y2="595" stroke="#34d399" stroke-width="1.5" marker-end="url(#seqArrowGreen)"/>
+  <text x="680" y="588" text-anchor="middle" fill="#a7f3d0" font-size="10">Return Grounded Medical Chunks</text>
+
+  <line x1="500" y1="620" x2="305" y2="620" stroke="#34d399" stroke-width="1.5" marker-end="url(#seqArrowGreen)"/>
+  <text x="400" y="613" text-anchor="middle" fill="#a7f3d0" font-size="10">Return Synthesis (Summary, Do's, Don'ts, ICD-10)</text>
+
+  <line x1="300" y1="645" x2="120" y2="645" stroke="#34d399" stroke-width="1.5" marker-end="url(#seqArrowGreen)"/>
+  <text x="200" y="638" text-anchor="middle" fill="#a7f3d0" font-size="10">Render Clinical Assessment View &amp; Enable PDF Export</text>
+</svg>

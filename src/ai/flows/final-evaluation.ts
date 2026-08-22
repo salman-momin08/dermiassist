@@ -35,9 +35,30 @@ const FinalEvaluationOutputSchema = z.object({
 export type FinalEvaluationOutput = z.infer<typeof FinalEvaluationOutputSchema>;
 
 
+import { callPythonLangGraphEvaluation } from '@/lib/python-ai-client';
+
 export async function finalEvaluation(
   input: FinalEvaluationInput
 ): Promise<FinalEvaluationOutput> {
+  // 1. Prioritize Python LangGraph Multi-Agent Engine
+  const langgraphRes = await callPythonLangGraphEvaluation(
+    input.initialCondition,
+    input.userAnswers,
+    input.photoDataUri
+  );
+
+  if (langgraphRes && langgraphRes.conditionName && langgraphRes.recommendations) {
+    return {
+      conditionName: langgraphRes.conditionName,
+      condition: langgraphRes.condition,
+      dos: langgraphRes.dos,
+      donts: langgraphRes.donts,
+      recommendations: langgraphRes.recommendations,
+      otherConsiderations: langgraphRes.otherConsiderations,
+    };
+  }
+
+  // 2. Fallback to TypeScript Genkit flow
   return finalEvaluationFlow(input);
 }
 

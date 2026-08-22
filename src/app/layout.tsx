@@ -1,15 +1,20 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { Chatbot } from '@/components/chatbot/chatbot';
 import { AuthProvider } from '@/hooks/use-auth';
-import { MobileWarning } from '@/components/mobile-warning';
 
 export const metadata: Metadata = {
   title: 'DermiAssist-AI - Your Personal Dermatology Assistant',
   description:
     'AI-powered skin analysis, doctor consultations, and personalized skincare recommendations.',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({
@@ -31,7 +36,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body antialiased">
+      <body className="font-body antialiased min-h-screen w-full overflow-x-hidden">
         <AuthProvider>
           <ThemeProvider
             attribute="class"
@@ -40,7 +45,6 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            <MobileWarning />
             <Chatbot />
             <Toaster />
           </ThemeProvider>

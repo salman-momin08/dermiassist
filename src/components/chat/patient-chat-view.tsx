@@ -243,10 +243,10 @@ export default function PatientChatView() {
     }
 
     return (
-        <div className="container mx-auto p-4 md:p-8 h-[calc(100vh-128px)] flex flex-col relative">
-            <div className="space-y-1.5 mb-6">
-                <h1 className="text-3xl font-extrabold tracking-tight font-headline">Chat with Your Doctor</h1>
-                <p className="text-sm text-muted-foreground">Communicate directly and securely with licensed healthcare providers.</p>
+        <div className="container mx-auto p-3 sm:p-4 md:p-8 h-[calc(100dvh-128px)] flex flex-col relative max-w-full overflow-hidden">
+            <div className="space-y-1 mb-4 sm:mb-6">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-headline">Chat with Your Doctor</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground">Communicate directly and securely with licensed healthcare providers.</p>
             </div>
 
             {error && (

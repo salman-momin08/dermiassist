@@ -24,32 +24,20 @@ const ProformaChatOutputSchema = z.object({
 });
 export type ProformaChatOutput = z.infer<typeof ProformaChatOutputSchema>;
 
+import { callPythonLangGraphNextQuestion } from '@/lib/python-ai-client';
+
 export async function proformaChat(
   input: ProformaChatInput
 ): Promise<ProformaChatOutput> {
+  // 1. Prioritize Python LangGraph Multi-Agent Engine
+  const langgraphRes = await callPythonLangGraphNextQuestion(input.conditionName, input.conversationHistory);
+  if (langgraphRes && langgraphRes.next_question && langgraphRes.next_question.trim().length > 5) {
+    return { nextQuestion: langgraphRes.next_question.trim() };
+  }
+
+  // 2. Fallback to TypeScript Genkit flow
   return proformaChatFlow(input);
 }
-
-const prompt = ai.definePrompt({
-  name: 'proformaChatPrompt',
-  input: {schema: ProformaChatInputSchema},
-  output: {schema: ProformaChatOutputSchema},
-  prompt: `You are a highly skilled conversational dermatologist AI, acting as a senior diagnostician. Your goal is to conduct a thorough diagnostic proforma by asking one insightful question at a time. The initial detected condition is **{{{conditionName}}}**.
-
-Your primary goal is not just to ask about the skin condition itself, but to investigate its potential root causes. Skin issues are often linked to other factors. Based on the conversation history, ask the next most relevant question to explore:
-- Symptom specifics (e.g., "Is the rash itchy, painful, or both?").
-- Patient's health history.
-- Lifestyle factors (e.g., "Have there been any recent changes in your diet or stress levels?").
-- Potential deficiencies or other systemic diseases that could be causing this skin manifestation.
-
-Think step-by-step. What is the most critical piece of information you need next to either confirm the initial diagnosis or explore a differential diagnosis? Ask only one question.
-
-**Conversation History:**
-{{{conversationHistory}}}
-
-What is the single most important question to ask next to get a deeper understanding of the patient's overall health and its connection to their skin?
-`,
-});
 
 const proformaChatFlow = ai.defineFlow(
   {
@@ -58,10 +46,49 @@ const proformaChatFlow = ai.defineFlow(
     outputSchema: ProformaChatOutputSchema,
   },
   async input => {
-    const { output } = await prompt(input);
-    if (!output) {
-      throw new AIOutputError('Model returned null output', { flow: 'proformaChatFlow' });
+    // Generate 100% dynamic clinical follow-up question using Gemini
+    let lastError: any = null;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await ai.generate({
+          system: `You are an expert board-certified dermatologist AI conducting a real-time clinical diagnostic proforma.
+The primary differential identified from visual analysis is **${input.conditionName}**.
+
+Your objective is to ask ONE thoughtful, highly relevant clinical follow-up question to investigate:
+- Specific morphological symptoms, progression, and timeline.
+- Sensations (itching severity, burning, soreness, bleeding).
+- Potential triggers, lifestyle factors, contact exposures, or medications.
+- Personal or family dermatological/allergic history.
+- Response to any previous treatments.
+
+Rules:
+1. Formulate the question strictly based on the patient's conversation history.
+2. Never repeat a question or topic already answered by the patient.
+3. Tailor the medical inquiry specifically to the nuances of ${input.conditionName}.
+4. Ask only ONE clear, compassionate question without extra introductory or concluding chatter.`,
+          prompt: `Conversation History so far:
+${input.conversationHistory}
+
+Based on the above patient history and the suspected condition (${input.conditionName}), ask the single most important next clinical question:`,
+        });
+
+        const generatedText = response.text?.trim().replace(/^["']|["']$/g, '');
+        if (generatedText && generatedText.length > 8) {
+          return { nextQuestion: generatedText };
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[proformaChatFlow] Attempt ${attempt} failed:`, err?.message || err);
+        if (attempt < 2) {
+          await new Promise(res => setTimeout(res, 800));
+        }
+      }
     }
-    return output;
+
+    throw new AIOutputError(
+      `Failed to generate dynamic proforma question: ${lastError?.message || 'Model did not return text'}`,
+      { flow: 'proformaChatFlow' }
+    );
   }
 );

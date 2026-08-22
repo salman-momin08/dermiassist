@@ -226,16 +226,13 @@ export default function AnalyzeClient() {
 
       setChatHistory(prev => [...prev, newAiMsg]);
       setQuestionCount(prev => prev + 1);
-    } catch (err) {
-      console.error("Failed to get next question:", err);
-      const fallbackMsg: ChatMessage = {
-        sender: 'ai',
-        text: "I have gathered enough clinical context. Let's proceed to generate your comprehensive medical assessment.",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      const updatedHistory = [...currentHistory, fallbackMsg];
-      setChatHistory(updatedHistory);
-      handleFinalEvaluation(updatedHistory);
+    } catch (err: any) {
+      console.error("AI question generation failed:", err);
+      toast({
+        title: "Connection issue",
+        description: "The AI diagnostician encountered a network delay. You can continue typing your response or complete the assessment.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -452,14 +449,14 @@ export default function AnalyzeClient() {
   }, [chatHistory, speechMode, isLoading, handlePlayMessageAudio]);
 
   return (
-    <div className="container mx-auto p-4 md:p-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl pt-6 sm:pt-8">
       {/* Navigation & Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <Button
           variant="outline"
           size="sm"
           onClick={resetState}
-          className="gap-2 rounded-xl bg-card/60 backdrop-blur-md border-border/80 hover:bg-accent/80 hover:border-primary/40 transition-all shadow-sm"
+          className="gap-2 rounded-xl bg-card/80 backdrop-blur-md border-border/80 hover:bg-accent/80 hover:border-primary/40 transition-all shadow-sm"
         >
           <ArrowLeft className="h-4 w-4 text-muted-foreground" />
           <span>{step === 'upload' ? 'Back to Dashboard' : 'Start New Analysis'}</span>
@@ -709,51 +706,47 @@ export default function AnalyzeClient() {
                         </Avatar>
                       )}
 
-                      <div
-                        className={cn(
-                          "rounded-2xl px-4.5 py-3.5 max-w-[85%] md:max-w-[78%] shadow-md relative transition-all",
-                          isAi
-                            ? "bg-card/95 text-foreground border border-border/80 rounded-tl-sm shadow-sm"
-                            : "bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 text-white rounded-tr-sm shadow-blue-500/20"
-                        )}
-                      >
-                        <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {msg.text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
-                            if (part.startsWith('**') && part.endsWith('**')) {
-                              return <strong key={i} className={isAi ? "text-primary font-bold" : "font-bold underline decoration-white/30"}>{part.slice(2, -2)}</strong>;
-                            }
-                            return part;
-                          })}
-                        </div>
-
-                        {/* Message Meta & Audio Trigger */}
-                        <div className={cn(
-                          "flex items-center justify-between mt-2 pt-1.5 border-t text-[10px] gap-3 font-medium",
-                          isAi ? "border-border/40 text-muted-foreground" : "border-white/20 text-white/80"
-                        )}>
-                          <span>{msg.timestamp || 'Just now'}</span>
-                          {isAi && (
+                      {/* Message Content & Discreet Metadata */}
+                      {isAi ? (
+                        <div className="flex flex-col items-start max-w-[85%] md:max-w-[78%]">
+                          <div className="rounded-2xl rounded-tl-sm px-4.5 py-3 bg-card/95 text-foreground border border-border/80 shadow-sm text-sm leading-relaxed whitespace-pre-wrap">
+                            {msg.text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
+                              if (part.startsWith('**') && part.endsWith('**')) {
+                                return <strong key={i} className="text-primary font-bold">{part.slice(2, -2)}</strong>;
+                              }
+                              return part;
+                            })}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 px-1 text-[10px] text-muted-foreground/70">
+                            <span>{msg.timestamp || 'Just now'}</span>
                             <Button
                               size="icon"
                               variant="ghost"
                               className={cn(
-                                "h-6 w-6 rounded-lg hover:bg-muted/80 transition-colors",
+                                "h-5 w-5 rounded-md hover:bg-muted/80 transition-colors p-0.5",
                                 playingAudio?.text === msg.text && "text-primary animate-pulse bg-primary/10"
                               )}
                               onClick={() => handlePlayMessageAudio(msg.text)}
                               disabled={isAudioLoading === msg.text}
                             >
                               {isAudioLoading === msg.text ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <Loader2 className="h-3 w-3 animate-spin" />
                               ) : playingAudio?.text === msg.text ? (
-                                <VolumeX className="h-3.5 w-3.5" />
+                                <VolumeX className="h-3 w-3" />
                               ) : (
-                                <Volume2 className="h-3.5 w-3.5" />
+                                <Volume2 className="h-3 w-3" />
                               )}
                             </Button>
-                          )}
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="flex flex-col items-end max-w-[85%] md:max-w-[75%]">
+                          <div className="rounded-2xl rounded-tr-sm px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 text-white shadow-md shadow-blue-500/20 text-sm leading-relaxed whitespace-pre-wrap font-normal">
+                            {msg.text}
+                          </div>
+                          <span className="text-[10px] text-muted-foreground/70 mt-1 px-1">{msg.timestamp || 'Just now'}</span>
+                        </div>
+                      )}
 
                       {!isAi && (
                         <Avatar className="h-9 w-9 border-2 border-indigo-500/30 bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md shrink-0 mt-0.5 rounded-xl">

@@ -219,16 +219,16 @@ export default function AppointmentsPage() {
 
     return (
         <div className="container mx-auto p-4 md:p-8">
-            <div className="flex items-center justify-between space-y-2 mb-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight font-headline">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-headline">
                         My Appointments
                     </h1>
-                    <p className="text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                         Manage your upcoming and past appointments with doctors.
                     </p>
                 </div>
-                <Button asChild>
+                <Button asChild className="w-full sm:w-auto">
                     <Link href="/doctors">
                         <Calendar className="mr-2 h-4 w-4" />
                         Book New Appointment

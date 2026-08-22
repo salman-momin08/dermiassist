@@ -97,12 +97,37 @@ class HealingMetrics(BaseModel):
     healing_velocity_score: float
     clinical_trajectory: str
 
-class HealingTrackResponse(BaseModel):
-    success: bool
-    days_elapsed: int
-    metrics: HealingMetrics
-    baseline_assessment: Dict[str, Any]
-    followup_assessment: Dict[str, Any]
-    recommendations: List[str]
-    processing_time_ms: float
+# ── 5. LANGGRAPH MULTI-AGENT DIAGNOSTIC SCHEMAS ──────────────────
+
+class LangGraphDetectRequest(BaseModel):
+    photo_data_uri: str = Field(..., description="Base64 data URI of the skin lesion photo")
+
+class LangGraphDetectResponse(BaseModel):
+    condition_name: str
+    turn_count: int = 0
+    error: Optional[str] = None
+
+class LangGraphQuestionRequest(BaseModel):
+    condition_name: str = Field(..., description="Detected skin condition name")
+    conversation_history: str = Field(..., description="Conversation transcript formatted as AI/User turns")
+
+class LangGraphQuestionResponse(BaseModel):
+    next_question: str
+    turn_count: int = 0
+    error: Optional[str] = None
+
+class LangGraphEvalRequest(BaseModel):
+    initial_condition: str = Field(..., description="Initial diagnosed condition")
+    user_answers: str = Field(..., description="Full consultation answers string")
+    photo_data_uri: Optional[str] = Field(None, description="Optional original photo data URI")
+
+class LangGraphEvalResponse(BaseModel):
+    conditionName: str
+    condition: str
+    dos: List[str]
+    donts: List[str]
+    recommendations: str
+    otherConsiderations: str
+    error: Optional[str] = None
+
 
