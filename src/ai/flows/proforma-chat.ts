@@ -21,6 +21,7 @@ export type ProformaChatInput = z.infer<typeof ProformaChatInputSchema>;
 
 const ProformaChatOutputSchema = z.object({
   nextQuestion: z.string().describe('The next single, relevant question to ask the user.'),
+  suggestedAnswers: z.array(z.string()).optional().describe('3 to 4 concise, relevant quick-answer suggestions that a patient might choose in response to this specific question.'),
   isComplete: z.boolean().optional().describe('True if the model has gathered sufficient clinical confidence to conclude the proforma.'),
   confidenceScore: z.number().min(0).max(100).optional().describe('Diagnostic confidence percentage (0-100) based on gathered patient history.'),
 });
@@ -65,13 +66,14 @@ Your objective is to clinically evaluate the patient's presentation through inte
 - Review personal or family dermatological/allergic history.
 - Evaluate response to previous topical/systemic treatments.
 
-You decide dynamically how many questions to ask based on diagnostic ambiguity. Simple, classic presentations may need 3-4 questions, whereas complex, overlapping rashes may require 6-10 questions to achieve high diagnostic certainty.
+For every question you ask, provide 3 to 4 distinct, highly realistic short answers (2 to 6 words each) tailored to that specific question.
 
 Output JSON format:
 {
-  "nextQuestion": "Single clear, compassionate clinical question (or closing statement if complete)",
-  "isComplete": true/false (Set true ONLY when you have high diagnostic certainty across timeline, sensations, and triggers),
-  "confidenceScore": number (0-100 reflecting your cumulative diagnostic confidence based on the history gathered)
+  "nextQuestion": "Single clear, compassionate clinical question",
+  "suggestedAnswers": ["Option 1", "Option 2", "Option 3", "Option 4"],
+  "isComplete": false,
+  "confidenceScore": 65
 }`,
           prompt: `Conversation History so far:
 ${input.conversationHistory}
@@ -82,6 +84,7 @@ Based on the patient's conversation history and suspected condition (${input.con
         if (response.output) {
           return {
             nextQuestion: response.output.nextQuestion,
+            suggestedAnswers: response.output.suggestedAnswers || [],
             isComplete: Boolean(response.output.isComplete),
             confidenceScore: typeof response.output.confidenceScore === 'number' ? response.output.confidenceScore : 75,
           };

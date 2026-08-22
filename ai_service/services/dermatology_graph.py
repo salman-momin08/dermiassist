@@ -351,3 +351,57 @@ async def execute_langgraph_evaluation(initial_condition: str, user_answers: str
         "error": None
     }
     return await final_evaluation_node(state)
+
+async def execute_langgraph_suggestions(question: str, condition_name: Optional[str] = None, conversation_history: Optional[str] = None) -> Dict[str, Any]:
+    """Execute Python AI suggestions agent to generate 3-4 tailored response options."""
+    prompt = f"""You are a specialized clinical assistant AI agent for DermiAssist-AI.
+Your role is to generate 3 to 4 realistic, distinct, concise patient response options (2 to 6 words each) for a patient answering the following clinical question.
+
+Condition: {condition_name or 'Dermatological Condition'}
+Question to the Patient: "{question}"
+Context: {conversation_history or 'Initial turn'}
+
+Rules:
+1. Every option must directly and naturally answer the specific question asked.
+2. Return ONLY a JSON list of 3-4 strings. Example: ["Option 1", "Option 2", "Option 3"]
+"""
+    try:
+        model = _get_gemini_model("gemini-2.5-flash")
+        if model:
+            res = model.generate_content(prompt)
+            text = res.text.strip()
+            # Extract JSON array
+            match = re.search(r'\[.*\]', text, re.DOTALL)
+            if match:
+                suggestions = json.loads(match.group(0))
+                if isinstance(suggestions, list) and len(suggestions) > 0:
+                    return {"suggestions": [str(s) for s in suggestions[:4]]}
+    except Exception as e:
+        print(f"[LangGraph Suggestions Agent Error]: {e}")
+        openai_client = _get_openai_client()
+        if openai_client:
+            try:
+                res = await openai_client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=100
+                )
+                text = res.choices[0].message.content.strip()
+                match = re.search(r'\[.*\]', text, re.DOTALL)
+                if match:
+                    suggestions = json.loads(match.group(0))
+                    if isinstance(suggestions, list) and len(suggestions) > 0:
+                        return {"suggestions": [str(s) for s in suggestions[:4]]}
+            except Exception as oai_err:
+                print(f"[LangGraph Suggestions OpenAI Fallback Error]: {oai_err}")
+
+    # Fallback generic options
+    return {
+        "suggestions": [
+            "Yes, experiencing this symptom",
+            "No, not present",
+            "Mild discomfort only",
+            "Started a few days ago"
+        ]
+    }
+

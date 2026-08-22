@@ -236,12 +236,14 @@ async def handle_mcp_jsonrpc(payload: dict):
 from ai_service.schemas import (
     LangGraphDetectRequest, LangGraphDetectResponse,
     LangGraphQuestionRequest, LangGraphQuestionResponse,
-    LangGraphEvalRequest, LangGraphEvalResponse
+    LangGraphEvalRequest, LangGraphEvalResponse,
+    LangGraphSuggestionsRequest, LangGraphSuggestionsResponse
 )
 from ai_service.services.dermatology_graph import (
     execute_langgraph_detect,
     execute_langgraph_question,
-    execute_langgraph_evaluation
+    execute_langgraph_evaluation,
+    execute_langgraph_suggestions
 )
 
 @app.post("/api/v1/langgraph/detect", response_model=LangGraphDetectResponse, tags=["LangGraph Multi-Agent Engine"])
@@ -294,4 +296,21 @@ async def langgraph_final_evaluation(request: LangGraphEvalRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/langgraph/suggestions", response_model=LangGraphSuggestionsResponse, tags=["LangGraph Multi-Agent Engine"])
+async def langgraph_generate_suggestions(request: LangGraphSuggestionsRequest):
+    """Execute LangGraph suggestions agent to generate 3-4 tailored response chips."""
+    try:
+        res = await execute_langgraph_suggestions(
+            question=request.question,
+            condition_name=request.condition_name,
+            conversation_history=request.conversation_history
+        )
+        return LangGraphSuggestionsResponse(
+            suggestions=res.get("suggestions", []),
+            error=res.get("error")
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 

@@ -130,4 +130,14 @@ class LangGraphEvalResponse(BaseModel):
     otherConsiderations: str
     error: Optional[str] = None
 
+class LangGraphSuggestionsRequest(BaseModel):
+    question: str = Field(..., description="The clinical question asked")
+    condition_name: Optional[str] = Field(None, description="Suspected condition name")
+    conversation_history: Optional[str] = Field(None, description="Conversation transcript context")
+
+class LangGraphSuggestionsResponse(BaseModel):
+    suggestions: List[str] = Field(default_factory=list, description="3-4 dynamic, tailored patient response options")
+    error: Optional[str] = None
+
+
 

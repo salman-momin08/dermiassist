@@ -100,6 +100,11 @@ export async function callPythonLangGraphNextQuestion(
   }
 }
 
+export interface PythonLangGraphSuggestionsResponse {
+  suggestions: string[];
+  error?: string | null;
+}
+
 /**
  * Call Python LangGraph clinical synthesis agent to generate full evaluation report.
  */
@@ -139,3 +144,44 @@ export async function callPythonLangGraphEvaluation(
     return null;
   }
 }
+
+/**
+ * Call Python LangGraph suggestions agent to generate 3-4 tailored response chips.
+ */
+export async function callPythonLangGraphSuggestions(
+  question: string,
+  conditionName?: string,
+  conversationHistory?: string,
+  timeoutMs: number = 5000
+): Promise<PythonLangGraphSuggestionsResponse | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const response = await fetch(`${PYTHON_AI_SERVICE_URL}/api/v1/langgraph/suggestions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        question,
+        condition_name: conditionName,
+        conversation_history: conversationHistory,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.warn(`[Python LangGraph Suggestions]: HTTP ${response.status}`);
+      return null;
+    }
+
+    return await response.json();
+  } catch (err: any) {
+    console.warn('[Python LangGraph Suggestions unavailable - falling back to Genkit]:', err?.message || err);
+    return null;
+  }
+}
+
