@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 680" width="100%" height="100%" style="background:#0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Title -->
+  <text x="500" y="40" text-anchor="middle" fill="#ffffff" font-size="22" font-weight="700" letter-spacing="0.5">DermiAssist-AI: High-Level System Architecture</text>
+  <text x="500" y="65" text-anchor="middle" fill="#94a3b8" font-size="13">Enterprise Polyglot Microservices Topology (Next.js 15 + Python FastAPI + LangGraph)</text>
+
+  <!-- 1. Client Presentation Layer -->
+  <rect x="50" y="90" width="900" height="90" rx="14" fill="#1e293b" stroke="#334155" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="70" y="115" fill="#38bdf8" font-size="13" font-weight="700">1. CLIENT PRESENTATION LAYER</text>
+  
+  <rect x="70" y="128" width="260" height="40" rx="8" fill="url(#primaryGrad)"/>
+  <text x="200" y="153" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">Next.js 15 Web App (React 19)</text>
+
+  <rect x="370" y="128" width="260" height="40" rx="8" fill="url(#primaryGrad)"/>
+  <text x="500" y="153" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">Mobile Responsive / PWA View</text>
+
+  <rect x="670" y="128" width="260" height="40" rx="8" fill="url(#primaryGrad)"/>
+  <text x="800" y="153" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">MCP Client (Claude / Cursor)</text>
+
+  <!-- Connector -->
+  <path d="M 500 180 L 500 205" stroke="#64748b" stroke-width="2" stroke-dasharray="4"/>
+
+  <!-- 2. Edge Security & Session Gateway -->
+  <rect x="50" y="205" width="900" height="85" rx="14" fill="#1e293b" stroke="#334155" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="70" y="230" fill="#a78bfa" font-size="13" font-weight="700">2. EDGE GATEWAY &amp; SECURITY LAYER</text>
+  
+  <rect x="70" y="240" width="260" height="38" rx="8" fill="url(#purpleGrad)"/>
+  <text x="200" y="264" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="600">Edge Middleware (src/middleware.ts)</text>
+
+  <rect x="370" y="240" width="260" height="38" rx="8" fill="url(#purpleGrad)"/>
+  <text x="500" y="264" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="600">Supabase SSR Session Auth</text>
+
+  <rect x="670" y="240" width="260" height="38" rx="8" fill="url(#purpleGrad)"/>
+  <text x="800" y="264" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="600">Upstash Redis (20 req/min Limiter)</text>
+
+  <!-- Connector -->
+  <path d="M 500 290 L 500 315" stroke="#64748b" stroke-width="2" stroke-dasharray="4"/>
+
+  <!-- 3. Microservices & AI Core Layer -->
+  <rect x="50" y="315" width="900" height="195" rx="14" fill="#1e293b" stroke="#334155" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="70" y="340" fill="#34d399" font-size="13" font-weight="700">3. MULTI-AGENT AI ENGINE &amp; FASTAPI MICROSERVICE</text>
+  
+  <!-- Next.js API -->
+  <rect x="70" y="355" width="390" height="65" rx="10" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="265" y="380" text-anchor="middle" fill="#60a5fa" font-size="13" font-weight="700">Next.js API &amp; Server Actions</text>
+  <text x="265" y="402" text-anchor="middle" fill="#94a3b8" font-size="11">TypeScript Genkit Flows | /api/ai/* | /api/mcp</text>
+
+  <!-- Python FastAPI -->
+  <rect x="540" y="355" width="390" height="65" rx="10" fill="#0f172a" stroke="#10b981" stroke-width="1.5"/>
+  <text x="735" y="380" text-anchor="middle" fill="#34d399" font-size="13" font-weight="700">Python FastAPI Microservice (Port 8000)</text>
+  <text x="735" y="402" text-anchor="middle" fill="#94a3b8" font-size="11">LangGraph State Machine | RAG | HuggingFace HAM10000</text>
+
+  <!-- Internal Agents Row -->
+  <rect x="70" y="435" width="165" height="60" rx="8" fill="url(#emeraldGrad)"/>
+  <text x="152" y="460" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700">LangGraph Vision</text>
+  <text x="152" y="478" text-anchor="middle" fill="#e2e8f0" font-size="10">Gemini 2.5 Flash</text>
+
+  <rect x="250" y="435" width="165" height="60" rx="8" fill="url(#emeraldGrad)"/>
+  <text x="332" y="460" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700">Proforma Agent</text>
+  <text x="332" y="478" text-anchor="middle" fill="#e2e8f0" font-size="10">Dynamic Triage</text>
+
+  <rect x="430" y="435" width="165" height="60" rx="8" fill="url(#emeraldGrad)"/>
+  <text x="512" y="460" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700">Synthesis Agent</text>
+  <text x="512" y="478" text-anchor="middle" fill="#e2e8f0" font-size="10">ICD-10 Guidelines</text>
+
+  <rect x="610" y="435" width="165" height="60" rx="8" fill="url(#emeraldGrad)"/>
+  <text x="692" y="460" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700">HuggingFace Model</text>
+  <text x="692" y="478" text-anchor="middle" fill="#e2e8f0" font-size="10">HAM10000 Lesions</text>
+
+  <rect x="790" y="435" width="140" height="60" rx="8" fill="url(#emeraldGrad)"/>
+  <text x="860" y="460" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700">Hybrid RAG</text>
+  <text x="860" y="478" text-anchor="middle" fill="#e2e8f0" font-size="10">pgvector RRF</text>
+
+  <!-- Connector -->
+  <path d="M 500 510 L 500 535" stroke="#64748b" stroke-width="2" stroke-dasharray="4"/>
+
+  <!-- 4. Data & Real-Time Telehealth Layer -->
+  <rect x="50" y="535" width="900" height="110" rx="14" fill="#1e293b" stroke="#334155" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="70" y="560" fill="#fbbf24" font-size="13" font-weight="700">4. PERSISTENT STORAGE &amp; REAL-TIME TELEHEALTH</text>
+  
+  <rect x="70" y="575" width="200" height="55" rx="8" fill="url(#amberGrad)"/>
+  <text x="170" y="598" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Supabase PostgreSQL</text>
+  <text x="170" y="616" text-anchor="middle" fill="#fef3c7" font-size="10">RLS + Patient Case History</text>
+
+  <rect x="290" y="575" width="200" height="55" rx="8" fill="url(#amberGrad)"/>
+  <text x="390" y="598" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">pgvector Extension</text>
+  <text x="390" y="616" text-anchor="middle" fill="#fef3c7" font-size="10">768-dim Medical Embeddings</text>
+
+  <rect x="510" y="575" width="200" height="55" rx="8" fill="url(#amberGrad)"/>
+  <text x="610" y="598" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Agora RTC Network</text>
+  <text x="610" y="616" text-anchor="middle" fill="#fef3c7" font-size="10">HD Encrypted Video Triage</text>
+
+  <rect x="730" y="575" width="200" height="55" rx="8" fill="url(#amberGrad)"/>
+  <text x="830" y="598" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Stream Chat API</text>
+  <text x="830" y="616" text-anchor="middle" fill="#fef3c7" font-size="10">Doctor-Patient Messaging</text>
+</svg>

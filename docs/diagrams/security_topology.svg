@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" width="100%" height="100%" style="background:#0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <linearGradient id="secBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="secPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="secGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <linearGradient id="secAmber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <marker id="secArrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="480" y="36" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="700">Distributed Security, Guardrails &amp; Reliability Topology</text>
+  <text x="480" y="58" text-anchor="middle" fill="#94a3b8" font-size="12">PII Sanitization, Sliding-Window Rate Limiting, Circuit Breaker Fallback &amp; Grounding</text>
+
+  <!-- Stage 1: Ingestion & Edge -->
+  <rect x="30" y="90" width="280" height="340" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="50" y="120" fill="#38bdf8" font-size="13" font-weight="700">1. INGESTION &amp; EDGE SECURITY</text>
+
+  <rect x="50" y="145" width="240" height="55" rx="8" fill="url(#secBlue)"/>
+  <text x="170" y="168" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Incoming Patient Request</text>
+  <text x="170" y="186" text-anchor="middle" fill="#dbeafe" font-size="10">HTTPS / TLS 1.3 Encrypted</text>
+
+  <line x1="170" y1="200" x2="170" y2="235" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#secArrow)"/>
+
+  <rect x="50" y="235" width="240" height="55" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="170" y="258" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">PII Input Sanitizer</text>
+  <text x="170" y="276" text-anchor="middle" fill="#94a3b8" font-size="10">Regex Strip SSN, Cards, Contact Info</text>
+
+  <line x1="170" y1="290" x2="170" y2="325" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#secArrow)"/>
+
+  <rect x="50" y="325" width="240" height="55" rx="8" fill="url(#secPurple)"/>
+  <text x="170" y="348" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Upstash Redis Limiter</text>
+  <text x="170" y="366" text-anchor="middle" fill="#e9d5ff" font-size="10">Sliding Window (20 req/min/IP)</text>
+
+  <!-- Arrow to Stage 2 -->
+  <line x1="310" y1="260" x2="350" y2="260" stroke="#38bdf8" stroke-width="2" marker-end="url(#secArrow)"/>
+
+  <!-- Stage 2: Fault-Tolerant Execution -->
+  <rect x="350" y="90" width="280" height="340" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="370" y="120" fill="#a78bfa" font-size="13" font-weight="700">2. FAULT-TOLERANT EXECUTION</text>
+
+  <rect x="370" y="145" width="240" height="60" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="1.5"/>
+  <text x="490" y="170" text-anchor="middle" fill="#c084fc" font-size="12" font-weight="700">Circuit Breaker Pattern</text>
+  <text x="490" y="188" text-anchor="middle" fill="#94a3b8" font-size="10">Monitors Service Health (500s / Latency)</text>
+
+  <line x1="490" y1="205" x2="440" y2="235" stroke="#34d399" stroke-width="1.5" marker-end="url(#secArrow)"/>
+  <line x1="490" y1="205" x2="540" y2="235" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#secArrow)"/>
+
+  <rect x="365" y="235" width="115" height="55" rx="8" fill="url(#secGreen)"/>
+  <text x="422" y="258" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700">Primary</text>
+  <text x="422" y="275" text-anchor="middle" fill="#d1fae5" font-size="9">Python LangGraph</text>
+
+  <rect x="495" y="235" width="115" height="55" rx="8" fill="url(#secAmber)"/>
+  <text x="552" y="258" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="700">Fallback</text>
+  <text x="552" y="275" text-anchor="middle" fill="#fef3c7" font-size="9">TypeScript Genkit</text>
+
+  <line x1="490" y1="290" x2="490" y2="325" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#secArrow)"/>
+
+  <rect x="370" y="325" width="240" height="55" rx="8" fill="#0f172a" stroke="#64748b" stroke-width="1.5"/>
+  <text x="490" y="348" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700">Token Budget Allocator</text>
+  <text x="490" y="366" text-anchor="middle" fill="#94a3b8" font-size="10">8,192 Max Tokens Context Capping</text>
+
+  <!-- Arrow to Stage 3 -->
+  <line x1="630" y1="260" x2="670" y2="260" stroke="#38bdf8" stroke-width="2" marker-end="url(#secArrow)"/>
+
+  <!-- Stage 3: Output Validation & Delivery -->
+  <rect x="670" y="90" width="260" height="340" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="690" y="120" fill="#34d399" font-size="13" font-weight="700">3. OUTPUT VALIDATION &amp; SAFETY</text>
+
+  <rect x="685" y="145" width="230" height="55" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1.5"/>
+  <text x="800" y="168" text-anchor="middle" fill="#34d399" font-size="12" font-weight="700">JSON Schema Validation</text>
+  <text x="800" y="186" text-anchor="middle" fill="#94a3b8" font-size="10">Strict Zod &amp; Pydantic Verification</text>
+
+  <line x1="800" y1="200" x2="800" y2="235" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#secArrow)"/>
+
+  <rect x="685" y="235" width="230" height="55" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="800" y="258" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="700">Medical Safety Disclaimer</text>
+  <text x="800" y="276" text-anchor="middle" fill="#94a3b8" font-size="10">HIPAA Compliance Notice Injected</text>
+
+  <line x1="800" y1="290" x2="800" y2="325" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#secArrow)"/>
+
+  <rect x="685" y="325" width="230" height="55" rx="8" fill="url(#secGreen)"/>
+  <text x="800" y="348" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Secure Client Delivery</text>
+  <text x="800" y="366" text-anchor="middle" fill="#d1fae5" font-size="10">Encrypted WebSocket / HTTPS</text>
+</svg>

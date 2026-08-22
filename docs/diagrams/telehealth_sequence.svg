@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620" width="100%" height="100%" style="background:#0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <linearGradient id="thBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="thGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <linearGradient id="thPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="thAmber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <marker id="thArrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+    </marker>
+    <marker id="thArrowGreen" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#34d399" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="480" y="36" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="700">Real-Time Telehealth Consultation Architecture</text>
+  <text x="480" y="58" text-anchor="middle" fill="#94a3b8" font-size="12">Agora RTC Encrypted WebRTC Video Engine + Stream Chat Secure Messaging</text>
+
+  <!-- Lifeline Headers -->
+  <!-- 1. Patient -->
+  <rect x="50" y="80" width="130" height="38" rx="8" fill="url(#thBlue)"/>
+  <text x="115" y="104" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Patient Client</text>
+  <line x1="115" y1="118" x2="115" y2="580" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
+
+  <!-- 2. Doctor -->
+  <rect x="230" y="80" width="130" height="38" rx="8" fill="url(#thGreen)"/>
+  <text x="295" y="104" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Doctor Portal</text>
+  <line x1="295" y1="118" x2="295" y2="580" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
+
+  <!-- 3. Next.js Telehealth API -->
+  <rect x="410" y="80" width="150" height="38" rx="8" fill="url(#thPurple)"/>
+  <text x="485" y="104" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Telehealth API</text>
+  <line x1="485" y1="118" x2="485" y2="580" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
+
+  <!-- 4. Agora RTC Network -->
+  <rect x="610" y="80" width="140" height="38" rx="8" fill="url(#thAmber)"/>
+  <text x="680" y="104" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Agora RTC Network</text>
+  <line x1="680" y1="118" x2="680" y2="580" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
+
+  <!-- 5. Stream Chat API -->
+  <rect x="790" y="80" width="130" height="38" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="855" y="104" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">Stream Chat</text>
+  <line x1="855" y1="118" x2="855" y2="580" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
+
+  <!-- Step 1: Doctor Confirms & Provisions Room -->
+  <line x1="295" y1="150" x2="480" y2="150" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#thArrow)"/>
+  <text x="390" y="143" text-anchor="middle" fill="#cbd5e1" font-size="10">1. Accept appointment &amp; create consultation room</text>
+
+  <line x1="485" y1="180" x2="675" y2="180" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#thArrow)"/>
+  <text x="580" y="173" text-anchor="middle" fill="#cbd5e1" font-size="10">Generate Agora RTC Dynamic Token</text>
+
+  <line x1="485" y1="210" x2="850" y2="210" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#thArrow)"/>
+  <text x="665" y="203" text-anchor="middle" fill="#cbd5e1" font-size="10">Provision Stream Chat Channel</text>
+
+  <line x1="485" y1="240" x2="300" y2="240" stroke="#34d399" stroke-width="1.5" marker-end="url(#thArrowGreen)"/>
+  <text x="390" y="233" text-anchor="middle" fill="#a7f3d0" font-size="10">Return { roomId, agoraToken, channelId }</text>
+
+  <!-- Step 2: Patient Joins -->
+  <line x1="115" y1="275" x2="480" y2="275" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#thArrow)"/>
+  <text x="300" y="268" text-anchor="middle" fill="#cbd5e1" font-size="10">2. Patient joins meeting from Dashboard</text>
+
+  <line x1="485" y1="305" x2="120" y2="305" stroke="#34d399" stroke-width="1.5" marker-end="url(#thArrowGreen)"/>
+  <text x="300" y="298" text-anchor="middle" fill="#a7f3d0" font-size="10">Deliver verified credentials</text>
+
+  <!-- Parallel Real-Time Session Box -->
+  <rect x="75" y="335" width="820" height="150" rx="10" fill="#1e293b" fill-opacity="0.5" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3"/>
+  <text x="90" y="355" fill="#34d399" font-size="11" font-weight="700">PARALLEL REAL-TIME CONSULTATION CHANNELS</text>
+
+  <!-- WebRTC Stream -->
+  <line x1="115" y1="380" x2="675" y2="380" stroke="#f59e0b" stroke-width="2" marker-end="url(#thArrow)"/>
+  <line x1="295" y1="400" x2="675" y2="400" stroke="#f59e0b" stroke-width="2" marker-end="url(#thArrow)"/>
+  <text x="485" y="393" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="600">Channel A: Peer-to-Peer Encrypted WebRTC Video/Audio Stream</text>
+
+  <!-- Stream Chat -->
+  <line x1="115" y1="440" x2="850" y2="440" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#thArrow)"/>
+  <line x1="295" y1="460" x2="850" y2="460" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#thArrow)"/>
+  <text x="570" y="453" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="600">Channel B: WebSocket Real-Time Chat &amp; Medical Image Attachments</text>
+
+  <!-- Step 3: Doctor Issues Prescription & Concludes -->
+  <line x1="295" y1="510" x2="480" y2="510" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#thArrow)"/>
+  <text x="390" y="503" text-anchor="middle" fill="#cbd5e1" font-size="10">3. Issue digital clinical prescription &amp; notes</text>
+
+  <line x1="485" y1="540" x2="120" y2="540" stroke="#34d399" stroke-width="1.5" marker-end="url(#thArrowGreen)"/>
+  <text x="300" y="533" text-anchor="middle" fill="#a7f3d0" font-size="10">Consultation Completed: Record saved to Patient History</text>
+</svg>

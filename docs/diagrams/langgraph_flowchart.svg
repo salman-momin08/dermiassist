@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 860" width="100%" height="100%" style="background:#0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#60a5fa" />
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#34d399" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="38" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="700">LangGraph Multi-Agent Clinical Diagnostic Flowchart</text>
+  <text x="450" y="60" text-anchor="middle" fill="#94a3b8" font-size="12">Stateful Cyclical Consultation Machine &amp; Multi-Agent Synthesis</text>
+
+  <!-- 1. Patient Upload Node -->
+  <rect x="300" y="90" width="300" height="50" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="450" y="120" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">Patient Lesion Image Upload</text>
+
+  <!-- Arrow -->
+  <line x1="450" y1="140" x2="450" y2="175" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- 2. Client Optimization -->
+  <rect x="275" y="175" width="350" height="50" rx="10" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>
+  <text x="450" y="196" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Client Canvas Optimization</text>
+  <text x="450" y="213" text-anchor="middle" fill="#94a3b8" font-size="10">HTML5 Canvas Scaling (1024px / 0.85 JPEG)</text>
+
+  <!-- Arrow -->
+  <line x1="450" y1="225" x2="450" y2="260" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- 3. LangGraph State Machine -->
+  <rect x="250" y="260" width="400" height="50" rx="10" fill="url(#blueGrad)" stroke="#60a5fa" stroke-width="1.5"/>
+  <text x="450" y="282" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">LangGraph State Machine</text>
+  <text x="450" y="299" text-anchor="middle" fill="#dbeafe" font-size="10">Initialize DermatologyDiagnosticState (turn_count=0)</text>
+
+  <!-- Arrow -->
+  <line x1="450" y1="310" x2="450" y2="345" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- 4. Node 1: Vision Diagnostic Agent -->
+  <rect x="250" y="345" width="400" height="54" rx="10" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="450" y="369" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="700">Node 1: Multimodal Vision Diagnostic Agent</text>
+  <text x="450" y="388" text-anchor="middle" fill="#94a3b8" font-size="11">Gemini 2.5 Flash Vision / Ensemble Lesion Classifier</text>
+
+  <!-- Arrow -->
+  <line x1="450" y1="399" x2="450" y2="435" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- 5. Diamond Condition Identified? -->
+  <polygon points="450,435 565,480 450,525 335,480" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="450" y="476" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">Condition</text>
+  <text x="450" y="492" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">Identified?</text>
+
+  <!-- Arrow Yes Down -->
+  <line x1="450" y1="525" x2="450" y2="560" stroke="#34d399" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <text x="465" y="546" fill="#34d399" font-size="11" font-weight="700">Yes</text>
+
+  <!-- 6. Node 2: Dynamic Proforma Question Agent -->
+  <rect x="250" y="560" width="400" height="54" rx="10" fill="url(#purpleGrad)" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="450" y="584" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Node 2: Dynamic Proforma Question Agent</text>
+  <text x="450" y="602" text-anchor="middle" fill="#e9d5ff" font-size="11">Contextual Clinical Inquiry (Onset, Sensations, Triggers)</text>
+
+  <!-- Cyclical Loop Box for Patient Interaction -->
+  <line x1="450" y1="614" x2="450" y2="640" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- 7. Patient Response & State Update -->
+  <rect x="280" y="640" width="340" height="42" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+  <text x="450" y="666" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="600">Patient Response &amp; State Transcript Update</text>
+
+  <!-- Cyclical Return Arrow -->
+  <path d="M 620 661 Q 720 661 720 587 Q 720 587 650 587" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#arrow)"/>
+  <text x="730" y="625" fill="#fbbf24" font-size="10" font-weight="600">Repeat until Turn 5</text>
+
+  <line x1="450" y1="682" x2="450" y2="715" stroke="#34d399" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- 8. Node 3: Clinical Synthesis & Evaluation -->
+  <rect x="250" y="715" width="400" height="54" rx="10" fill="url(#emeraldGrad)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="450" y="738" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Node 3: Clinical Synthesis &amp; Hybrid RAG</text>
+  <text x="450" y="756" text-anchor="middle" fill="#d1fae5" font-size="11">ICD-10 Mapping, Do's/Don'ts, Treatment Pathways</text>
+
+  <!-- Arrow -->
+  <line x1="450" y1="769" x2="450" y2="800" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- 9. Final Report Generation -->
+  <rect x="280" y="800" width="340" height="42" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="2"/>
+  <text x="450" y="826" text-anchor="middle" fill="#34d399" font-size="12" font-weight="700">Comprehensive Report &amp; PDF Export</text>
+</svg>

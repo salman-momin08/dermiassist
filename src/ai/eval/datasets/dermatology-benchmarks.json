@@ -1,0 +1,42 @@
+[
+  {
+    "id": "eval-001",
+    "caseTitle": "Acne Vulgaris Inflammatory Papules",
+    "inputSymptoms": "Red painful bumps on forehead and chin for 3 weeks, oily skin, worsens with stress.",
+    "expectedCondition": "Acne Vulgaris",
+    "expectedCategory": "Acne",
+    "expectedDos": ["Wash face with mild cleanser", "Use non-comedogenic moisturizers"],
+    "expectedDonts": ["Squeeze or pop papules", "Use greasy face oils"],
+    "expectedIcd": "L70.0"
+  },
+  {
+    "id": "eval-002",
+    "caseTitle": "Flexural Atopic Dermatitis",
+    "inputSymptoms": "Intensely itchy dry red patches on inner elbows and behind knees for 2 months.",
+    "expectedCondition": "Atopic Dermatitis",
+    "expectedCategory": "Eczema",
+    "expectedDos": ["Apply emollients immediately after bathing", "Wear soft cotton clothing"],
+    "expectedDonts": ["Take hot long showers", "Use scented body washes"],
+    "expectedIcd": "L20.9"
+  },
+  {
+    "id": "eval-003",
+    "caseTitle": "Plaque Psoriasis Extensor Surfaces",
+    "inputSymptoms": "Thick scaly silver patches on elbows and knees, slight itching, persistent for months.",
+    "expectedCondition": "Psoriasis Vulgaris",
+    "expectedCategory": "Psoriasis",
+    "expectedDos": ["Keep skin hydrated", "Expose skin to controlled sunlight"],
+    "expectedDonts": ["Scrape silver scales", "Use harsh soaps"],
+    "expectedIcd": "L40.0"
+  },
+  {
+    "id": "eval-004",
+    "caseTitle": "Tinea Corporis Annular Rash",
+    "inputSymptoms": "Ring-shaped red scaly border rash with clear center on inner thigh, mild itching.",
+    "expectedCondition": "Tinea Corporis",
+    "expectedCategory": "Fungal",
+    "expectedDos": ["Keep area dry and clean", "Use antifungal topical treatment as advised"],
+    "expectedDonts": ["Share towels or clothes", "Scratch lesion"],
+    "expectedIcd": "B35.4"
+  }
+]
