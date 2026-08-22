@@ -71,28 +71,16 @@ export default function LoginPage() {
         throw error;
       }
 
-      // Fetch user profile to determine role
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .single();
-
-      // If profile missing, default to patient
-      const role = profile?.role || 'patient';
-
       toast({
         title: "Login Successful",
         description: "Welcome back! Redirecting you to your dashboard.",
       });
 
-      let destination = '/dashboard';
-      if (role === 'doctor') {
-        destination = '/doctor/dashboard';
-      } else if (role === 'admin') {
-        destination = '/admin/dashboard';
-      }
-      router.push(destination);
+      // Redirect optimistically instead of blocking on a second round-trip
+      // just to look up the role — the auth context fetches the profile
+      // anyway, and (app)/layout.tsx already redirects doctors/admins from
+      // /dashboard to their correct destination once the role is known.
+      router.push('/dashboard');
 
     } catch (error: any) {
       console.error("Login failed:", error);

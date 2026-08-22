@@ -26,6 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import Link from "next/link";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -47,15 +48,9 @@ export default function AdminDashboardPage() {
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const { toast } = useToast();
     const supabase = createClient();
-    const [user, setUser] = useState<any>(null);
-
-    useEffect(() => {
-        const fetchSession = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            setUser(user);
-        };
-        fetchSession();
-    }, [supabase]);
+    // The admin layout already resolves the current user via useAuth before
+    // this page renders — reusing it here avoids a redundant auth round-trip.
+    const { user } = useAuth();
 
     useEffect(() => {
         const fetchData = async () => {
