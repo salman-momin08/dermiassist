@@ -97,6 +97,13 @@ class HealingMetrics(BaseModel):
     healing_velocity_score: float
     clinical_trajectory: str
 
+class HealingTrackResponse(BaseModel):
+    success: bool
+    metrics: HealingMetrics
+    summary_report: str
+    is_healing_satisfactorily: bool
+
+
 # ── 5. LANGGRAPH MULTI-AGENT DIAGNOSTIC SCHEMAS ──────────────────
 
 class LangGraphDetectRequest(BaseModel):
