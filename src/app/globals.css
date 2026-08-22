@@ -120,34 +120,9 @@ html {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Stream Chat Specificity Cascades (Clean CSS, No !important)
+   Stream Chat Complete Design Overhaul
    ───────────────────────────────────────────────────────────── */
 
-.str-chat {
-    background-color: transparent;
-    color: hsl(var(--foreground));
-    font-family: inherit;
-}
-
-.str-chat .str-chat__channel-list,
-.str-chat .str-chat__channel-list-messenger {
-    background-color: hsl(var(--card));
-    border-right: 1px solid hsl(var(--border));
-}
-
-.str-chat .str-chat__channel-preview-messenger {
-    border-bottom: 1px solid hsl(var(--border) / 0.4);
-    transition: background-color 0.2s ease;
-    padding: 12px 14px;
-}
-
-.str-chat .str-chat__channel-preview-messenger:hover {
-    background-color: hsl(var(--accent) / 0.1);
-}
-
-.str-chat .str-chat__channel-preview-messenger--active {
-    background-color: hsl(var(--primary) / 0.15);
-/* Stream Chat Complete Design Overhaul */
 .str-chat {
     --str-chat__primary-color: hsl(var(--primary));
     --str-chat__active-primary-color: hsl(var(--primary));
