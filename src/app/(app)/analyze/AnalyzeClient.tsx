@@ -49,6 +49,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { sanitizeConditionName } from "@/ai/guards/condition-guard";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { compressImage } from "@/lib/image-compressor";
 
 type Step = 'upload' | 'proforma' | 'analyzing' | 'error';
 type ChatMessage = { sender: 'ai' | 'user'; text: string; timestamp?: string };
@@ -104,198 +105,41 @@ export default function AnalyzeClient() {
     }
   }, []);
 
-  useEffect(() => {
-    scrollToBottom('smooth');
-  }, [chatHistory, isLoading, isListening, scrollToBottom]);
-
-  // Handle URL query parameters for prefilled conditions
-  useEffect(() => {
-    const prefilledCondition = searchParams.get('condition');
-    const prefilledImage = searchParams.get('image');
-
-    if (prefilledCondition && prefilledImage) {
-      const sanitizedCondition = sanitizeConditionName(prefilledCondition);
-      setDetectedCondition(sanitizedCondition);
-      setPreview(prefilledImage);
-      setStep('proforma');
-      startProforma(sanitizedCondition);
+  const handlePlayMessageAudio = useCallback(async (text: string) => {
+    if (playingAudio && playingAudio.text === text) {
+      playingAudio.audio.pause();
+      setPlayingAudio(null);
+      return;
     }
-  }, [searchParams]);
-
-  // Setup Web Speech Recognition
-  useEffect(() => {
-    if (!SpeechRecognition) return;
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0]?.[0]?.transcript;
-      if (transcript) {
-        setUserResponse(transcript);
-        handleUserResponse(transcript);
-      }
-      setIsListening(false);
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
-      if (event.error === 'not-allowed') {
-        toast({
-          title: "Permission Denied",
-          description: "Please enable microphone access in your browser.",
-          variant: "destructive"
-        });
-      }
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-  }, [toast]);
-
-  // Automatically play AI voice if speech mode is enabled
-  useEffect(() => {
-    if (speechMode && chatHistory.length > 0) {
-      const lastMessage = chatHistory[chatHistory.length - 1];
-      if (lastMessage.sender === 'ai' && !isLoading) {
-        handlePlayMessageAudio(lastMessage.text);
-      }
+    if (playingAudio) {
+      playingAudio.audio.pause();
     }
-  }, [chatHistory, speechMode, isLoading]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      processFile(selectedFile);
-    }
-  };
+    const onEnded = () => setPlayingAudio(null);
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const droppedFile = e.dataTransfer.files?.[0];
-    if (droppedFile && droppedFile.type.startsWith('image/')) {
-      processFile(droppedFile);
-    } else {
-      toast({
-        title: "Invalid file",
-        description: "Please upload an image file (PNG, JPG, JPEG, WEBP).",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const processFile = (fileToProcess: File) => {
-    setFile(fileToProcess);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result as string);
-    };
-    reader.readAsDataURL(fileToProcess);
-  };
-
-  const handleImageSubmit = async () => {
-    if (!file || !preview) {
-      toast({ title: "No image selected", description: "Please upload a photo of the skin lesion.", variant: "destructive" });
+    if (audioCache[text]) {
+      const audio = new Audio(audioCache[text]);
+      setPlayingAudio({ audio, text });
+      audio.play();
+      audio.onended = onEnded;
       return;
     }
 
-    setIsLoading(true);
-    setLoadingMessage("Analyzing image & detecting condition...");
-    setError(null);
-
+    setIsAudioLoading(text);
     try {
-      const { conditionName } = await detectDiseaseName({ photoDataUri: preview }, user?.id);
-      const sanitizedName = sanitizeConditionName(conditionName);
-      setDetectedCondition(sanitizedName);
-      setStep('proforma');
-      startProforma(sanitizedName);
-    } catch (err: any) {
-      console.error("Initial analysis failed:", err);
-      const errorMessage = err.message || "Failed to analyze the image. The AI may be unable to identify a condition. Please try another clear photo.";
-      setError(errorMessage);
-      setStep('error');
-    } finally {
-      setIsLoading(false);
-      setLoadingMessage("");
-    }
-  };
-
-  const startProforma = (conditionName: string) => {
-    const welcomeMsg: ChatMessage = {
-      sender: 'ai',
-      text: `I've analyzed your image and identified the primary differential as **${conditionName}**. To generate your personalized clinical report, I'll ask a few quick questions regarding your symptoms and health context.`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    setChatHistory([welcomeMsg]);
-    setQuestionCount(0);
-    getNextQuestion(conditionName, `AI: Initial detection is ${conditionName}.`, [welcomeMsg]);
-  };
-
-  const getNextQuestion = async (
-    conditionName: string,
-    historyString: string,
-    currentHistory: ChatMessage[]
-  ) => {
-    setIsLoading(true);
-    try {
-      const { nextQuestion } = await proformaChat({
-        conditionName: conditionName,
-        conversationHistory: historyString,
-      });
-
-      const newAiMsg: ChatMessage = {
-        sender: 'ai',
-        text: nextQuestion,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-
-      setChatHistory(prev => [...prev, newAiMsg]);
-      setQuestionCount(prev => prev + 1);
+      const { audioUrl } = await textToSpeech({ text });
+      setAudioCache(prev => ({ ...prev, [text]: audioUrl }));
+      const audio = new Audio(audioUrl);
+      setPlayingAudio({ audio, text });
+      audio.play();
+      audio.onended = onEnded;
     } catch (err) {
-      console.error("Failed to get next question:", err);
-      const fallbackMsg: ChatMessage = {
-        sender: 'ai',
-        text: "I have gathered enough clinical context. Let's proceed to generate your comprehensive medical assessment.",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      const updatedHistory = [...currentHistory, fallbackMsg];
-      setChatHistory(updatedHistory);
-      handleFinalEvaluation(updatedHistory);
+      console.error("Failed to play audio:", err);
+      toast({ title: "Audio Error", description: "Could not play the message audio.", variant: "destructive" });
     } finally {
-      setIsLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setIsAudioLoading(null);
     }
-  };
-
-  const handleUserResponse = (responseText?: string) => {
-    const textToSend = (responseText ?? userResponse).trim();
-    if (!textToSend || !detectedCondition || isLoading) return;
-
-    const userMsg: ChatMessage = {
-      sender: 'user',
-      text: textToSend,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    const newHistory = [...chatHistory, userMsg];
-    setChatHistory(newHistory);
-    setUserResponse("");
-
-    const newCount = questionCount + 1;
-
-    if (newCount >= MAX_QUESTIONS) {
-      handleFinalEvaluation(newHistory);
-    } else {
-      const historyString = newHistory.map(m => `${m.sender === 'ai' ? 'AI' : 'User'}: ${m.text}`).join('\n');
-      getNextQuestion(detectedCondition, historyString, newHistory);
-    }
-  };
+  }, [audioCache, playingAudio, toast]);
 
   const handleFinalEvaluation = async (historyToEvaluate?: ChatMessage[]) => {
     if (!user || !userData) {
@@ -362,6 +206,141 @@ export default function AnalyzeClient() {
     }
   };
 
+  const getNextQuestion = async (
+    conditionName: string,
+    historyString: string,
+    currentHistory: ChatMessage[]
+  ) => {
+    setIsLoading(true);
+    try {
+      const { nextQuestion } = await proformaChat({
+        conditionName: conditionName,
+        conversationHistory: historyString,
+      });
+
+      const newAiMsg: ChatMessage = {
+        sender: 'ai',
+        text: nextQuestion,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      setChatHistory(prev => [...prev, newAiMsg]);
+      setQuestionCount(prev => prev + 1);
+    } catch (err) {
+      console.error("Failed to get next question:", err);
+      const fallbackMsg: ChatMessage = {
+        sender: 'ai',
+        text: "I have gathered enough clinical context. Let's proceed to generate your comprehensive medical assessment.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      const updatedHistory = [...currentHistory, fallbackMsg];
+      setChatHistory(updatedHistory);
+      handleFinalEvaluation(updatedHistory);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  };
+
+  const handleUserResponse = (responseText?: string) => {
+    const textToSend = (responseText ?? userResponse).trim();
+    if (!textToSend || !detectedCondition || isLoading) return;
+
+    const userMsg: ChatMessage = {
+      sender: 'user',
+      text: textToSend,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    const newHistory = [...chatHistory, userMsg];
+    setChatHistory(newHistory);
+    setUserResponse("");
+
+    const newCount = questionCount + 1;
+
+    if (newCount >= MAX_QUESTIONS) {
+      handleFinalEvaluation(newHistory);
+    } else {
+      const historyString = newHistory.map(m => `${m.sender === 'ai' ? 'AI' : 'User'}: ${m.text}`).join('\n');
+      getNextQuestion(detectedCondition, historyString, newHistory);
+    }
+  };
+
+  const startProforma = (conditionName: string) => {
+    const welcomeMsg: ChatMessage = {
+      sender: 'ai',
+      text: `I've analyzed your image and identified the primary differential as **${conditionName}**. To generate your personalized clinical report, I'll ask a few quick questions regarding your symptoms and health context.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setChatHistory([welcomeMsg]);
+    setQuestionCount(0);
+    getNextQuestion(conditionName, `AI: Initial detection is ${conditionName}.`, [welcomeMsg]);
+  };
+
+  const processFile = async (fileToProcess: File) => {
+    setFile(fileToProcess);
+    try {
+      const optimizedDataUri = await compressImage(fileToProcess, 1024, 1024, 0.85);
+      setPreview(optimizedDataUri);
+    } catch (err) {
+      console.warn("Client compression fallback:", err);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+      };
+      reader.readAsDataURL(fileToProcess);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      processFile(selectedFile);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile && droppedFile.type.startsWith('image/')) {
+      processFile(droppedFile);
+    } else {
+      toast({
+        title: "Invalid file",
+        description: "Please upload an image file (PNG, JPG, JPEG, WEBP).",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleImageSubmit = async () => {
+    if (!file || !preview) {
+      toast({ title: "No image selected", description: "Please upload a photo of the skin lesion.", variant: "destructive" });
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadingMessage("Analyzing image & detecting condition...");
+    setError(null);
+
+    try {
+      const { conditionName } = await detectDiseaseName({ photoDataUri: preview }, user?.id);
+      const sanitizedName = sanitizeConditionName(conditionName);
+      setDetectedCondition(sanitizedName);
+      setStep('proforma');
+      startProforma(sanitizedName);
+    } catch (err: any) {
+      console.error("Initial analysis failed:", err);
+      const errorMessage = err.message || "Failed to analyze the image. The AI may be unable to identify a condition. Please try another clear photo.";
+      setError(errorMessage);
+      setStep('error');
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage("");
+    }
+  };
+
   const handleMicClick = () => {
     if (!recognitionRef.current) {
       toast({ title: "Speech Recognition Unavailable", description: "Speech recognition is not supported in this browser.", variant: "destructive" });
@@ -382,42 +361,6 @@ export default function AnalyzeClient() {
     }
   };
 
-  const handlePlayMessageAudio = useCallback(async (text: string) => {
-    if (playingAudio && playingAudio.text === text) {
-      playingAudio.audio.pause();
-      setPlayingAudio(null);
-      return;
-    }
-    if (playingAudio) {
-      playingAudio.audio.pause();
-    }
-
-    const onEnded = () => setPlayingAudio(null);
-
-    if (audioCache[text]) {
-      const audio = new Audio(audioCache[text]);
-      setPlayingAudio({ audio, text });
-      audio.play();
-      audio.onended = onEnded;
-      return;
-    }
-
-    setIsAudioLoading(text);
-    try {
-      const { audioUrl } = await textToSpeech({ text });
-      setAudioCache(prev => ({ ...prev, [text]: audioUrl }));
-      const audio = new Audio(audioUrl);
-      setPlayingAudio({ audio, text });
-      audio.play();
-      audio.onended = onEnded;
-    } catch (err) {
-      console.error("Failed to play audio:", err);
-      toast({ title: "Audio Error", description: "Could not play the message audio.", variant: "destructive" });
-    } finally {
-      setIsAudioLoading(null);
-    }
-  }, [audioCache, playingAudio, toast]);
-
   const resetState = () => {
     if (searchParams.get('condition')) {
       router.push('/dashboard');
@@ -436,6 +379,77 @@ export default function AnalyzeClient() {
       }
     }
   };
+
+  // --- EFFECTS ---
+
+  useEffect(() => {
+    scrollToBottom('smooth');
+  }, [chatHistory, isLoading, isListening, scrollToBottom]);
+
+  // Handle URL query parameters for prefilled conditions
+  useEffect(() => {
+    const prefilledCondition = searchParams.get('condition');
+    const prefilledImage = searchParams.get('image');
+
+    if (prefilledCondition && prefilledImage) {
+      const sanitizedCondition = sanitizeConditionName(prefilledCondition);
+      setDetectedCondition(sanitizedCondition);
+      setPreview(prefilledImage);
+      setStep('proforma');
+      startProforma(sanitizedCondition);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // Stable handler ref for speech recognition
+  const handleUserResponseRef = useRef(handleUserResponse);
+  handleUserResponseRef.current = handleUserResponse;
+
+  // Setup Web Speech Recognition
+  useEffect(() => {
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) {
+        setUserResponse(transcript);
+        handleUserResponseRef.current(transcript);
+      }
+      setIsListening(false);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      if (event.error === 'not-allowed') {
+        toast({
+          title: "Permission Denied",
+          description: "Please enable microphone access in your browser.",
+          variant: "destructive"
+        });
+      }
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+  }, [toast]);
+
+  // Automatically play AI voice if speech mode is enabled
+  useEffect(() => {
+    if (speechMode && chatHistory.length > 0) {
+      const lastMessage = chatHistory[chatHistory.length - 1];
+      if (lastMessage.sender === 'ai' && !isLoading) {
+        handlePlayMessageAudio(lastMessage.text);
+      }
+    }
+  }, [chatHistory, speechMode, isLoading, handlePlayMessageAudio]);
 
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-4xl">
