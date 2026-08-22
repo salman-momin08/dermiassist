@@ -1,9 +1,23 @@
 import type { Metadata, Viewport } from 'next';
+import { Inter, Source_Code_Pro } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { Chatbot } from '@/components/chatbot/chatbot';
 import { AuthProvider } from '@/hooks/use-auth';
+
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '800'],
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+const sourceCodePro = Source_Code_Pro({
+  subsets: ['latin'],
+  variable: '--font-code',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'DermiAssist-AI - Your Personal Dermatology Assistant',
@@ -23,19 +37,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Source+Code+Pro&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased min-h-screen w-full overflow-x-hidden">
         <AuthProvider>
           <ThemeProvider

@@ -34,11 +34,11 @@ class InboxErrorBoundary extends React.Component<
       // Fallback: plain bell icon so the header stays intact
       return (
         <button
-          className="relative inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:text-foreground transition-colors"
+          className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground transition-colors"
           title="Notifications unavailable"
           onClick={() => this.setState({ hasError: false })}
         >
-          <Bell className="h-5 w-5" />
+          <Bell className="h-[1.2rem] w-[1.2rem]" />
         </button>
       );
     }
@@ -72,8 +72,8 @@ const INBOX_APPEARANCE = {
 // Simple loading fallback
 function BellSkeleton() {
   return (
-    <div className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground">
-      <Bell className="h-5 w-5 animate-pulse" />
+    <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground">
+      <Bell className="h-[1.2rem] w-[1.2rem] animate-pulse" />
     </div>
   );
 }

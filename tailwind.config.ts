@@ -19,9 +19,9 @@ export default {
     extend: {
       fontFamily: {
         sans: ["var(--font-sans)", ...defaultTheme.fontFamily.sans],
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
-        code: ['"Source Code Pro"', 'monospace'],
+        body: ["var(--font-sans)", ...defaultTheme.fontFamily.sans],
+        headline: ["var(--font-sans)", ...defaultTheme.fontFamily.sans],
+        code: ["var(--font-code)", ...defaultTheme.fontFamily.mono],
       },
       colors: {
         background: 'hsl(var(--background))',

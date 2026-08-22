@@ -1,6 +1,7 @@
 ﻿"use client"
 
 import { useState, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,12 @@ import { createClient } from "@/lib/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { indianStates } from "@/lib/indian-states";
-import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
+// react-easy-crop is only needed once the user opens the crop flow, so it's
+// split into its own client-only chunk instead of shipping on every profile-page visit.
+const ImageCropDialog = dynamic(
+    () => import("@/components/ui/image-crop-dialog").then(m => m.ImageCropDialog),
+    { ssr: false }
+);
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
@@ -373,12 +379,14 @@ export default function ProfilePage() {
 
     return (
         <>
-            <ImageCropDialog
-                open={isCropDialogOpen}
-                onOpenChange={setIsCropDialogOpen}
-                imageSrc={imageToCrop}
-                onCropComplete={handleCropComplete}
-            />
+            {isCropDialogOpen && (
+                <ImageCropDialog
+                    open={isCropDialogOpen}
+                    onOpenChange={setIsCropDialogOpen}
+                    imageSrc={imageToCrop}
+                    onCropComplete={handleCropComplete}
+                />
+            )}
             <div className="container mx-auto p-4 md:p-8 max-w-4xl">
                 <div className="space-y-2 mb-8">
                     <h1 className="text-3xl font-bold tracking-tight font-headline">
@@ -398,8 +406,8 @@ export default function ProfilePage() {
                             <CardDescription>Update your personal details here.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="flex items-center space-x-6">
-                                <div className="relative">
+                            <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                                <div className="relative shrink-0">
                                     <Dialog>
                                         <DialogTrigger asChild>
                                             <Avatar className="h-24 w-24 cursor-pointer">
@@ -451,9 +459,9 @@ export default function ProfilePage() {
                                     </div>
                                     <Input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                                 </div>
-                                <div className="space-y-1">
-                                    <h3 className="text-xl font-bold">{formState.displayName}</h3>
-                                    <p className="text-muted-foreground">{user.email}</p>
+                                <div className="space-y-1 min-w-0">
+                                    <h3 className="text-xl font-bold truncate">{formState.displayName}</h3>
+                                    <p className="text-muted-foreground truncate">{user.email}</p>
                                 </div>
                             </div>
                             <Separator />
@@ -605,19 +613,19 @@ export default function ProfilePage() {
                                 <CardDescription>Manage your notification and data sharing preferences.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-6">
-                                <div className="flex items-center justify-between rounded-lg border p-4">
-                                    <div className="space-y-0.5">
+                                <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+                                    <div className="space-y-0.5 min-w-0">
                                         <Label htmlFor="email-notifications">Email Notifications</Label>
                                         <p className="text-xs text-muted-foreground">Receive emails about appointments and platform updates.</p>
                                     </div>
-                                    <Switch id="email-notifications" checked={formState.emailNotifications} onCheckedChange={(checked) => handleInputChange('emailNotifications', checked)} />
+                                    <Switch id="email-notifications" className="shrink-0" checked={formState.emailNotifications} onCheckedChange={(checked) => handleInputChange('emailNotifications', checked)} />
                                 </div>
-                                <div className="flex items-center justify-between rounded-lg border p-4">
-                                    <div className="space-y-0.5">
+                                <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+                                    <div className="space-y-0.5 min-w-0">
                                         <Label htmlFor="data-sharing">Share Data with Doctors</Label>
                                         <p className="text-xs text-muted-foreground">Allow your analysis reports to be shared with doctors during consultations.</p>
                                     </div>
-                                    <Switch id="data-sharing" checked={formState.allowDataSharing} onCheckedChange={(checked) => handleInputChange('allowDataSharing', checked)} />
+                                    <Switch id="data-sharing" className="shrink-0" checked={formState.allowDataSharing} onCheckedChange={(checked) => handleInputChange('allowDataSharing', checked)} />
                                 </div>
                             </CardContent>
                         </Card>
@@ -630,12 +638,12 @@ export default function ProfilePage() {
                             <CardDescription>Manage your plan and view payment history.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="flex items-center justify-between rounded-lg border p-4">
-                                <div className="space-y-0.5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border p-4">
+                                <div className="space-y-0.5 min-w-0">
                                     <Label className="text-base font-semibold">Current Plan</Label>
-                                    <p className="text-2xl font-bold">{userData?.subscription_plan || 'Free'}</p>
+                                    <p className="text-2xl font-bold truncate">{userData?.subscription_plan || 'Free'}</p>
                                 </div>
-                                <Button variant="outline" asChild>
+                                <Button variant="outline" asChild className="w-full sm:w-auto">
                                     <Link href="/subscription">Change Plan</Link>
                                 </Button>
                             </div>
@@ -656,14 +664,14 @@ export default function ProfilePage() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex items-center justify-between">
-                                <div>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="min-w-0">
                                     <h3 className="font-semibold">Delete Your Account</h3>
                                     <p className="text-sm text-muted-foreground">Permanently remove your account and all of your data.</p>
                                 </div>
                                 <AlertDialog open={isDeleteDialogOpen} onOpenChange={(open) => { setIsDeleteDialogOpen(open); if (!open) setDeleteConfirmName(''); }}>
                                     <AlertDialogTrigger asChild>
-                                        <Button variant="destructive">Delete Account</Button>
+                                        <Button variant="destructive" className="w-full sm:w-auto">Delete Account</Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                         <AlertDialogHeader>

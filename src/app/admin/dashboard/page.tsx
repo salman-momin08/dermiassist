@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, Users, UserCheck, FileClock, Trash2, CheckCircle, XCircle, Search, LineChart, User as UserIcon, Loader2 } from "lucide-react";
+import { MoreHorizontal, Users, FileClock, Trash2, Search, User as UserIcon, Loader2 } from "lucide-react";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -21,8 +21,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
@@ -30,14 +28,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { format, subMonths, startOfMonth } from "date-fns";
-
-const chartConfig = {
-    users: {
-        label: "New Users",
-        color: "hsl(var(--primary))",
-    },
-} satisfies ChartConfig;
 
 type User = {
     id: string;
@@ -49,15 +39,8 @@ type User = {
     [key: string]: any;
 };
 
-type Doctor = User & {
-    specialization: string;
-    status: 'Verified' | 'Pending' | 'Not Verified';
-};
-
-
 export default function AdminDashboardPage() {
     const [allUsers, setAllUsers] = useState<User[]>([]);
-    const [patients, setPatients] = useState<User[]>([]);
     const [requests, setRequests] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [userSearch, setUserSearch] = useState("");
@@ -82,12 +65,22 @@ export default function AdminDashboardPage() {
                 return;
             }
 
-            // Fetch all users (excluding admins)
-            const { data: usersData, error: usersError } = await supabase
-                .from('profiles')
-                .select('*')
-                .neq('role', 'admin')
-                .order('created_at', { ascending: false });
+            // Fetch users and contact requests concurrently — they're independent
+            // queries, so awaiting them in sequence would cost an extra round-trip.
+            const [
+                { data: usersData, error: usersError },
+                { data: requestsData, error: requestsError },
+            ] = await Promise.all([
+                supabase
+                    .from('profiles')
+                    .select('*')
+                    .neq('role', 'admin')
+                    .order('created_at', { ascending: false }),
+                supabase
+                    .from('contact_requests')
+                    .select('*')
+                    .order('created_at', { ascending: false }),
+            ]);
 
             if (usersError) {
                 toast({
@@ -104,12 +97,6 @@ export default function AdminDashboardPage() {
 
                 setAllUsers(formattedUsers);
             }
-
-            // Fetch contact requests
-            const { data: requestsData, error: requestsError } = await supabase
-                .from('contact_requests')
-                .select('*')
-                .order('created_at', { ascending: false });
 
             if (requestsError) {
                 toast({
@@ -161,11 +148,6 @@ export default function AdminDashboardPage() {
         }
     };
 
-    const patientUsers = useMemo(() => {
-        const patients = allUsers.filter(user => user.role === 'patient');
-        return patients;
-    }, [allUsers]);
-
     const filteredUsers = useMemo(() => {
         const filtered = allUsers.filter(user =>
             user.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
@@ -173,36 +155,6 @@ export default function AdminDashboardPage() {
         );
         return filtered;
     }, [allUsers, userSearch]);
-
-    const analyticsData = useMemo(() => {
-        if (isLoading || allUsers.length === 0) return [];
-
-        const monthlyCounts: { [key: string]: number } = {};
-
-        // Initialize last 6 months
-        for (let i = 0; i < 6; i++) {
-            const month = format(subMonths(new Date(), i), 'MMM yyyy');
-            monthlyCounts[month] = 0;
-        }
-
-        allUsers.forEach(user => {
-            if (user.createdAt) {
-                const joinDate = new Date(user.createdAt);
-                const month = format(joinDate, 'MMM yyyy');
-                if (monthlyCounts.hasOwnProperty(month)) {
-                    monthlyCounts[month]++;
-                }
-            }
-        });
-
-        return Object.entries(monthlyCounts)
-            .map(([month, count]) => ({
-                month: month.split(' ')[0], // Just get month name
-                users: count,
-                date: startOfMonth(new Date(month))
-            }))
-            .sort((a, b) => a.date.getTime() - b.date.getTime());
-    }, [allUsers, isLoading]);
 
     if (isLoading) {
         return (

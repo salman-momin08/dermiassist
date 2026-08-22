@@ -20,7 +20,7 @@ const buttonVariants = cva(
         outline:
           "border border-border/80 bg-background hover:bg-muted/70 text-foreground shadow-2xs",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/40 shadow-2xs",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-foreground/15 shadow-2xs",
         ghost:
           "hover:bg-muted/70 text-muted-foreground hover:text-foreground",
         link:
@@ -31,7 +31,7 @@ const buttonVariants = cva(
         sm: "h-8 px-3 text-xs font-medium",
         lg: "h-10 px-5 text-sm font-semibold",
         xl: "h-11 px-6 text-base font-semibold",
-        icon: "h-8.5 w-8.5",
+        icon: "h-9 w-9",
       },
     },
     defaultVariants: {
