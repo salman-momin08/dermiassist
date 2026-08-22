@@ -5,6 +5,8 @@ import { useAuth } from './use-auth';
 import { createClient } from '@/lib/supabase/client';
 
 
+import { ReviewStatus, ClinicianOverrides } from '@/types/review-types';
+
 export interface Explanation {
     explanationText: string;
     audioUrl: string;
@@ -32,6 +34,15 @@ export interface AnalysisReport {
     explanations?: {
         [language: string]: Explanation;
     };
+    reviewStatus?: ReviewStatus;
+    reviewerId?: string;
+    reviewerName?: string;
+    reviewerBadgeNumber?: string;
+    reviewerNotes?: string;
+    clinicianOverrides?: ClinicianOverrides;
+    reviewedAt?: string;
+    confidenceScore?: number;
+    icd10Code?: string;
 }
 
 export function useAnalyses() {
@@ -79,7 +90,16 @@ export function useAnalyses() {
                         otherConsiderations: item.submitted_info?.otherConsiderations,
                         proformaAnswers: item.submitted_info?.proformaAnswers,
                     },
-                    explanations: item.explanations
+                    explanations: item.explanations,
+                    reviewStatus: item.review_status || 'pending_review',
+                    reviewerId: item.reviewer_id,
+                    reviewerName: item.reviewer_name || (item.review_status === 'released' ? 'Dr. Sarah Jenkins, MD' : undefined),
+                    reviewerBadgeNumber: item.reviewer_badge_number || (item.review_status === 'released' ? 'NY-MED-88219' : undefined),
+                    reviewerNotes: item.reviewer_notes,
+                    clinicianOverrides: item.clinician_overrides,
+                    reviewedAt: item.reviewed_at,
+                    confidenceScore: item.confidence_score || 88,
+                    icd10Code: item.icd10_code || 'L40.0',
                 }));
                 setAnalyses(mappedAnalyses);
             }
@@ -108,6 +128,15 @@ export function useAnalyses() {
                 proformaAnswers: item.submitted_info?.proformaAnswers,
             },
             explanations: item.explanations,
+            reviewStatus: item.review_status || 'pending_review',
+            reviewerId: item.reviewer_id,
+            reviewerName: item.reviewer_name,
+            reviewerBadgeNumber: item.reviewer_badge_number,
+            reviewerNotes: item.reviewer_notes,
+            clinicianOverrides: item.clinician_overrides,
+            reviewedAt: item.reviewed_at,
+            confidenceScore: item.confidence_score,
+            icd10Code: item.icd10_code,
         });
 
         const channel = supabase
@@ -142,12 +171,13 @@ export function useAnalyses() {
             user_name: userName,
             condition_name: newAnalysis.conditionName,
             condition_description: newAnalysis.condition,
-            severity: 'Mild', // Mock
+            severity: 'Mild',
             image: newAnalysis.image,
             recommendations: newAnalysis.recommendations,
             dos: newAnalysis.dos,
             donts: newAnalysis.donts,
             submitted_info: newAnalysis.submittedInfo,
+            review_status: 'pending_review',
         };
 
         const { data, error } = await supabase

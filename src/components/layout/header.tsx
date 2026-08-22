@@ -28,6 +28,7 @@ export function AppHeader() {
       case 'doctor':
         return [
           { href: "/doctor/dashboard", label: "Dashboard" },
+          { href: "/doctor/review-queue", label: "Triage Queue" },
           { href: "/doctor/appointments", label: "Appointments" },
           { href: "/doctor/cases", label: "Patient Cases" },
           { href: "/chat", label: "Patients" },
