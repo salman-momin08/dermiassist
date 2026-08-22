@@ -5,6 +5,7 @@ Coordinates Triage Agent, Vision Agent (Hugging Face Open-Source Model + Gemini)
 
 import time
 import os
+import asyncio
 from typing import Dict, Any, Optional
 from ai_service.services.rag_service import search_vector_rag
 from ai_service.services.huggingface_service import classify_skin_lesion_hf
@@ -28,21 +29,22 @@ async def run_multi_agent_pipeline(symptoms: str, image_url: Optional[str] = Non
         triage_risk = "urgent"
     trace.append({"agent": "TriageAgent", "duration_ms": round((time.time() - t1) * 1000, 2), "status": "completed"})
 
-    # 3. Multimodal Vision Agent (Hugging Face Open-Source Lesion Model + Gemini)
-    t2 = time.time()
-    hf_vision_result = await classify_skin_lesion_hf(image_url)
+    # 3 + 4. Vision (Hugging Face) and RAG (vector search) are independent I/O —
+    # run them concurrently instead of one-after-another to cut a full round-trip.
+    t_parallel = time.time()
+    hf_vision_result, rag_result = await asyncio.gather(
+        classify_skin_lesion_hf(image_url),
+        search_vector_rag(sanitized_symptoms, match_count=3),
+    )
+    parallel_ms = round((time.time() - t_parallel) * 1000, 2)
     vision_morphology = f"Lesion Analysis via {hf_vision_result.get('source', 'HuggingFace Engine')}: {hf_vision_result.get('top_prediction', 'Melanocytic Nevi')}"
     trace.append({
         "agent": "HuggingFaceVisionAgent",
-        "duration_ms": round((time.time() - t2) * 1000, 2),
+        "duration_ms": parallel_ms,
         "status": "completed",
         "model": hf_vision_result.get("model_used", "nateraw/skin-cancer-mnist-ham10000")
     })
-
-    # 4. RAG Specialist Agent (Vector search)
-    t3 = time.time()
-    rag_result = await search_vector_rag(sanitized_symptoms, match_count=3)
-    trace.append({"agent": "RAGSpecialistAgent", "duration_ms": round((time.time() - t3) * 1000, 2), "status": "completed"})
+    trace.append({"agent": "RAGSpecialistAgent", "duration_ms": parallel_ms, "status": "completed"})
 
     # 5. Differential Report Synthesis Agent
     t4 = time.time()

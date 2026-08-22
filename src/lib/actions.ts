@@ -9,7 +9,7 @@
 
 import { v2 as cloudinary } from 'cloudinary';
 import { logger } from '@/lib/logger';
-import { FileUploadError, ValidationError, serializeError } from '@/lib/errors';
+import { FileUploadError, serializeError } from '@/lib/errors';
 
 // ─────────────────────────────────────────────────────────────
 // Configuration

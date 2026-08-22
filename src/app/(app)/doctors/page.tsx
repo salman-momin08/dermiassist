@@ -3,16 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, ShieldCheck, Star, Loader2, CalendarIcon, Upload, User, Info, MessageSquare, UserPlus, Clock, Search } from "lucide-react";
+import { MapPin, ShieldCheck, Loader2, CalendarIcon, User, Info, MessageSquare, Clock, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useAnalyses, type AnalysisReport } from '@/hooks/use-analyses';
+import { useAnalyses } from '@/hooks/use-analyses';
 import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { useDebounce } from '@/hooks/use-debounce';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,12 +20,9 @@ import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
 import { uploadFile } from '@/lib/actions';
 import { createClient } from '@/lib/supabase/client';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { DoctorProfileModal } from '@/components/DoctorProfileModal';
 
 type Doctor = {
     id: string;
@@ -155,7 +150,8 @@ export default function DoctorsPage() {
                     const { data: reqs, error: reqsError } = await supabase
                         .from('connection_requests')
                         .select('*')
-                        .eq('patient_id', user.id);
+                        .eq('patient_id', user.id)
+                        .limit(200);
 
                     if (reqs) {
                         setConnectionRequests(reqs);

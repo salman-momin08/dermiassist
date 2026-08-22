@@ -16,7 +16,6 @@ import { useAuth } from "@/hooks/use-auth"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import { format, parse, isValid } from "date-fns"
-import { Separator } from "@/components/ui/separator"
 
 type Appointment = {
     id: string;
@@ -61,11 +60,24 @@ export default function DoctorDashboardPage() {
         setIsLoadingConnectionRequests(true);
 
         async function fetchData() {
-            // Fetch Appointments
-            const { data: appointmentsData, error: appointmentsError } = await supabase
-                .from('appointments')
-                .select('*')
-                .eq('doctor_id', user!.id);
+            // Appointments and connection requests are independent queries —
+            // run them concurrently instead of paying for two round-trips.
+            const [
+                { data: appointmentsData, error: appointmentsError },
+                { data: connectionsData, error: connectionsError },
+            ] = await Promise.all([
+                supabase
+                    .from('appointments')
+                    .select('*')
+                    .eq('doctor_id', user!.id)
+                    .limit(200),
+                supabase
+                    .from('connection_requests')
+                    .select('*, profiles:patient_id(display_name, photo_url, email)')
+                    .eq('doctor_id', user!.id)
+                    .eq('status', 'pending')
+                    .limit(200),
+            ]);
 
             if (appointmentsError) {
                 toast({ title: "Error", description: "Could not fetch appointments.", variant: "destructive" });
@@ -88,13 +100,6 @@ export default function DoctorDashboardPage() {
                 setAppointments(mapped);
             }
             setIsLoadingAppointments(false);
-
-            // Fetch Connection Requests
-            const { data: connectionsData, error: connectionsError } = await supabase
-                .from('connection_requests')
-                .select('*, profiles:patient_id(display_name, photo_url, email)')
-                .eq('doctor_id', user!.id)
-                .eq('status', 'pending');
 
             if (connectionsError) {
                 // Ignore silent fetch errors

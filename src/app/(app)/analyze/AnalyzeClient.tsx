@@ -30,7 +30,6 @@ import {
   VolumeX,
   Sparkles,
   CheckCircle2,
-  FileText,
   RotateCcw,
 } from "lucide-react";
 import Image from "next/image";
@@ -38,6 +37,7 @@ import { detectDiseaseNameCached as detectDiseaseName } from "@/ai/flows/cached"
 import { finalEvaluationCached as finalEvaluation } from "@/ai/flows/cached";
 import { proformaChat } from "@/ai/flows/proforma-chat";
 import { useToast } from "@/hooks/use-toast";
+import { getSafeErrorMessage } from "@/lib/errors";
 import { useAnalyses } from "@/hooks/use-analyses";
 import { useAuth } from "@/hooks/use-auth";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -47,10 +47,9 @@ import { textToSpeech } from "@/ai/flows/text-to-speech";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { sanitizeConditionName } from "@/ai/guards/condition-guard";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { compressImage } from "@/lib/image-compressor";
-import { SUPPORTED_LANGUAGES, getLocalizedText, SupportedLanguage } from "@/lib/translation-service";
+import { SUPPORTED_LANGUAGES, getLocalizedText } from "@/lib/translation-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Globe } from "lucide-react";
 import { generateQuestionSuggestions } from "@/ai/flows/generate-suggestions";
@@ -242,7 +241,7 @@ export default function AnalyzeClient() {
 
     } catch (err: any) {
       console.error("Final evaluation failed:", err);
-      setError(err?.message || "An unexpected error occurred during report synthesis. Please try again.");
+      setError(getSafeErrorMessage(err, "An unexpected error occurred during report synthesis. Please try again."));
       setStep('error');
     } finally {
       setIsLoading(false);
@@ -420,7 +419,7 @@ export default function AnalyzeClient() {
       startProforma(sanitizedName);
     } catch (err: any) {
       console.error("Initial analysis failed:", err);
-      const errorMessage = err.message || "Failed to analyze the image. The AI may be unable to identify a condition. Please try another clear photo.";
+      const errorMessage = getSafeErrorMessage(err, "Failed to analyze the image. The AI may be unable to identify a condition. Please try another clear photo.");
       setError(errorMessage);
       setStep('error');
     } finally {

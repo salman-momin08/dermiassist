@@ -4,17 +4,11 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { 
-  Stethoscope, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Clock, 
-  Filter, 
-  Search, 
-  ArrowUpDown, 
-  ShieldCheck, 
-  Sparkles, 
-  Eye, 
-  Database,
+  CheckCircle2,
+  Clock,
+  Search,
+  ShieldCheck,
+  Eye,
   Loader2,
   RefreshCw,
   Zap
@@ -60,7 +54,8 @@ export default function DoctorReviewQueuePage() {
       const { data, error } = await supabase
         .from('analyses')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(200);
 
       if (error) throw error;
 

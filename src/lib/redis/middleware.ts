@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkRateLimit, RateLimitPresets, type RateLimitConfig } from '@/lib/redis/rate-limit';
+import { checkRateLimit, RateLimitPresets } from '@/lib/redis/rate-limit';
 
 /**
  * Rate Limiting Middleware

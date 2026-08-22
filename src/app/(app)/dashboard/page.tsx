@@ -12,9 +12,7 @@ import {
   Sparkles, 
   ShieldCheck, 
   Lock, 
-  ChevronRight, 
-  TrendingUp,
-  Award,
+  ChevronRight,
   CalendarDays
 } from "lucide-react";
 import Link from "next/link";

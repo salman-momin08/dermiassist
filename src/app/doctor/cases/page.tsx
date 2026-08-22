@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,8 @@ export default function DoctorCasesPage() {
                 const { data: cases, error: casesError } = await supabase
                     .from('doctor_cases')
                     .select('*')
-                    .eq('doctor_id', user.id);
+                    .eq('doctor_id', user.id)
+                    .limit(200);
 
                 if (casesError) throw casesError;
 

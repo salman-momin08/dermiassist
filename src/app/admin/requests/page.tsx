@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2, MessageSquare, UserCog, AlertCircle, Lightbulb, CheckCircle, XCircle, Eye, Clock, FileText, Upload } from "lucide-react"
@@ -25,7 +25,6 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
 
 type RequestType = "role-change" | "enquiry" | "technical-support" | "feedback"
 
@@ -81,64 +80,14 @@ export default function AdminRequestsPage() {
         setIsLoading(true)
 
         try {
-            // Debug: Check current user and session
-            const { data: { user }, error: userError } = await supabase.auth.getUser()
-
-            if (userError) {
-                toast({
-                    title: "Authentication Error",
-                    description: "You are not logged in. Please log in again.",
-                    variant: "destructive"
-                })
-                setIsLoading(false)
-                return
-            }
-
-            if (!user) {
-                toast({
-                    title: "Not Authenticated",
-                    description: "Please log in to access this page.",
-                    variant: "destructive"
-                })
-                setIsLoading(false)
-                return
-            }
-
-
-            // Debug: Check user's profile and role
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('id, email, role')
-                .eq('id', user.id)
-                .single()
-
-            if (profileError) {
-                toast({
-                    title: "Profile Error",
-                    description: "Could not fetch your profile. Please refresh the page.",
-                    variant: "destructive"
-                })
-                setIsLoading(false)
-                return
-            }
-
-
-            if (profile?.role !== 'admin') {
-                toast({
-                    title: "Access Denied",
-                    description: "You do not have admin permissions.",
-                    variant: "destructive"
-                })
-                setIsLoading(false)
-                return
-            }
-
-
-            // Fetch contact requests
+            // Admin identity/role is already verified by useAuth() + admin/layout.tsx
+            // before this page can render — no need to re-check auth.getUser() and
+            // the profiles table here on every fetch.
             const { data, error } = await supabase
                 .from('contact_requests')
                 .select('*')
                 .order('created_at', { ascending: false })
+                .limit(200)
 
             if (error) {
                 toast({

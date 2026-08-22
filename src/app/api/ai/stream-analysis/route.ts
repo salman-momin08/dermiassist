@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { executeMultiAgentPipeline } from '@/ai/orchestrator';
+import { checkRateLimit, RateLimitPresets } from '@/lib/redis/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -10,10 +11,26 @@ export const runtime = 'nodejs';
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { symptoms, imageUrl, bodyLocation } = body;
+        const { symptoms, imageUrl, bodyLocation, userId } = body;
 
         if (!symptoms || typeof symptoms !== 'string') {
             return new Response('Missing symptoms parameter.', { status: 400 });
+        }
+
+        // Same pipeline cost as /api/ai/analyze — apply the same rate limit.
+        const forwardedFor = request.headers.get('x-forwarded-for');
+        const identifier = userId || forwardedFor?.split(',')[0].trim() || 'unknown';
+        const rateLimitResult = await checkRateLimit({
+            limit: RateLimitPresets.AI_ANALYSIS.limit,
+            window: RateLimitPresets.AI_ANALYSIS.window,
+            identifier,
+            endpoint: '/api/ai/stream-analysis',
+        });
+        if (!rateLimitResult.success) {
+            return new Response('Rate limit exceeded. Please try again later.', {
+                status: 429,
+                headers: { 'Retry-After': String(rateLimitResult.retryAfter ?? 3600) },
+            });
         }
 
         const encoder = new TextEncoder();

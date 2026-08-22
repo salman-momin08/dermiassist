@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, MessageSquare, Trash2, ShieldCheck, UserCheck, Calendar, ArrowLeft } from 'lucide-react';
+import { Loader2, MessageSquare, Trash2, ShieldCheck, UserCheck, Calendar } from 'lucide-react';
 import { StreamChat } from 'stream-chat';
 import {
     Chat,

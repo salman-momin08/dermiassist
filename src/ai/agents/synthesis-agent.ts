@@ -9,9 +9,6 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
-import { TriageOutput } from './triage-agent';
-import { VisionOutput } from './vision-agent';
-import { RAGAgentOutput } from './rag-specialist-agent';
 
 export const SynthesisInputSchema = z.object({
     patientSymptoms: z.string(),

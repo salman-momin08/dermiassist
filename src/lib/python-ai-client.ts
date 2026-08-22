@@ -4,7 +4,12 @@
  * Supports automatic fallback if the Python service is offline.
  */
 
-const PYTHON_AI_SERVICE_URL = process.env.PYTHON_AI_SERVICE_URL || 'http://localhost:8000';
+// Canonical env var is PYTHON_AI_SERVICE_URL; FASTAPI_SERVICE_URL is accepted
+// as a fallback so this client and /api/ai/analyze can't point at different hosts.
+const PYTHON_AI_SERVICE_URL =
+  process.env.PYTHON_AI_SERVICE_URL ||
+  process.env.FASTAPI_SERVICE_URL ||
+  'http://localhost:8000';
 
 export interface PythonLangGraphDetectResponse {
   condition_name: string;

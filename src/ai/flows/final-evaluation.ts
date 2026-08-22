@@ -11,7 +11,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
-import { AIOutputError } from '@/lib/errors';
 
 const FinalEvaluationInputSchema = z.object({
   photoDataUri: z

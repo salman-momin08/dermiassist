@@ -34,7 +34,6 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { StreamChat } from 'stream-chat';
 
 
 type Appointment = {
@@ -90,7 +89,8 @@ export default function DoctorAppointmentsPage() {
             const { data, error } = await supabase
                 .from('appointments')
                 .select('*')
-                .eq('doctor_id', user.id);
+                .eq('doctor_id', user.id)
+                .limit(200);
 
             if (error) {
                 toast({ title: "Error", description: "Could not fetch appointments.", variant: "destructive" });

@@ -34,33 +34,38 @@ export async function POST(request: NextRequest) {
         const serverClient = StreamChat.getInstance(apiKey, apiSecret, {
             timeout: 15000,  // 15s — default 3s is too low for slower networks
         });
+
+        // 2. Ensure a channel exists for each connection — these are independent
+        // Stream API calls, so run them concurrently instead of one at a time.
+        const results = await Promise.allSettled(connections.map(async (conn) => {
+            const sortedIds = [conn.doctor_id, conn.patient_id].sort();
+            const fullHash = crypto.createHash('sha256')
+                .update(`${process.env.CHAT_SECRET_SALT || 'dermiassist_salt'}:${sortedIds[0]}:${sortedIds[1]}`)
+                .digest('hex');
+            // Stream Chat enforces max 64 chars for channel IDs.
+            // "consult_" = 8 chars, so use first 48 hex chars (56 total).
+            const channelId = `consult_${fullHash.substring(0, 48)}`;
+
+            const channel = serverClient.channel('messaging', channelId, {
+                members: [conn.patient_id, conn.doctor_id],
+                created_by_id: conn.doctor_id,
+            });
+
+            // This will create the channel if it doesn't exist, or just update it if it does
+            await channel.create();
+            return conn.id;
+        }));
+
         let syncedCount = 0;
         let failedCount = 0;
-
-        // 2. Ensure a channel exists for each connection
-        for (const conn of connections) {
-            try {
-                const sortedIds = [conn.doctor_id, conn.patient_id].sort();
-                const fullHash = crypto.createHash('sha256')
-                    .update(`${process.env.CHAT_SECRET_SALT || 'dermiassist_salt'}:${sortedIds[0]}:${sortedIds[1]}`)
-                    .digest('hex');
-                // Stream Chat enforces max 64 chars for channel IDs.
-                // "consult_" = 8 chars, so use first 48 hex chars (56 total).
-                const channelId = `consult_${fullHash.substring(0, 48)}`;
-
-                const channel = serverClient.channel('messaging', channelId, {
-                    members: [conn.patient_id, conn.doctor_id],
-                    created_by_id: conn.doctor_id,
-                });
-
-                // This will create the channel if it doesn't exist, or just update it if it does
-                await channel.create();
+        results.forEach((result, i) => {
+            if (result.status === 'fulfilled') {
                 syncedCount++;
-            } catch (channelError: any) {
+            } else {
                 failedCount++;
-                console.warn(`[Chat Sync] Failed to sync channel for connection ${conn.id}:`, channelError.message);
+                console.warn(`[Chat Sync] Failed to sync channel for connection ${connections[i].id}:`, result.reason?.message);
             }
-        }
+        });
 
         return NextResponse.json({ success: true, syncedCount, failedCount });
 
