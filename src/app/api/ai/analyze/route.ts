@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeMultiAgentPipeline } from '@/ai/orchestrator';
+import { checkRateLimit, RateLimitPresets } from '@/lib/redis/rate-limit';
 
 export async function POST(request: NextRequest) {
     try {
@@ -10,6 +11,23 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 { error: 'Missing or invalid symptoms parameter.' },
                 { status: 400 }
+            );
+        }
+
+        // This endpoint runs the full multi-agent pipeline (or an OpenAI call) —
+        // rate-limit it the same way as the other AI-invoking flows.
+        const forwardedFor = request.headers.get('x-forwarded-for');
+        const identifier = userId || forwardedFor?.split(',')[0].trim() || 'unknown';
+        const rateLimitResult = await checkRateLimit({
+            limit: RateLimitPresets.AI_ANALYSIS.limit,
+            window: RateLimitPresets.AI_ANALYSIS.window,
+            identifier,
+            endpoint: '/api/ai/analyze',
+        });
+        if (!rateLimitResult.success) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Please try again later.' },
+                { status: 429, headers: { 'Retry-After': String(rateLimitResult.retryAfter ?? 3600) } }
             );
         }
 
@@ -46,7 +64,7 @@ export async function POST(request: NextRequest) {
 
         // 1. Try FastAPI Python Microservice (Port 8000)
         try {
-            const fastApiUrl = process.env.FASTAPI_SERVICE_URL || 'http://localhost:8000';
+            const fastApiUrl = process.env.PYTHON_AI_SERVICE_URL || process.env.FASTAPI_SERVICE_URL || 'http://localhost:8000';
             const fastApiResponse = await fetch(`${fastApiUrl}/api/v1/analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

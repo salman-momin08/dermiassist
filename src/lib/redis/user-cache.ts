@@ -7,7 +7,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import { getCacheOrSet, setCache, deleteCache, CacheKeys, CacheTTL } from '@/lib/redis';
+import { getCacheOrSet, deleteCache, CacheKeys, CacheTTL } from '@/lib/redis';
 import { withRetry, isNetworkError } from '@/lib/utils/retry';
 import { logger } from '@/lib/logger';
 

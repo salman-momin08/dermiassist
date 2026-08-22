@@ -7,14 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2, MessageSquare, UserCog, AlertCircle, Lightbulb, CheckCircle, XCircle, Eye, Clock } from "lucide-react"
 import { format } from "date-fns"
 import { useAuth } from "@/hooks/use-auth"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Upload, FileText, X } from "lucide-react"
+import { Upload } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { uploadFile, validateDocumentUpload, deleteFile } from "@/lib/actions"
 
@@ -76,6 +75,7 @@ export default function MyRequestsPage() {
             .select('*')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
+            .limit(100)
 
         if (error) {
             toast({ title: "Error", description: "Could not fetch requests.", variant: "destructive" })

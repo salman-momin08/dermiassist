@@ -6,20 +6,17 @@ import { useParams, notFound, useRouter } from 'next/navigation';
 import { useAnalyses, type AnalysisReport, type Explanation } from '@/hooks/use-analyses';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Video, BrainCircuit, Languages, Mic, Send, Bot, User, Volume2, Stethoscope, MapPin, Download, Sun, ShieldCheck, Database } from "lucide-react";
+import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Languages, Mic, Send, Bot, User, Volume2, Stethoscope, Download, ShieldCheck, Database } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { downloadFhirJson } from "@/lib/fhir-exporter";
-import { calculateUVProtection, FITZPATRICK_PROFILES, FitzpatrickSkinType } from "@/lib/uv-tracker";
+import { calculateUVProtection, FitzpatrickSkinType } from "@/lib/uv-tracker";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { visualProgressAnalysis } from '@/ai/flows/visual-progress-analysis';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { generateHealingVideo } from '@/ai/flows/generate-healing-video';
 import { explainReportMultimodal } from '@/ai/flows/explain-report-multimodal';
 import { generateChatSummary } from '@/ai/flows/generate-chat-summary';
@@ -28,7 +25,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -40,7 +37,6 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { textToSpeech } from '@/ai/flows/text-to-speech';
-import { uploadFile } from '@/lib/actions';
 import { recommendDoctors, RecommendDoctorsOutput } from '@/ai/flows/recommend-doctors';
 
 

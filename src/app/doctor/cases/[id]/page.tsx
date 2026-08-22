@@ -5,22 +5,17 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { 
-  ArrowLeft, 
-  Stethoscope, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Save, 
-  Send, 
-  Sparkles, 
-  FileText, 
-  ShieldCheck, 
-  Loader2, 
-  Bot, 
-  User, 
-  Clock, 
-  Maximize2,
-  CheckCircle,
-  XCircle
+  ArrowLeft,
+  Stethoscope,
+  CheckCircle2,
+  AlertTriangle,
+  Send,
+  Sparkles,
+  FileText,
+  ShieldCheck,
+  Loader2,
+  Bot,
+  Maximize2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

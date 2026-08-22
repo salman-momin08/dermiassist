@@ -30,7 +30,6 @@ import {
   VolumeX,
   Sparkles,
   CheckCircle2,
-  FileText,
   RotateCcw,
 } from "lucide-react";
 import Image from "next/image";
@@ -48,10 +47,9 @@ import { textToSpeech } from "@/ai/flows/text-to-speech";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { sanitizeConditionName } from "@/ai/guards/condition-guard";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { compressImage } from "@/lib/image-compressor";
-import { SUPPORTED_LANGUAGES, getLocalizedText, SupportedLanguage } from "@/lib/translation-service";
+import { SUPPORTED_LANGUAGES, getLocalizedText } from "@/lib/translation-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Globe } from "lucide-react";
 import { generateQuestionSuggestions } from "@/ai/flows/generate-suggestions";

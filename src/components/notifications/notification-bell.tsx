@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 
 // Lazy-load the Novu Inbox so it never runs during SSR

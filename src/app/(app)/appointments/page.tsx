@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Separator } from "@/components/ui/separator";
 import { Logo } from "@/components/logo";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { differenceInMinutes, format, isFuture, isPast, parse, isValid } from "date-fns";
+import { differenceInMinutes, format, parse, isValid } from "date-fns";
 
 import Image from "next/image";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -64,7 +64,8 @@ export default function AppointmentsPage() {
                 .from('appointments')
                 .select('*')
                 .eq('patient_id', user!.id)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .limit(200);
 
             if (error) {
                 console.error("Error fetching appointments:", error);

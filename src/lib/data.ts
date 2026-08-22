@@ -1,7 +1,6 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import type { AnalysisReport } from "@/hooks/use-analyses";
 
 export async function getAnalysesForUser(userId: string) {
     if (!userId) {

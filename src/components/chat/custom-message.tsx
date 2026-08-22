@@ -6,7 +6,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ChevronDown, Trash, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
-import { Italic } from 'lucide-react';
 
 interface CustomMessageProps {
     deletedMessages: string[];

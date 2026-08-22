@@ -5,13 +5,11 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Bot, Stethoscope, FileText, Loader2, Search } from 'lucide-react';
+import { Bot, FileText, Search } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AppHeader } from '@/components/layout/header';
 import { AppFooter } from '@/components/layout/footer';
-import { Logo } from '@/components/logo';
 import { motion } from 'framer-motion';
 
 function LandingPageContent() {

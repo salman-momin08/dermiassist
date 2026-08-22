@@ -3,7 +3,7 @@
 import { AppHeader } from "@/components/layout/header";
 import { AppFooter } from "@/components/layout/footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Bot, User, Shield, Lock, MessageSquare, LineChart, FileText, Video, Bell, Palette, Languages, Cpu, Zap, Activity, Database, Terminal, Workflow } from "lucide-react";
+import { Bot, User, MessageSquare, LineChart, FileText, Video, Cpu, Zap, Activity, Database, Terminal, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const features = [

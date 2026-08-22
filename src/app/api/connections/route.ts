@@ -68,17 +68,18 @@ export const POST = RateLimitMiddleware.strict(async (request: NextRequest) => {
 
         // Notify doctor of new connection request
         try {
-            const { data: doctorProfile } = await supabase
-                .from('profiles')
-                .select('email, display_name')
-                .eq('id', doctorId)
-                .single();
-
-            const { data: patientProfile } = await supabase
-                .from('profiles')
-                .select('display_name')
-                .eq('id', patientId)
-                .single();
+            const [{ data: doctorProfile }, { data: patientProfile }] = await Promise.all([
+                supabase
+                    .from('profiles')
+                    .select('email, display_name')
+                    .eq('id', doctorId)
+                    .single(),
+                supabase
+                    .from('profiles')
+                    .select('display_name')
+                    .eq('id', patientId)
+                    .single(),
+            ]);
 
             await novu.trigger('connection-request', {
                 to: {
@@ -148,17 +149,18 @@ export const PATCH = RateLimitMiddleware.strict(async (request: NextRequest) => 
 
         // 3. Notify patient of the response
         try {
-            const { data: patientProfile } = await supabase
-                .from('profiles')
-                .select('email, display_name')
-                .eq('id', connection.patient_id)
-                .single();
-
-            const { data: doctorProfile } = await supabase
-                .from('profiles')
-                .select('display_name')
-                .eq('id', connection.doctor_id)
-                .single();
+            const [{ data: patientProfile }, { data: doctorProfile }] = await Promise.all([
+                supabase
+                    .from('profiles')
+                    .select('email, display_name')
+                    .eq('id', connection.patient_id)
+                    .single(),
+                supabase
+                    .from('profiles')
+                    .select('display_name')
+                    .eq('id', connection.doctor_id)
+                    .single(),
+            ]);
 
             await novu.trigger('connection-response', {
                 to: {
