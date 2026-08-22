@@ -15,8 +15,6 @@ env
 .env*.local
 *.log
 .DS_Store
-src/ai/rag/datasets
-src/ai/eval/datasets
 ai_service/ingestion/datasets
 ai_service/benchmarks
 docs

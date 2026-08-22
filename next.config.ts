@@ -44,10 +44,6 @@ const nextConfig: NextConfig = {
         serverActions: {
             bodySizeLimit: '10mb',
         },
-        // @ts-ignore - this is a known experimental flag or may just silence the specific warning
-        turbopack: {
-            root: '.',
-        }
     },
     // serverExternalPackages: ['stream-chat', 'stream-chat-react'],
     typescript: {
