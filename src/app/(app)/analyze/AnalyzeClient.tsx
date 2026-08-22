@@ -38,6 +38,7 @@ import { detectDiseaseNameCached as detectDiseaseName } from "@/ai/flows/cached"
 import { finalEvaluationCached as finalEvaluation } from "@/ai/flows/cached";
 import { proformaChat } from "@/ai/flows/proforma-chat";
 import { useToast } from "@/hooks/use-toast";
+import { getSafeErrorMessage } from "@/lib/errors";
 import { useAnalyses } from "@/hooks/use-analyses";
 import { useAuth } from "@/hooks/use-auth";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -242,7 +243,7 @@ export default function AnalyzeClient() {
 
     } catch (err: any) {
       console.error("Final evaluation failed:", err);
-      setError(err?.message || "An unexpected error occurred during report synthesis. Please try again.");
+      setError(getSafeErrorMessage(err, "An unexpected error occurred during report synthesis. Please try again."));
       setStep('error');
     } finally {
       setIsLoading(false);
@@ -420,7 +421,7 @@ export default function AnalyzeClient() {
       startProforma(sanitizedName);
     } catch (err: any) {
       console.error("Initial analysis failed:", err);
-      const errorMessage = err.message || "Failed to analyze the image. The AI may be unable to identify a condition. Please try another clear photo.";
+      const errorMessage = getSafeErrorMessage(err, "Failed to analyze the image. The AI may be unable to identify a condition. Please try another clear photo.");
       setError(errorMessage);
       setStep('error');
     } finally {

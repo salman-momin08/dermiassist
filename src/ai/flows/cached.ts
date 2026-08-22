@@ -40,9 +40,20 @@ export async function detectDiseaseNameCached(
         async () => {
             logger.info('ai_cache.detect_disease.miss', { imageHashPrefix: imageHash.substring(0, 16) });
             trackCacheMiss();
-            const apiResult = await originalDetectDiseaseName(input);
-            logger.info('ai_cache.detect_disease.api_returned', { conditionName: apiResult.conditionName });
-            return apiResult;
+            try {
+                const apiResult = await originalDetectDiseaseName(input);
+                logger.info('ai_cache.detect_disease.api_returned', { conditionName: apiResult.conditionName });
+                return apiResult;
+            } catch (error) {
+                logger.error('ai_cache.detect_disease.failed', {
+                    imageHashPrefix: imageHash.substring(0, 16),
+                    userId,
+                    name: error instanceof Error ? error.name : typeof error,
+                    message: error instanceof Error ? error.message : String(error),
+                    code: (error as any)?.code,
+                });
+                throw error;
+            }
         },
         { ttl: CacheTTL.AI_ANALYSIS } // 30 days
     );
@@ -100,9 +111,20 @@ export async function finalEvaluationCached(
                 answersLength: input.userAnswers.length,
             });
             trackCacheMiss();
-            const apiResult = await originalFinalEvaluation(input);
-            logger.info('ai_cache.final_eval.api_returned', { conditionName: apiResult.conditionName });
-            return apiResult;
+            try {
+                const apiResult = await originalFinalEvaluation(input);
+                logger.info('ai_cache.final_eval.api_returned', { conditionName: apiResult.conditionName });
+                return apiResult;
+            } catch (error) {
+                logger.error('ai_cache.final_eval.failed', {
+                    imageHashPrefix: imageHash.substring(0, 16),
+                    userId,
+                    name: error instanceof Error ? error.name : typeof error,
+                    message: error instanceof Error ? error.message : String(error),
+                    code: (error as any)?.code,
+                });
+                throw error;
+            }
         },
         { ttl: CacheTTL.AI_ANALYSIS } // 30 days
     );

@@ -169,6 +169,29 @@ export class NotFoundError extends AppError {
 // ─────────────────────────────────────────────────────────────
 
 /**
+ * Next.js redacts thrown Server Component / Server Action errors in
+ * production to a generic message (see the "omitted in production builds"
+ * text) and swaps in a `digest` instead. `err.message` is still truthy in
+ * that case, so naive `err.message || fallback` checks never fall through.
+ */
+function isNextRedactedErrorMessage(message: string): boolean {
+    return message.includes('omitted in production builds');
+}
+
+/**
+ * Pick a message safe to show a user from a caught client-side error,
+ * falling back to `fallback` for Next.js's redacted production error text
+ * (or when there's no usable message at all).
+ */
+export function getSafeErrorMessage(error: unknown, fallback: string): string {
+    const message = error instanceof Error ? error.message : undefined;
+    if (!message || isNextRedactedErrorMessage(message)) {
+        return fallback;
+    }
+    return message;
+}
+
+/**
  * Serialize an error to a plain object safe for API responses.
  * In production, context is omitted to avoid leaking internals.
  */
