@@ -454,15 +454,15 @@ export default function AnalyzeClient() {
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-4xl">
       {/* Navigation & Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <Button
           variant="outline"
           size="sm"
           onClick={resetState}
-          className="gap-2 hover:bg-muted/80 transition-colors"
+          className="gap-2 rounded-xl bg-card/60 backdrop-blur-md border-border/80 hover:bg-accent/80 hover:border-primary/40 transition-all shadow-sm"
         >
-          <ArrowLeft className="h-4 w-4" />
-          {step === 'upload' ? 'Back' : 'Start New Analysis'}
+          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          <span>{step === 'upload' ? 'Back to Dashboard' : 'Start New Analysis'}</span>
         </Button>
 
         {step === 'proforma' && (
@@ -470,15 +470,16 @@ export default function AnalyzeClient() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2 bg-muted/60 px-3 py-1.5 rounded-full border border-border/60">
-                    <Volume2 className="h-4 w-4 text-primary" />
-                    <Label htmlFor="speech-mode" className="text-xs font-medium cursor-pointer">
-                      Voice Mode
+                  <div className="flex items-center gap-2 bg-card/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-border/80 shadow-sm transition-all hover:border-primary/40">
+                    <Volume2 className="h-4 w-4 text-primary animate-pulse" />
+                    <Label htmlFor="speech-mode" className="text-xs font-semibold cursor-pointer select-none">
+                      Voice Readout
                     </Label>
                     <Switch
                       id="speech-mode"
                       checked={speechMode}
                       onCheckedChange={setSpeechMode}
+                      className="data-[state=checked]:bg-primary"
                     />
                   </div>
                 </TooltipTrigger>
@@ -490,14 +491,14 @@ export default function AnalyzeClient() {
 
             {questionCount >= 1 && (
               <Button
-                variant="secondary"
+                variant="gradient"
                 size="sm"
                 onClick={() => handleFinalEvaluation()}
                 disabled={isLoading}
-                className="gap-1.5 font-medium text-xs bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 shadow-none"
+                className="gap-1.5 text-xs font-semibold rounded-xl shadow-sm hover:shadow-md"
               >
                 <FileText className="h-3.5 w-3.5" />
-                Finish & View Report
+                <span>Complete Assessment</span>
               </Button>
             )}
           </div>
@@ -505,38 +506,48 @@ export default function AnalyzeClient() {
       </div>
 
       {/* Main Analysis Card */}
-      <Card className="shadow-lg border-border/80 overflow-hidden backdrop-blur-sm bg-card/95">
-        <CardHeader className="border-b bg-muted/30 pb-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <CardTitle className="font-headline text-xl flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                Dermatological Consultation & Analysis
+      <Card className="shadow-2xl border-border/80 overflow-hidden backdrop-blur-xl bg-card/90 rounded-2xl relative">
+        {/* Subtle decorative gradient glow at the top */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-teal-400" />
+
+        <CardHeader className="border-b border-border/60 bg-muted/20 pb-4 pt-5 px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle className="font-headline text-xl md:text-2xl flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shadow-inner">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <span>Dermatological Clinical Consultation</span>
               </CardTitle>
-              <CardDescription className="text-xs sm:text-sm mt-0.5">
+              <CardDescription className="text-xs md:text-sm text-muted-foreground">
                 {step === 'upload' && "Upload a clear photo to initiate AI condition detection and guided diagnostic triage."}
-                {step === 'proforma' && "Answer follow-up diagnostic questions to calibrate accuracy and rule out differential diagnoses."}
+                {step === 'proforma' && "Answer follow-up diagnostic questions to calibrate accuracy and evaluate potential root causes."}
                 {step === 'analyzing' && "Generating clinical synthesis with ICD-10 coding and medical guidelines..."}
                 {step === 'error' && "An error occurred during evaluation."}
               </CardDescription>
             </div>
 
             {step === 'proforma' && detectedCondition && (
-              <div className="flex items-center gap-2 bg-primary/10 text-primary border border-primary/20 rounded-full px-3 py-1 text-xs font-semibold">
-                <span>Detected:</span>
-                <span className="underline">{detectedCondition}</span>
+              <div className="flex items-center gap-2 bg-primary/10 text-primary border border-primary/20 rounded-xl px-3.5 py-1.5 text-xs font-semibold backdrop-blur-sm shadow-sm">
+                <span className="text-muted-foreground font-normal">Primary Differential:</span>
+                <span className="font-bold underline decoration-primary/40 underline-offset-2">{detectedCondition}</span>
               </div>
             )}
           </div>
 
           {/* Progress bar during proforma */}
           {step === 'proforma' && (
-            <div className="mt-4 space-y-1.5">
-              <div className="flex justify-between text-xs text-muted-foreground font-medium">
-                <span>Consultation Progress</span>
-                <span>Question {Math.min(questionCount + 1, MAX_QUESTIONS)} of {MAX_QUESTIONS}</span>
+            <div className="mt-4 space-y-2">
+              <div className="flex justify-between text-xs font-semibold">
+                <span className="text-muted-foreground">Consultation Calibration</span>
+                <span className="text-primary font-bold">Step {Math.min(questionCount + 1, MAX_QUESTIONS)} of {MAX_QUESTIONS}</span>
               </div>
-              <Progress value={(Math.min(questionCount, MAX_QUESTIONS) / MAX_QUESTIONS) * 100} className="h-1.5" />
+              <div className="w-full bg-muted/60 rounded-full h-2 overflow-hidden border border-border/40">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-teal-400 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${(Math.min(questionCount + 1, MAX_QUESTIONS) / MAX_QUESTIONS) * 100}%` }}
+                />
+              </div>
             </div>
           )}
         </CardHeader>
@@ -544,33 +555,40 @@ export default function AnalyzeClient() {
         {/* STEP 1: UPLOAD */}
         {step === 'upload' && (
           <>
-            <CardContent className="p-6">
-              <div className="space-y-4">
+            <CardContent className="p-6 md:p-8">
+              <div className="space-y-6">
                 <div
                   onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
                   onDragLeave={() => setIsDragOver(false)}
                   onDrop={handleDrop}
                   className={cn(
-                    "border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer flex flex-col items-center justify-center min-h-[260px]",
-                    isDragOver ? "border-primary bg-primary/5 scale-[1.01]" : "border-muted-foreground/25 hover:border-primary/60 hover:bg-muted/20",
-                    preview ? "border-solid border-border/80 p-4" : ""
+                    "border-2 border-dashed rounded-2xl p-8 md:p-10 text-center transition-all duration-300 cursor-pointer flex flex-col items-center justify-center min-h-[300px] relative overflow-hidden",
+                    isDragOver
+                      ? "border-primary bg-primary/5 scale-[1.01] shadow-xl shadow-primary/10"
+                      : "border-border/80 hover:border-primary/60 bg-muted/15 hover:bg-muted/30 shadow-inner",
+                    preview ? "border-solid border-border/80 bg-background/50 p-6" : ""
                   )}
                 >
                   {preview ? (
-                    <div className="relative group flex flex-col items-center">
-                      <div className="relative rounded-lg overflow-hidden border border-border shadow-md">
+                    <div className="relative group flex flex-col items-center gap-4">
+                      <div className="relative rounded-2xl overflow-hidden border-2 border-border/80 shadow-2xl shadow-black/20 group-hover:scale-[1.02] transition-transform duration-300">
                         <Image
                           src={preview}
                           alt="Skin condition specimen"
-                          width={280}
-                          height={280}
-                          className="object-cover rounded-lg max-h-[260px] w-auto"
+                          width={320}
+                          height={320}
+                          className="object-cover rounded-2xl max-h-[280px] w-auto"
                         />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                          <span className="text-white text-xs font-semibold bg-black/60 px-3 py-1.5 rounded-xl backdrop-blur-md border border-white/20">
+                            Click Remove to change photo
+                          </span>
+                        </div>
                       </div>
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="mt-3 gap-1 text-xs shadow-sm"
+                        className="rounded-xl shadow-md gap-1.5 text-xs font-semibold px-4"
                         onClick={(e) => {
                           e.stopPropagation();
                           setFile(null);
@@ -578,21 +596,29 @@ export default function AnalyzeClient() {
                         }}
                       >
                         <XCircle className="h-4 w-4" />
-                        Remove Image
+                        Remove Photo
                       </Button>
                     </div>
                   ) : (
-                    <label htmlFor="picture" className="cursor-pointer w-full flex flex-col items-center justify-center space-y-3 py-6">
-                      <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                        <Upload className="h-8 w-8" />
+                    <label htmlFor="picture" className="cursor-pointer w-full flex flex-col items-center justify-center space-y-4 py-6">
+                      <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border border-primary/30 flex items-center justify-center text-primary group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-primary/20 transition-all duration-300">
+                        <Upload className="h-9 w-9" />
                       </div>
-                      <div className="space-y-1 text-center">
-                        <p className="text-sm font-semibold text-foreground">
-                          Drag & drop your skin photo here, or <span className="text-primary underline">browse</span>
+                      <div className="space-y-1.5 text-center max-w-sm">
+                        <p className="text-base font-bold text-foreground">
+                          Drag & drop your skin photo here, or <span className="text-primary underline decoration-primary/40 underline-offset-2">browse files</span>
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          Supports JPEG, PNG, WEBP (High-resolution, well-lit photos give highest diagnostic accuracy)
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Supports JPEG, PNG, WEBP. High-resolution, well-lit photographs deliver maximum clinical accuracy.
                         </p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                        <Badge variant="secondary" className="text-[11px] font-medium rounded-lg px-2.5 py-1 bg-muted/60 border border-border/60">
+                          Auto Image Optimization
+                        </Badge>
+                        <Badge variant="secondary" className="text-[11px] font-medium rounded-lg px-2.5 py-1 bg-muted/60 border border-border/60">
+                          End-to-End Encrypted
+                        </Badge>
                       </div>
                       <Input
                         id="picture"
@@ -607,25 +633,27 @@ export default function AnalyzeClient() {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="border-t bg-muted/10 p-4 flex justify-between">
-              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <CardFooter className="border-t border-border/60 bg-muted/10 p-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-muted-foreground flex items-center gap-2 font-medium">
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                HIPAA & ISO 27001 compliant encrypted pipeline
+                <span>HIPAA / ISO 27001 compliant vision pipeline</span>
               </div>
               <Button
+                variant="default"
+                size="lg"
                 onClick={handleImageSubmit}
                 disabled={isLoading || !file || !preview}
-                className="gap-2 font-semibold shadow-md px-6"
+                className="gap-2 font-bold px-8 rounded-xl shadow-lg hover:shadow-xl transition-all"
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    {loadingMessage}
+                    <span>{loadingMessage}</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4" />
-                    Start Guided Analysis
+                    <span>Begin Guided Consultation</span>
                   </>
                 )}
               </Button>
@@ -635,22 +663,27 @@ export default function AnalyzeClient() {
 
         {/* STEP 2: PROFORMA CONSULTATION CHAT */}
         {step === 'proforma' && (
-          <div className="flex flex-col h-[65vh] min-h-[500px]">
+          <div className="flex flex-col h-[65vh] min-h-[520px]">
             {/* Specimen Banner */}
             {preview && (
-              <div className="bg-muted/40 px-4 py-2.5 border-b flex items-center justify-between text-xs text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Image
-                    src={preview}
-                    alt="Specimen thumbnail"
-                    width={32}
-                    height={32}
-                    className="h-8 w-8 rounded-md object-cover border border-border"
-                  />
-                  <span>Active Specimen Analysis</span>
+              <div className="bg-muted/30 px-5 py-3 border-b border-border/60 flex items-center justify-between text-xs text-muted-foreground backdrop-blur-md">
+                <div className="flex items-center gap-3">
+                  <div className="relative rounded-lg overflow-hidden border border-border/80 shadow-sm">
+                    <Image
+                      src={preview}
+                      alt="Specimen thumbnail"
+                      width={36}
+                      height={36}
+                      className="h-9 w-9 object-cover"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground text-xs">Active Dermatological Case</p>
+                    <p className="text-[10px] text-muted-foreground">Specimen loaded & verified</p>
+                  </div>
                 </div>
-                <Badge variant="outline" className="text-[11px] font-normal border-primary/30 text-primary">
-                  Interactive Triage Mode
+                <Badge variant="outline" className="text-[11px] font-semibold border-primary/40 bg-primary/5 text-primary rounded-lg px-2.5 py-0.5">
+                  AI Active Triage
                 </Badge>
               </div>
             )}
@@ -664,13 +697,13 @@ export default function AnalyzeClient() {
                     <div
                       key={index}
                       className={cn(
-                        "flex items-start gap-3 transition-opacity duration-300",
+                        "flex items-start gap-3 transition-all duration-300",
                         isAi ? "justify-start" : "justify-end"
                       )}
                     >
                       {isAi && (
-                        <Avatar className="h-8 w-8 border border-primary/20 bg-primary/10 text-primary shrink-0 mt-0.5">
-                          <AvatarFallback className="bg-primary text-primary-foreground font-bold">
+                        <Avatar className="h-9 w-9 border-2 border-primary/30 bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shrink-0 mt-0.5 rounded-xl">
+                          <AvatarFallback className="bg-transparent text-white font-bold">
                             <Bot className="h-4 w-4" />
                           </AvatarFallback>
                         </Avatar>
@@ -678,41 +711,44 @@ export default function AnalyzeClient() {
 
                       <div
                         className={cn(
-                          "rounded-2xl px-4 py-3 max-w-[85%] md:max-w-[75%] shadow-sm relative group",
+                          "rounded-2xl px-4.5 py-3.5 max-w-[85%] md:max-w-[78%] shadow-md relative transition-all",
                           isAi
-                            ? "bg-muted/90 text-foreground border border-border/60 rounded-tl-sm"
-                            : "bg-primary text-primary-foreground rounded-tr-sm"
+                            ? "bg-card/95 text-foreground border border-border/80 rounded-tl-sm shadow-sm"
+                            : "bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 text-white rounded-tr-sm shadow-blue-500/20"
                         )}
                       >
                         <div className="text-sm leading-relaxed whitespace-pre-wrap">
                           {msg.text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
                             if (part.startsWith('**') && part.endsWith('**')) {
-                              return <strong key={i} className={isAi ? "text-primary font-semibold" : "font-bold"}>{part.slice(2, -2)}</strong>;
+                              return <strong key={i} className={isAi ? "text-primary font-bold" : "font-bold underline decoration-white/30"}>{part.slice(2, -2)}</strong>;
                             }
                             return part;
                           })}
                         </div>
 
                         {/* Message Meta & Audio Trigger */}
-                        <div className="flex items-center justify-between mt-2 pt-1 border-t border-border/20 text-[10px] opacity-75 gap-3">
+                        <div className={cn(
+                          "flex items-center justify-between mt-2 pt-1.5 border-t text-[10px] gap-3 font-medium",
+                          isAi ? "border-border/40 text-muted-foreground" : "border-white/20 text-white/80"
+                        )}>
                           <span>{msg.timestamp || 'Just now'}</span>
                           {isAi && (
                             <Button
                               size="icon"
                               variant="ghost"
                               className={cn(
-                                "h-5 w-5 rounded-full hover:bg-background/50",
-                                playingAudio?.text === msg.text && "text-primary animate-pulse"
+                                "h-6 w-6 rounded-lg hover:bg-muted/80 transition-colors",
+                                playingAudio?.text === msg.text && "text-primary animate-pulse bg-primary/10"
                               )}
                               onClick={() => handlePlayMessageAudio(msg.text)}
                               disabled={isAudioLoading === msg.text}
                             >
                               {isAudioLoading === msg.text ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                               ) : playingAudio?.text === msg.text ? (
-                                <VolumeX className="h-3 w-3" />
+                                <VolumeX className="h-3.5 w-3.5" />
                               ) : (
-                                <Volume2 className="h-3 w-3" />
+                                <Volume2 className="h-3.5 w-3.5" />
                               )}
                             </Button>
                           )}
@@ -720,8 +756,8 @@ export default function AnalyzeClient() {
                       </div>
 
                       {!isAi && (
-                        <Avatar className="h-8 w-8 border border-border shrink-0 mt-0.5">
-                          <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold">
+                        <Avatar className="h-9 w-9 border-2 border-indigo-500/30 bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md shrink-0 mt-0.5 rounded-xl">
+                          <AvatarFallback className="bg-transparent text-white font-bold">
                             <User className="h-4 w-4" />
                           </AvatarFallback>
                         </Avatar>
@@ -733,14 +769,14 @@ export default function AnalyzeClient() {
                 {/* AI Thinking Animation */}
                 {isLoading && (
                   <div className="flex items-start gap-3">
-                    <Avatar className="h-8 w-8 border border-primary/20 bg-primary/10 text-primary shrink-0">
-                      <AvatarFallback className="bg-primary text-primary-foreground font-bold">
+                    <Avatar className="h-9 w-9 border-2 border-primary/30 bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shrink-0 rounded-xl">
+                      <AvatarFallback className="bg-transparent text-white font-bold">
                         <Bot className="h-4 w-4" />
                       </AvatarFallback>
                     </Avatar>
-                    <div className="rounded-2xl rounded-tl-sm px-4 py-3 bg-muted/80 border border-border/60 flex items-center gap-2 text-xs text-muted-foreground shadow-sm">
+                    <div className="rounded-2xl rounded-tl-sm px-4.5 py-3 bg-card border border-border/80 flex items-center gap-2.5 text-xs text-muted-foreground shadow-sm">
                       <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      <span>Formulating clinical inquiry...</span>
+                      <span className="font-medium">Synthesizing clinical follow-up question...</span>
                     </div>
                   </div>
                 )}
@@ -750,15 +786,18 @@ export default function AnalyzeClient() {
               </div>
             </ScrollArea>
 
-            {/* Quick Answer Chips */}
+            {/* Quick Answer Suggestion Pills */}
             {!isLoading && (
-              <div className="px-4 py-2 border-t bg-muted/20 flex gap-1.5 overflow-x-auto scrollbar-none">
-                <span className="text-[11px] text-muted-foreground self-center shrink-0 mr-1 font-medium">Suggestions:</span>
+              <div className="px-5 py-2.5 border-t border-border/60 bg-muted/20 flex gap-2 overflow-x-auto scrollbar-none items-center">
+                <span className="text-[11px] text-muted-foreground font-semibold shrink-0 mr-1 flex items-center gap-1">
+                  <Sparkles className="h-3 w-3 text-primary" />
+                  Quick answers:
+                </span>
                 {QUICK_SUGGESTIONS.map((chip, i) => (
                   <button
                     key={i}
                     onClick={() => handleUserResponse(chip)}
-                    className="text-xs shrink-0 bg-background hover:bg-primary/10 hover:text-primary border border-border/80 rounded-full px-3 py-1 transition-colors text-muted-foreground cursor-pointer"
+                    className="text-xs shrink-0 bg-card hover:bg-primary/10 hover:border-primary/50 hover:text-primary border border-border/80 rounded-xl px-3.5 py-1.5 font-medium transition-all shadow-sm active:scale-95 text-foreground cursor-pointer"
                   >
                     {chip}
                   </button>
@@ -767,11 +806,11 @@ export default function AnalyzeClient() {
             )}
 
             {/* Chat Input Bar */}
-            <div className="p-3 md:p-4 border-t bg-card">
-              <div className="relative flex items-center">
+            <div className="p-4 border-t border-border/60 bg-card/90 backdrop-blur-md">
+              <div className="relative flex items-center max-w-3xl mx-auto">
                 <Input
                   ref={inputRef}
-                  placeholder={isListening ? "Listening to your voice..." : "Type your clinical answer or symptoms..."}
+                  placeholder={isListening ? "Listening to your voice... (Speak now)" : "Type your symptom details or response..."}
                   value={userResponse}
                   onChange={(e) => setUserResponse(e.target.value)}
                   onKeyDown={(e) => {
@@ -782,11 +821,11 @@ export default function AnalyzeClient() {
                   }}
                   disabled={isLoading}
                   className={cn(
-                    "pr-24 py-6 bg-muted/30 focus-visible:ring-primary text-sm",
-                    isListening && "border-red-500 bg-red-50/10 placeholder:text-red-500 animate-pulse"
+                    "pr-28 py-6 rounded-2xl bg-muted/30 focus-visible:ring-primary text-sm shadow-inner transition-all",
+                    isListening && "border-red-500 bg-red-500/10 placeholder:text-red-500 ring-2 ring-red-500/30"
                   )}
                 />
-                <div className="absolute right-2 flex items-center gap-1">
+                <div className="absolute right-2 flex items-center gap-1.5">
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -795,22 +834,26 @@ export default function AnalyzeClient() {
                           variant={isListening ? 'destructive' : 'ghost'}
                           onClick={handleMicClick}
                           disabled={isLoading}
-                          className="h-8 w-8 rounded-full"
+                          className={cn(
+                            "h-9 w-9 rounded-xl transition-all",
+                            isListening && "animate-bounce shadow-lg shadow-red-500/30"
+                          )}
                         >
-                          {isListening ? <MicOff className="h-4 w-4 animate-bounce" /> : <Mic className="h-4 w-4" />}
+                          {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>{isListening ? 'Stop listening' : 'Speak your answer'}</p>
+                        <p>{isListening ? 'Stop voice recording' : 'Speak your answer'}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
 
                   <Button
                     size="icon"
+                    variant="default"
                     onClick={() => handleUserResponse()}
                     disabled={isLoading || !userResponse.trim()}
-                    className="h-8 w-8 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                    className="h-9 w-9 rounded-xl shadow-md hover:shadow-lg transition-all"
                   >
                     <Send className="h-4 w-4" />
                   </Button>
@@ -822,21 +865,21 @@ export default function AnalyzeClient() {
 
         {/* STEP 3 & 4: ANALYZING / ERROR STATES */}
         {(step === 'analyzing' || step === 'error') && (
-          <CardContent className="flex flex-col items-center justify-center min-h-[340px] p-8 text-center">
+          <CardContent className="flex flex-col items-center justify-center min-h-[360px] p-8 text-center">
             {step === 'analyzing' && (
-              <div className="space-y-4 max-w-md flex flex-col items-center">
+              <div className="space-y-5 max-w-md flex flex-col items-center">
                 <div className="relative">
-                  <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center text-primary animate-pulse">
-                    <WandSparkles className="h-10 w-10 text-primary" />
+                  <div className="h-24 w-24 rounded-2xl bg-gradient-to-br from-blue-600/20 via-indigo-600/20 to-teal-400/20 border border-primary/30 flex items-center justify-center text-primary shadow-xl shadow-primary/10">
+                    <WandSparkles className="h-12 w-12 text-primary animate-pulse" />
                   </div>
-                  <div className="absolute inset-0 rounded-full border-2 border-primary/40 border-t-transparent animate-spin" />
+                  <div className="absolute -inset-1 rounded-2xl border-2 border-primary/40 border-t-transparent animate-spin" />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="font-semibold text-lg text-foreground">
+                <div className="space-y-2">
+                  <h3 className="font-headline font-bold text-xl text-foreground">
                     {loadingMessage || "Generating Clinical Synthesis"}
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Performing multimodal RAG cross-referencing, ICD-10 differential mapping, and clinical guideline synthesis.
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Executing multi-agent vision verification, Supabase vector retrieval, and grounded medical guideline synthesis.
                   </p>
                 </div>
               </div>
@@ -844,16 +887,21 @@ export default function AnalyzeClient() {
 
             {step === 'error' && error && (
               <div className="space-y-4 max-w-md flex flex-col items-center text-destructive">
-                <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
-                  <AlertTriangle className="h-8 w-8 text-destructive" />
+                <div className="h-20 w-20 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center shadow-lg shadow-destructive/10">
+                  <AlertTriangle className="h-10 w-10 text-destructive" />
                 </div>
-                <div className="space-y-1 text-center">
-                  <h3 className="font-semibold text-base">Analysis Error</h3>
+                <div className="space-y-1.5 text-center">
+                  <h3 className="font-headline font-bold text-lg text-foreground">Consultation Interrupted</h3>
                   <p className="text-xs text-muted-foreground break-words">{error}</p>
                 </div>
-                <Button onClick={resetState} variant="outline" className="gap-2 mt-2">
+                <Button
+                  variant="default"
+                  size="default"
+                  onClick={resetState}
+                  className="gap-2 mt-3 rounded-xl font-bold shadow-md"
+                >
                   <RotateCcw className="h-4 w-4" />
-                  Try Again
+                  <span>Restart Consultation</span>
                 </Button>
               </div>
             )}
