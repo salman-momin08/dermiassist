@@ -199,31 +199,7 @@ export function AppHeader() {
           </Link>
         </div>
 
-        {/* Center: Desktop Nav — absolutely centered with active indicators */}
-        <div className="absolute left-1/2 -translate-x-1/2 hidden lg:flex items-center">
-          {authenticated && (
-            <nav className="flex items-center space-x-6 text-sm font-medium" aria-label="Desktop Navigation">
-              {filteredNavLinks.map(link => {
-                const isActive = pathname === link.href || (link.href !== '/' && pathname?.startsWith(link.href));
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={cn(
-                      "transition-colors hover:text-foreground py-1 border-b-2 font-medium",
-                      isActive
-                        ? "border-primary text-primary font-semibold"
-                        : "border-transparent text-muted-foreground hover:border-muted"
-                    )}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          )}
-        </div>
+
 
         {/* Right: Notifications + Theme toggle + UserNav (desktop) / Login buttons */}
         <div className="flex items-center justify-end gap-1.5 sm:gap-2">

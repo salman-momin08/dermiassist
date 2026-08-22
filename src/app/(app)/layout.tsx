@@ -6,6 +6,8 @@ import { AppFooter } from "@/components/layout/footer";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { AppSidebar } from "@/components/layout/sidebar";
+
 export default function AppLayout({
   children,
 }: {
@@ -25,7 +27,6 @@ export default function AppLayout({
   // Role-based redirect logic - only redirect once
   useEffect(() => {
     if (!loading && user && role && !hasRedirected.current) {
-      // Define role-specific dashboards
       const roleDashboards: Record<string, string> = {
         'patient': '/dashboard',
         'doctor': '/doctor/dashboard',
@@ -34,7 +35,6 @@ export default function AppLayout({
 
       const expectedDashboard = roleDashboards[role];
 
-      // Only redirect if user is on /dashboard and their role requires a different one
       if (pathname === '/dashboard' && expectedDashboard !== '/dashboard') {
         hasRedirected.current = true;
         router.replace(expectedDashboard);
@@ -43,11 +43,14 @@ export default function AppLayout({
   }, [user, loading, role, pathname, router]);
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <AppHeader />
-      <main className="flex-1">
-        {children}
-      </main>
+      <div className="flex-1 flex">
+        <AppSidebar />
+        <main className="flex-1 min-w-0">
+          {children}
+        </main>
+      </div>
       <AppFooter />
     </div>
   );

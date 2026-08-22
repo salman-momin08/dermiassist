@@ -332,18 +332,16 @@ export default function DoctorsPage() {
     }
 
     const renderSkeleton = () => (
-        <div className="flex flex-col">
-            <CardHeader className="items-center text-center">
-                <Skeleton className="w-24 h-24 rounded-full mb-4" />
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-1/2 mt-2" />
-            </CardHeader>
-            <CardContent className="flex-grow">
-                <Skeleton className="h-10 w-full" />
-            </CardContent>
-            <CardFooter>
-                <Skeleton className="h-10 w-full" />
-            </CardFooter>
+        <div className="relative overflow-hidden rounded-[2.25rem] p-6 bg-gradient-to-b from-slate-900/80 via-slate-900/90 to-[#0A1926]/98 border border-white/20 dark:border-cyan-500/25 shadow-2xl backdrop-blur-2xl flex flex-col items-center">
+            <div className="w-28 h-28 rounded-full bg-slate-800 animate-pulse mb-4 ring-4 ring-cyan-500/20" />
+            <div className="h-6 w-3/4 bg-slate-800 rounded-lg animate-pulse mb-2" />
+            <div className="h-4 w-1/2 bg-slate-800/80 rounded-md animate-pulse mb-4" />
+            <div className="h-6 w-2/3 bg-slate-800/60 rounded-full animate-pulse mb-6" />
+            <div className="grid grid-cols-2 gap-3 w-full mb-3">
+                <div className="h-11 bg-slate-800/70 rounded-2xl animate-pulse" />
+                <div className="h-11 bg-slate-800/70 rounded-2xl animate-pulse" />
+            </div>
+            <div className="h-12 w-full bg-slate-800/90 rounded-2xl animate-pulse" />
         </div>
     );
 
@@ -353,14 +351,13 @@ export default function DoctorsPage() {
     }
 
     return (
-        <div className="container mx-auto p-4 md:p-8">
+        <div className="container mx-auto p-4 md:p-8 max-w-7xl">
             <div className="flex flex-col items-center justify-center space-y-2 mb-8 text-center">
-                <h1 className="text-3xl font-bold tracking-tight font-headline">
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight font-headline">
                     Find a Certified Doctor
                 </h1>
-                <p className="text-muted-foreground max-w-2xl mb-4">
-                    Browse our network of professional dermatologists and book an appointment.
-                    Connect to start a direct chat.
+                <p className="text-muted-foreground max-w-2xl text-sm sm:text-base">
+                    Browse our network of board-certified dermatologists and book a clinical consultation.
                 </p>
                 
                 <div className="relative w-full max-w-md mt-4">
@@ -369,95 +366,113 @@ export default function DoctorsPage() {
                         placeholder="Search by name or specialty..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 w-full"
+                        className="pl-9 w-full rounded-full bg-card/60 backdrop-blur-md border-border/80"
                     />
                 </div>
             </div>
 
             {isLoadingDoctors ? (
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {Array.from({ length: 4 }).map((_, i) => <Card key={i}>{renderSkeleton()}</Card>)}
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, i) => <div key={i}>{renderSkeleton()}</div>)}
                 </div>
             ) : doctors.length > 0 ? (
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
                     {doctors.map((doctor) => {
                         const connectionStatus = getConnectionStatus(doctor.id);
                         return (
-                            <Card key={doctor.id} className="flex flex-col">
-                                <CardHeader className="items-center text-center">
-                                    <Avatar className="w-24 h-24 mb-4">
-                                        <AvatarImage src={doctor.avatar} alt={doctor.name} data-ai-hint="doctor portrait" />
-                                        <AvatarFallback>{doctor.name.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <CardTitle className="flex items-center gap-2">
-                                        {doctor.name}
-                                        {doctor.verified && <ShieldCheck className="h-5 w-5 text-primary" />}
-                                    </CardTitle>
-                                    <CardDescription>{doctor.specialization}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="flex-grow">
-                                    <div className="flex justify-center items-center text-sm text-muted-foreground border-t pt-4">
-                                        <div className="flex items-center gap-1">
-                                            <MapPin className="h-4 w-4" />
-                                            {doctor.location}
-                                        </div>
+                            <div 
+                                key={doctor.id} 
+                                className="relative overflow-hidden rounded-[2.25rem] p-6 bg-gradient-to-b from-slate-900/80 via-slate-900/95 to-[#0A1926]/98 border border-white/20 dark:border-cyan-500/25 shadow-2xl backdrop-blur-2xl transition-all duration-300 hover:shadow-cyan-500/20 hover:-translate-y-1.5 flex flex-col group"
+                            >
+                                {/* Top Ambient Radial Glow */}
+                                <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-60 h-60 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none group-hover:bg-cyan-500/25 transition-all" />
+
+                                {/* Avatar with Glowing Halo Ring & Verified Emblem */}
+                                <div className="relative mx-auto mb-4 pt-1">
+                                    <div className="relative w-28 h-28 rounded-full ring-4 ring-cyan-500/30 p-1 bg-gradient-to-b from-cyan-400/30 to-transparent shadow-[0_0_30px_rgba(6,182,212,0.25)] flex items-center justify-center overflow-hidden">
+                                        <Avatar className="w-full h-full">
+                                            <AvatarImage src={doctor.avatar} alt={doctor.name} className="object-cover" />
+                                            <AvatarFallback className="bg-slate-800 text-cyan-400 font-bold text-2xl">
+                                                {doctor.name.charAt(0)}
+                                            </AvatarFallback>
+                                        </Avatar>
                                     </div>
-                                    <div className="mt-4 flex gap-2 justify-center">
+                                    {/* Floating Verified Emblem */}
+                                    <div className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-slate-950 border-2 border-cyan-400/90 flex items-center justify-center text-cyan-400 shadow-md">
+                                        <span className="font-extrabold text-[11px] tracking-tighter">D</span>
+                                        <ShieldCheck className="h-3.5 w-3.5 text-cyan-400 -ml-0.5" />
+                                    </div>
+                                </div>
+
+                                {/* Doctor Name & Verification */}
+                                <div className="text-center">
+                                    <h3 className="text-xl font-bold text-white tracking-tight flex items-center justify-center gap-1.5 font-headline">
+                                        <span>{doctor.name}</span>
+                                        {doctor.verified && (
+                                            <ShieldCheck className="h-5 w-5 text-cyan-400 fill-cyan-400/20" />
+                                        )}
+                                    </h3>
+                                    <p className="text-xs sm:text-sm font-medium text-slate-300 mt-1">
+                                        {doctor.specialization || "Dermatologist"}{doctor.education?.[0]?.degree ? `, ${doctor.education[0].degree}` : ", MBBS"}
+                                    </p>
+                                </div>
+
+                                {/* Location & Availability Pill */}
+                                <div className="flex items-center justify-center gap-2.5 mt-4 text-xs text-slate-300">
+                                    <div className="flex items-center gap-1">
+                                        <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                                        <span>{doctor.location || "Bangalore"}</span>
+                                    </div>
+                                    <span className="text-slate-600">|</span>
+                                    <span className="bg-cyan-950/80 text-cyan-300 border border-cyan-500/30 px-3 py-0.5 rounded-full text-[11px] font-semibold shadow-xs">
+                                        Available Today
+                                    </span>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="mt-6 flex flex-col gap-3">
+                                    {/* Top Row: Chat + View Profile */}
+                                    <div className="grid grid-cols-2 gap-2.5">
                                         {connectionStatus === 'accepted' ? (
-                                            <Button className="w-full flex gap-2" variant="secondary" onClick={() => router.push('/chat')}>
-                                                <MessageSquare className="h-4 w-4" /> Chat
+                                            <Button 
+                                                className="h-11 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/20 backdrop-blur-md font-medium text-sm transition-all shadow-xs flex items-center justify-center gap-1.5"
+                                                onClick={() => router.push('/chat')}
+                                            >
+                                                <MessageSquare className="h-4 w-4 text-cyan-400" /> Chat
                                             </Button>
                                         ) : connectionStatus === 'pending' ? (
-                                            <Button className="w-full flex gap-2" variant="outline" disabled>
+                                            <Button 
+                                                className="h-11 rounded-2xl bg-white/10 text-slate-400 border border-white/10 font-medium text-sm flex items-center justify-center gap-1.5 cursor-not-allowed" 
+                                                disabled
+                                            >
                                                 <Clock className="h-4 w-4" /> Pending
                                             </Button>
                                         ) : (
                                             <Button
-                                                className="w-full flex gap-2"
-                                                variant="outline"
+                                                className="h-11 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/20 backdrop-blur-md font-medium text-sm transition-all shadow-xs flex items-center justify-center gap-1.5"
                                                 onClick={() => handleConnect(doctor.id)}
                                                 disabled={isConnectingMap[doctor.id]}
                                             >
-                                                {isConnectingMap[doctor.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                                                Connect
+                                                {isConnectingMap[doctor.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 text-cyan-400" />}
+                                                Chat
                                             </Button>
                                         )}
+
+                                        <Button
+                                            className="h-11 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/20 backdrop-blur-md font-medium text-sm transition-all shadow-xs flex items-center justify-center gap-1.5"
+                                            onClick={() => setOpenDialog(`profile-${doctor.id}`)}
+                                        >
+                                            <User className="h-4 w-4 text-cyan-400" /> View Profile
+                                        </Button>
                                     </div>
-                                </CardContent>
-                                <CardFooter className="flex flex-col gap-2">
-                                    <DoctorProfileModal
-                                        doctor={{
-                                            id: doctor.id,
-                                            name: doctor.name,
-                                            avatar: doctor.avatar,
-                                            verified: doctor.verified,
-                                            specialization: doctor.specialization,
-                                            location: doctor.location,
-                                            bio: doctor.bio,
-                                            phone: doctor.phone,
-                                            education: doctor.education,
-                                            certificates: doctor.certificates,
-                                            years_of_experience: doctor.years_of_experience,
-                                            languages: doctor.languages,
-                                            consultation_fee: doctor.consultation_fee,
-                                            documents_public: doctor.documents_public,
-                                        }}
-                                        open={openDialog === `profile-${doctor.id}`}
-                                        onOpenChange={(isOpen) => setOpenDialog(isOpen ? `profile-${doctor.id}` : null)}
-                                        connectionStatus={connectionStatus}
-                                        onConnect={() => handleConnect(doctor.id)}
-                                        isConnecting={isConnectingMap[doctor.id] || false}
-                                    />
-                                    <Button
-                                        className="w-full"
-                                        variant="ghost"
-                                        onClick={() => setOpenDialog(`profile-${doctor.id}`)}
-                                    >
-                                        <User className="mr-2 h-4 w-4" /> View Profile
-                                    </Button>
+
+                                    {/* Bottom Row: Request Appointment (Luminous Pill) */}
                                     <Dialog open={openDialog === doctor.id} onOpenChange={(isOpen) => { setOpenDialog(isOpen ? doctor.id : null); if (!isOpen) resetForm(); }}>
                                         <DialogTrigger asChild>
-                                            <Button className="w-full">Request Appointment</Button>
+                                            <Button className="w-full h-12 rounded-2xl bg-gradient-to-r from-blue-700 via-teal-600 to-cyan-500 hover:from-blue-600 hover:to-cyan-400 text-white font-bold text-sm shadow-lg shadow-teal-500/25 border border-cyan-400/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                                                <span>Request Appointment</span>
+                                                <CalendarIcon className="h-4 w-4" />
+                                            </Button>
                                         </DialogTrigger>
                                         <DialogContent className="sm:max-w-2xl">
                                             <DialogHeader>
@@ -610,8 +625,8 @@ export default function DoctorsPage() {
                                             </DialogFooter>
                                         </DialogContent>
                                     </Dialog>
-                                </CardFooter>
-                            </Card>
+                                </div>
+                            </div>
                         );
                     })}
                 </div>

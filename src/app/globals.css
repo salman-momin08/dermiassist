@@ -147,98 +147,125 @@ html {
 
 .str-chat .str-chat__channel-preview-messenger--active {
     background-color: hsl(var(--primary) / 0.15);
-    border-left: 3px solid hsl(var(--primary));
+/* Stream Chat Complete Design Overhaul */
+.str-chat {
+    --str-chat__primary-color: hsl(var(--primary));
+    --str-chat__active-primary-color: hsl(var(--primary));
+    --str-chat__surface-color: hsl(var(--card));
+    --str-chat__secondary-surface-color: hsl(var(--muted));
+    --str-chat__background-color: hsl(var(--card));
+    --str-chat__border-color: hsl(var(--border));
+    --str-chat__text-color: hsl(var(--foreground));
+    font-family: inherit;
+}
+
+.str-chat .str-chat__channel-list-messenger {
+    background-color: hsl(var(--card));
+    padding: 8px;
+}
+
+.str-chat .str-chat__channel-preview-messenger {
+    border-radius: 0.75rem;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+}
+
+.str-chat .str-chat__channel-preview-messenger:hover {
+    background-color: hsl(var(--muted) / 0.6);
+}
+
+.str-chat .str-chat__channel-preview-messenger--active {
+    background-color: hsl(var(--primary) / 0.1) !important;
+    border-color: hsl(var(--primary) / 0.3);
 }
 
 .str-chat .str-chat__channel-preview-messenger--name,
 .str-chat .str-chat__channel-preview-title {
     color: hsl(var(--foreground));
     font-weight: 600;
+    font-size: 0.85rem;
 }
 
 .str-chat .str-chat__channel-preview-messenger--last-message {
     color: hsl(var(--muted-foreground));
+    font-size: 0.75rem;
 }
 
 .str-chat .str-chat__main-panel,
 .str-chat .str-chat__thread,
 .str-chat .str-chat__list {
-    background-color: hsl(var(--card));
+    background-color: hsl(var(--background));
 }
 
-.str-chat .str-chat__header-livestream,
-.str-chat .str-chat__channel-header {
-    background-color: hsl(var(--card));
-    border-bottom: 1px solid hsl(var(--border));
-    color: hsl(var(--foreground));
-    padding: 12px 16px;
-}
-
-.str-chat .str-chat__channel-header-title {
-    color: hsl(var(--foreground));
-    font-weight: 700;
-}
-
-.str-chat .str-chat__channel-header-info {
-    color: hsl(var(--muted-foreground));
+.str-chat .str-chat__list {
+    padding: 16px 20px;
 }
 
 .str-chat .str-chat__message-simple-text-inner {
-    border-radius: 1rem;
-    padding: 10px 14px;
+    border-radius: 1.125rem;
+    padding: 10px 16px;
     font-size: 0.875rem;
-    line-height: 1.45;
+    line-height: 1.5;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .str-chat .str-chat__message--me .str-chat__message-simple-text-inner {
-    background-color: hsl(var(--primary));
+    background: hsl(var(--primary));
     color: hsl(var(--primary-foreground));
     border-bottom-right-radius: 0.25rem;
 }
 
 .str-chat .str-chat__message--other .str-chat__message-simple-text-inner {
-    background-color: hsl(var(--muted));
+    background-color: hsl(var(--card));
     color: hsl(var(--foreground));
     border-bottom-left-radius: 0.25rem;
     border: 1px solid hsl(var(--border));
 }
 
 .str-chat .str-chat__message-simple-timestamp {
-    color: hsl(var(--muted-foreground));
-    font-size: 0.7rem;
+    color: hsl(var(--muted-foreground) / 0.7);
+    font-size: 0.68rem;
+    margin-top: 4px;
 }
 
 .str-chat .str-chat__date-separator {
     color: hsl(var(--muted-foreground));
-    margin: 16px 0;
+    margin: 20px 0;
+    font-size: 0.75rem;
+    font-weight: 500;
 }
 
 .str-chat .str-chat__date-separator-line {
-    background-color: hsl(var(--border));
+    background-color: hsl(var(--border) / 0.6);
 }
 
 .str-chat .str-chat__message-input,
 .str-chat .str-chat__input-flat {
     background-color: hsl(var(--card));
-    border-top: 1px solid hsl(var(--border));
+    border-top: 1px solid hsl(var(--border) / 0.8);
     padding: 12px 16px;
 }
 
 .str-chat .str-chat__textarea textarea,
 .str-chat .str-chat__input-flat--textarea {
-    background-color: hsl(var(--muted) / 0.5);
+    background-color: hsl(var(--muted) / 0.4);
     color: hsl(var(--foreground));
     border: 1px solid hsl(var(--border));
     border-radius: 9999px;
     padding: 10px 18px;
-    font-size: 0.875rem;
-    box-shadow: none;
+    font-size: 0.85rem;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+    transition: all 0.15s ease;
 }
 
 .str-chat .str-chat__textarea textarea:focus,
 .str-chat .str-chat__input-flat--textarea:focus {
     border-color: hsl(var(--primary));
+    background-color: hsl(var(--card));
     outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15);
 }
 
 .str-chat .str-chat__send-button,
@@ -251,23 +278,20 @@ html {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.15s ease;
+    transition: all 0.15s ease;
+    cursor: pointer;
 }
 
 .str-chat .str-chat__send-button:hover,
 .str-chat .str-chat__input-flat--send-button:hover {
     transform: scale(1.05);
+    background-color: hsl(var(--primary) / 0.9);
 }
 
 .str-chat .str-chat__load-more-button {
-    background-color: hsl(var(--muted));
-    color: hsl(var(--foreground));
-    border: 1px solid hsl(var(--border));
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    padding: 6px 14px;
-    margin: 8px auto;
+    display: none !important;
 }
+
 
 /* ==========================================================================
    DERMATOLOGICAL CLINICAL UTILITIES
