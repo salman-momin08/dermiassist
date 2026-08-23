@@ -39,7 +39,10 @@ export async function GET(request: NextRequest) {
         try {
             const resp = await fetch(`${fastApiUrl}/api/v1/eval/run?provider=${encodeURIComponent(provider)}`, {
                 method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-internal-api-key': process.env.PYTHON_AI_SERVICE_API_KEY || '',
+                },
                 // The suite runs every benchmark case through a real model; allow time.
                 signal: AbortSignal.timeout(120000),
             });

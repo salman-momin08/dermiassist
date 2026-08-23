@@ -11,6 +11,12 @@ const PYTHON_AI_SERVICE_URL =
   process.env.FASTAPI_SERVICE_URL ||
   'http://localhost:8000';
 
+// Shared secret the Python service requires on every route except /health.
+const PYTHON_SERVICE_HEADERS = {
+  'Content-Type': 'application/json',
+  'x-internal-api-key': process.env.PYTHON_AI_SERVICE_API_KEY || '',
+};
+
 export interface PythonLangGraphDetectResponse {
   condition_name: string;
   turn_count: number;
@@ -46,9 +52,7 @@ export async function callPythonLangGraphDetect(
 
     const response = await fetch(`${PYTHON_AI_SERVICE_URL}/api/v1/langgraph/detect`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: PYTHON_SERVICE_HEADERS,
       body: JSON.stringify({ photo_data_uri: photoDataUri }),
       signal: controller.signal,
     });
@@ -81,9 +85,7 @@ export async function callPythonLangGraphNextQuestion(
 
     const response = await fetch(`${PYTHON_AI_SERVICE_URL}/api/v1/langgraph/next-question`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: PYTHON_SERVICE_HEADERS,
       body: JSON.stringify({
         condition_name: conditionName,
         conversation_history: conversationHistory,
@@ -125,9 +127,7 @@ export async function callPythonLangGraphEvaluation(
 
     const response = await fetch(`${PYTHON_AI_SERVICE_URL}/api/v1/langgraph/evaluate`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: PYTHON_SERVICE_HEADERS,
       body: JSON.stringify({
         initial_condition: initialCondition,
         user_answers: userAnswers,
@@ -165,9 +165,7 @@ export async function callPythonLangGraphSuggestions(
 
     const response = await fetch(`${PYTHON_AI_SERVICE_URL}/api/v1/langgraph/suggestions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: PYTHON_SERVICE_HEADERS,
       body: JSON.stringify({
         question,
         condition_name: conditionName,

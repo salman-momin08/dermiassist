@@ -10,6 +10,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { logger } from '@/lib/logger';
 import { FileUploadError, serializeError } from '@/lib/errors';
+import { createClient } from '@/lib/supabase/server';
 
 // ─────────────────────────────────────────────────────────────
 // Configuration
@@ -94,6 +95,36 @@ export interface ValidateDocumentsResult {
  * Validates that a File object passes size and MIME type checks.
  * Raises FileUploadError if validation fails.
  */
+async function isPublicIdOwnedByUser(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    userId: string,
+    publicId: string
+): Promise<boolean> {
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('photo_public_id, signature_public_id')
+        .eq('id', userId)
+        .single();
+    if (profile && (profile.photo_public_id === publicId || profile.signature_public_id === publicId)) {
+        return true;
+    }
+
+    const { data: requests } = await supabase
+        .from('contact_requests')
+        .select('data')
+        .eq('user_id', userId);
+    if (requests) {
+        for (const req of requests) {
+            const docs = (req as { data?: { documents?: Record<string, { publicId?: string }> } }).data?.documents;
+            if (docs && Object.values(docs).some((d) => d?.publicId === publicId)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 function validateFile(file: File): void {
     if (file.size > MAX_FILE_SIZE_BYTES) {
         throw new FileUploadError(
@@ -125,6 +156,12 @@ export async function uploadFile(
     base64Data?: string,
     options?: { folder?: string }
 ): Promise<UploadFileResult> {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+        return { success: false, message: 'Unauthorized.', code: 'UNAUTHORIZED' };
+    }
+
     let dataUri: string;
 
     if (base64Data) {
@@ -181,6 +218,17 @@ export async function uploadFile(
 export async function deleteFile(publicId: string): Promise<DeleteResult> {
     if (!publicId || typeof publicId !== 'string') {
         return { success: false, message: 'A valid public ID is required.' };
+    }
+
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+        return { success: false, message: 'Unauthorized.' };
+    }
+
+    const owned = await isPublicIdOwnedByUser(supabase, user.id, publicId);
+    if (!owned) {
+        return { success: false, message: 'You do not have permission to delete this file.' };
     }
 
     try {

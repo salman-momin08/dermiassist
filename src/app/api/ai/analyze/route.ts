@@ -39,7 +39,10 @@ export async function POST(request: NextRequest) {
             const fastApiUrl = process.env.PYTHON_AI_SERVICE_URL || process.env.FASTAPI_SERVICE_URL || 'http://localhost:8000';
             const fastApiResponse = await fetch(`${fastApiUrl}/api/v1/analyze`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-internal-api-key': process.env.PYTHON_AI_SERVICE_API_KEY || '',
+                },
                 body: JSON.stringify({
                     symptoms,
                     image_url: imageUrl,

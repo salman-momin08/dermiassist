@@ -59,9 +59,13 @@ export async function getCachedDoctorList(
             async () => {
                 return await withRetry(async () => {
                     const supabase = await createClient();
+                    // Explicit column list — never '*' here: this table also carries
+                    // leftover patient-only PII (dob, gender, blood_group, city, state,
+                    // address) on rows that changed role from patient to doctor, and
+                    // this result set is served to the public doctor listing.
                     let query = supabase
                         .from('profiles')
-                        .select('*')
+                        .select('id, email, display_name, photo_url, verified, specialization, location, bio, phone, signature_url, education, certificates, years_of_experience, languages, consultation_fee, role, created_at, updated_at')
                         .eq('role', 'doctor');
 
                     // Apply filters

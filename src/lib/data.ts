@@ -36,7 +36,7 @@ export async function getVerifiedDoctorsBySpecialization(specialization: string)
 
     const { data: doctors, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, display_name, specialization, location, photo_url')
         .eq('role', 'doctor')
         .eq('verified', true)
         .eq('specialization', specialization);

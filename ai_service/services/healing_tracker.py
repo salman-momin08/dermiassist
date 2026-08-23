@@ -23,6 +23,7 @@ from typing import Dict, Any, Optional, Tuple
 import httpx
 
 from ai_service.services.huggingface_service import classify_skin_lesion_hf
+from ai_service.utils.url_safety import assert_public_http_url
 
 
 def _assessment(analysis: Dict[str, Any]) -> Dict[str, Any]:
@@ -43,6 +44,8 @@ async def _measure_image(url: str) -> Optional[Tuple[float, float]]:
     fixed threshold. Both are REAL measurements of the image pixels.
     """
     try:
+        assert_public_http_url(url)
+
         import numpy as np  # lazy import
         from PIL import Image  # lazy import
         import io

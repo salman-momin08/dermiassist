@@ -83,7 +83,7 @@ export default function MyAnalysesPage() {
             });
 
             // Open print window with formatted HTML for pixel-perfect PDF export
-            const printWindow = window.open('', '_blank');
+            const printWindow = window.open('', '_blank', 'noopener,noreferrer');
             if (printWindow) {
                 printWindow.document.write(`
                     <!DOCTYPE html>
