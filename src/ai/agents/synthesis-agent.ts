@@ -3,7 +3,7 @@
  * Combines findings from Triage, Vision, and RAG Specialist agents
  * into a structured, comprehensive dermatological analysis report.
  *
- * Performance: maxOutputTokens=1024, temperature=0.3 for fast, deterministic completions.
+ * Performance: maxOutputTokens=4096, temperature=0.3 for fast, deterministic completions.
  */
 
 import { ai } from '@/ai/genkit';
@@ -48,7 +48,7 @@ const synthesisPrompt = ai.definePrompt({
     input: { schema: SynthesisInputSchema },
     output: { schema: FinalReportSchema },
     config: {
-        maxOutputTokens: 1024,
+        maxOutputTokens: 4096,
         temperature: 0.3,
     },
     prompt: `You are an Expert Dermatologist. Compile findings into a structured medical report.
