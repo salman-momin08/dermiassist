@@ -4,6 +4,8 @@ Provides RESTful AI endpoints, RAG search, Tool Execution, MCP Server, Hugging F
 and Distributed System Design Architecture (RRF Search, Token Budgeting, Circuit Breakers, Async Queue).
 """
 
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from ai_service.schemas import (
@@ -13,13 +15,15 @@ from ai_service.schemas import (
     DoctorQueryRequest, DoctorQueryResponse,
     HealingTrackRequest, HealingTrackResponse
 )
-from ai_service.services.rag_service import search_vector_rag
+from ai_service.services.rag_service import search_vector_rag, count_knowledge_chunks
 from ai_service.services.orchestrator_service import run_multi_agent_pipeline
+from ai_service.ingestion.ingest_knowledge_base import ingest as ingest_knowledge_base, load_knowledge_base
 from ai_service.services.huggingface_service import classify_skin_lesion_hf, generate_bge_embedding_hf
 from ai_service.services.healing_tracker import track_longitudinal_healing
 from ai_service.services.hybrid_search import search_hybrid_rrf
 from ai_service.services.openai_service import analyze_disease_with_openai
 from ai_service.services.eval_harness import run_eval_harness
+from ai_service.services.drug_interaction_service import check_drug_interaction
 from ai_service.utils.token_budget import estimate_token_count, truncate_to_token_budget, calculate_llm_cost
 from ai_service.utils.circuit_breaker import gemini_circuit_breaker, huggingface_circuit_breaker
 from ai_service.queue.task_worker import submit_async_job, get_job_status
@@ -40,6 +44,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def _knowledge_base_startup_check():
+    """Report RAG grounding health at boot; optionally auto-ingest if empty.
+
+    We do NOT re-embed on every boot (wasteful). We log the current row count so
+    grounding availability is observable. If INGEST_KB_ON_STARTUP=true and the
+    table is empty, we run the real ingestion once.
+    """
+    import logging
+    logger = logging.getLogger("Startup")
+    try:
+        count = await count_knowledge_chunks()
+        expected = len(load_knowledge_base())
+        logger.info(f"RAG knowledge base: {count if count is not None else 'unknown'} chunks in pgvector (curated KB has {expected} entries).")
+
+        if count == 0 and os.getenv("INGEST_KB_ON_STARTUP", "").lower() == "true":
+            logger.info("INGEST_KB_ON_STARTUP=true and KB empty — running ingestion...")
+            result = await ingest_knowledge_base()
+            logger.info(f"Startup ingestion: {result['succeeded']} succeeded, {result['failed']} failed.")
+        elif count is not None and count < expected:
+            logger.warning(
+                f"RAG grounding may be incomplete ({count}/{expected} chunks). "
+                "Run `npm run ingest:kb` (or POST /api/v1/admin/ingest-knowledge-base) to populate."
+            )
+    except Exception as e:
+        logger.warning(f"Knowledge-base startup check failed (non-fatal): {e}")
+
 
 @app.get("/health", tags=["Health Check"])
 async def health_check():
@@ -80,6 +112,29 @@ async def analyze_symptoms(request: AnalysisRequest):
         return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/rag/status", tags=["Vector RAG Engine"])
+async def rag_status():
+    """Report RAG grounding health: how many curated chunks are live in pgvector."""
+    count = await count_knowledge_chunks()
+    expected = len(load_knowledge_base())
+    return {
+        "chunks_in_pgvector": count,
+        "curated_kb_entries": expected,
+        "grounding_available": bool(count and count > 0),
+        "fully_ingested": count is not None and count >= expected,
+        "hint": None if (count and count >= expected) else "Run `npm run ingest:kb` to (re)populate the vector store.",
+    }
+
+
+@app.post("/api/v1/admin/ingest-knowledge-base", tags=["Vector RAG Engine"])
+async def admin_ingest_knowledge_base():
+    """Trigger a real embed-and-upsert of the curated knowledge base into pgvector."""
+    try:
+        return await ingest_knowledge_base()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/v1/eval/run", tags=["AI Diagnostic Engine"])
 async def run_benchmark_evals(provider: str = "gemini"):
@@ -180,36 +235,15 @@ async def track_healing_analytics(request: HealingTrackRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/tools/drug-interaction", response_model=DrugInteractionResponse, tags=["Agent Tools"])
-async def check_drug_interaction(request: DrugInteractionRequest):
-    """Execute Drug Interaction Contraindication Tool."""
-    topical = request.topical_medication.lower()
-    oral = (request.oral_medication or "").lower()
-
-    if "isotretinoin" in oral and ("doxycycline" in oral or "tetracycline" in oral):
-        return {
-            "safe_to_combine": False,
-            "interaction_risk_level": "severe",
-            "warning_message": "CRITICAL CONTRAINDICATION: Combining oral isotretinoin with tetracyclines carries high risk of pseudotumor cerebri.",
-            "recommended_spacing_hours": None
-        }
-
-    if "benzoyl" in topical and "tretinoin" in topical:
-        return {
-            "safe_to_combine": True,
-            "interaction_risk_level": "moderate",
-            "warning_message": "Benzoyl peroxide can oxidize tretinoin. Apply benzoyl peroxide in the morning and tretinoin at night.",
-            "recommended_spacing_hours": 12
-        }
-
-    # This tool only knows a small set of hardcoded rules. For any combination it
-    # has NOT actually evaluated, it must NOT assert safety — a false "safe to
-    # combine" is a dangerous false negative. Return an explicit "not assessed".
-    return {
-        "safe_to_combine": None,
-        "interaction_risk_level": "unknown",
-        "warning_message": "This combination was not assessed by the built-in rule set. Do not assume it is safe — consult a pharmacist or physician before combining.",
-        "recommended_spacing_hours": None
-    }
+async def check_drug_interaction_endpoint(request: DrugInteractionRequest):
+    """Check a medication combination using curated contraindications + live openFDA labeling."""
+    try:
+        return await check_drug_interaction(
+            topical_medication=request.topical_medication,
+            oral_medication=request.oral_medication,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/mcp", tags=["Model Context Protocol"])
 async def handle_mcp_jsonrpc(payload: dict):

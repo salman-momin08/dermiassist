@@ -25,6 +25,8 @@ class DiagnosticReport(BaseModel):
     dos: List[str] = []
     donts: List[str] = []
     citations_used: List[str]
+    literature_grounded: bool = False
+    model_reported_grounded: bool = False
     disclaimer: str
 
 class AgentTraceStep(BaseModel):
@@ -84,11 +86,12 @@ class DrugInteractionRequest(BaseModel):
     oral_medication: Optional[str] = Field(None, example="Isotretinoin")
 
 class DrugInteractionResponse(BaseModel):
-    # None = not assessed by the rule set (do NOT interpret as "safe").
+    # None = not assessed / no data (do NOT interpret as "safe").
     safe_to_combine: Optional[bool] = None
-    interaction_risk_level: str  # none | moderate | severe | unknown
+    interaction_risk_level: str  # none | moderate | severe | potential | unknown
     warning_message: str
     recommended_spacing_hours: Optional[int] = None
+    sources: List[str] = []
 
 class DoctorQueryRequest(BaseModel):
     specialty: Optional[str] = Field(None, example="General Dermatology")
@@ -118,13 +121,28 @@ class LesionAssessment(BaseModel):
     model_used: Optional[str] = None
     error: Optional[str] = None
 
+class ImageMeasurements(BaseModel):
+    """Real pixel-level measurements computed from the two actual images.
+
+    NOTE: these are image-derived signals (erythema/lesion-area proxies), NOT
+    clinically validated metrics. `validated` is always False.
+    """
+    baseline_lesion_area_fraction: float
+    followup_lesion_area_fraction: float
+    area_change_percent: float          # negative = reduction in reddened area
+    baseline_mean_erythema: float
+    followup_mean_erythema: float
+    erythema_change_percent: float      # negative = fading
+    method: str
+    validated: bool = False
+
 class HealingTrackResponse(BaseModel):
     success: bool
     days_elapsed: int
     baseline_assessment: LesionAssessment
     followup_assessment: LesionAssessment
-    # Quantitative surface-area / erythema metrics require real image
-    # segmentation, which is NOT implemented — we do not fabricate them.
+    # Real image-derived measurements when both images are processable; None otherwise.
+    image_measurements: Optional[ImageMeasurements] = None
     quantitative_metrics_available: bool = False
     classification_changed: Optional[bool] = None
     note: str

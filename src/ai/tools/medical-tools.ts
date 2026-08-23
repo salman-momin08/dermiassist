@@ -21,13 +21,18 @@ export interface DrugInteractionResult {
     // `null` = not assessed / unknown. We must never assert `true` (safe) for a
     // combination that was not actually checked against a known rule or database.
     safeToCombine: boolean | null;
-    interactionRiskLevel: 'none' | 'moderate' | 'severe' | 'unknown';
+    interactionRiskLevel: 'none' | 'moderate' | 'severe' | 'potential' | 'unknown';
     warningMessage: string;
     recommendedSpacingHours?: number;
+    sources?: string[];
 }
 
 /**
  * Executable Tool: Check drug interactions between topical and oral skin medications.
+ *
+ * Primary path: the Python service (curated contraindications + live openFDA drug
+ * labeling). If that service is unreachable, we fall back to the local curated
+ * rules below and otherwise return an honest "not assessed" — never a false "safe".
  */
 export async function checkDrugInteractionsTool(
     input: z.infer<typeof DrugInteractionInputSchema>
@@ -36,6 +41,30 @@ export async function checkDrugInteractionsTool(
     const oral = (input.oralMedication || '').toLowerCase();
 
     logger.info('tool.drug_interaction.executed', { topical, oral });
+
+    // Primary: real-time Python engine (curated rules + openFDA labels).
+    try {
+        const fastApiUrl = process.env.PYTHON_AI_SERVICE_URL || process.env.FASTAPI_SERVICE_URL || 'http://localhost:8000';
+        const resp = await fetch(`${fastApiUrl}/api/v1/tools/drug-interaction`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topical_medication: input.topicalMedication, oral_medication: input.oralMedication }),
+            signal: AbortSignal.timeout(12000),
+        });
+        if (resp.ok) {
+            const d = await resp.json();
+            return {
+                safeToCombine: d.safe_to_combine ?? null,
+                interactionRiskLevel: d.interaction_risk_level ?? 'unknown',
+                warningMessage: d.warning_message,
+                recommendedSpacingHours: d.recommended_spacing_hours ?? undefined,
+                sources: d.sources ?? [],
+            };
+        }
+    } catch (err) {
+        logger.warn('tool.drug_interaction.python_unavailable', { error: err instanceof Error ? err.message : String(err) });
+    }
+    // Fallback: local curated rules only (below).
 
     // Severe Contraindication: Oral Isotretinoin + Oral Tetracyclines (Doxycycline) -> Pseudotumor Cerebri
     if (oral.includes('isotretinoin') && (oral.includes('doxycycline') || oral.includes('tetracycline'))) {

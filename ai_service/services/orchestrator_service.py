@@ -101,9 +101,16 @@ async def run_multi_agent_pipeline(
     trace.append({"agent": "DifferentialSynthesisAgent", "duration_ms": synth_ms, "status": "completed"})
 
     d = diagnosis["data"]
+    rag_chunks = rag_result.get("matched_chunks", [])
+    rag_grounded = bool(rag_result.get("success") and rag_chunks)
     key_findings = [
         f"Primary differential (via {diagnosis['provider']} {diagnosis['model']}): {d['condition']}",
         f"Risk Stratification: {triage_risk.upper()}",
+        (
+            f"RAG grounding: {len(rag_chunks)} sourced reference(s) retrieved"
+            if rag_grounded
+            else f"RAG grounding: none available ({rag_result.get('error', 'no matches')}) — assessment not literature-grounded"
+        ),
     ]
     # Only report the vision classification if the vision model actually ran.
     if hf_vision_result.get("success"):
@@ -127,9 +134,13 @@ async def run_multi_agent_pipeline(
         "donts": d.get("donts", []),
         # Citations only from REAL retrieved chunks; empty when RAG was unavailable.
         "citations_used": [
-            f"[{c['title']}] (ICD-10: {c.get('icd_code', d['icd_code'])})"
-            for c in rag_result.get("matched_chunks", [])
+            f"[{c.get('title')}] (Source: {c.get('source')}{', ICD-10: ' + c.get('icd_code') if c.get('icd_code') else ''})"
+            for c in rag_chunks
         ],
+        # Whether this assessment is backed by retrieved literature. The model's own
+        # self-reported grounding flag is included for transparency.
+        "literature_grounded": rag_grounded,
+        "model_reported_grounded": bool(d.get("grounded", False)),
         "disclaimer": "INFORMATIONAL ONLY: This AI report does not constitute a formal diagnosis. Consult a licensed dermatologist.",
     }
 

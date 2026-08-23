@@ -53,19 +53,38 @@ _REQUIRED_FIELDS = {"condition", "icd_code", "confidence", "severity", "summary"
 
 _SYSTEM_INSTRUCTION = (
     "You are an expert board-certified dermatologist AI performing differential "
-    "diagnosis. Analyze the patient's symptoms together with any vision findings "
-    "and grounded literature provided. Respond with STRICTLY VALID JSON only "
-    "(no markdown, no prose) matching exactly this schema:\n"
+    "diagnosis for clinical decision-support (not a definitive diagnosis).\n\n"
+    "GROUNDING & ANTI-HALLUCINATION RULES (follow strictly):\n"
+    "1. Base your assessment on the patient's symptoms, any vision findings, and "
+    "the GROUNDED MEDICAL LITERATURE provided in the user message.\n"
+    "2. Do NOT invent facts, statistics, study results, ICD-10 codes, or sources. "
+    "The `citations` you return MUST be copied verbatim from the 'Source:' lines "
+    "of the provided references — never fabricate a citation. If no references are "
+    "provided, return an empty citations array; do not make one up.\n"
+    "3. Prefer conditions and management that are supported by the provided "
+    "references. If the references do not support a confident conclusion, LOWER "
+    "the confidence score accordingly and state the uncertainty in the summary.\n"
+    "4. Calibrate `confidence` honestly: high (>80) only when symptoms and "
+    "references clearly converge; low (<50) when evidence is sparse, ambiguous, or "
+    "an image was not analyzed. When confidence is low or red-flag/urgent features "
+    "are present, explicitly recommend prompt in-person evaluation by a licensed "
+    "dermatologist in the summary.\n"
+    "5. Never fabricate a diagnosis to appear certain. It is correct and safe to "
+    "express uncertainty.\n\n"
+    "Respond with STRICTLY VALID JSON only (no markdown, no prose) matching exactly "
+    "this schema:\n"
     "{\n"
     '  "condition": "most likely primary condition name",\n'
     '  "icd_code": "ICD-10 code",\n'
     '  "confidence": 0-100 number,\n'
     '  "severity": "Mild" | "Moderate" | "Severe" | "Critical",\n'
-    '  "summary": "concise clinical summary",\n'
-    '  "dos": ["3 specific care steps"],\n'
-    '  "donts": ["3 specific things to avoid"],\n'
+    '  "summary": "concise clinical summary; state uncertainty and when to seek care",\n'
+    '  "dos": ["specific care steps"],\n'
+    '  "donts": ["specific things to avoid"],\n'
     '  "treatment_guidelines": ["standard treatment pathways"],\n'
-    '  "differential": ["2-4 alternative conditions to consider"]\n'
+    '  "differential": ["2-4 alternative conditions to consider"],\n'
+    '  "citations": ["exact Source strings copied from the provided references"],\n'
+    '  "grounded": true if the assessment is supported by the provided references else false\n'
     "}"
 )
 
@@ -101,7 +120,7 @@ def _validate_diagnosis(data: Dict[str, Any]) -> Dict[str, Any]:
     if missing:
         raise ValueError(f"Model output missing required fields: {sorted(missing)}")
     # Normalize optional list fields so downstream consumers get consistent types.
-    for list_field in ("dos", "donts", "treatment_guidelines", "differential"):
+    for list_field in ("dos", "donts", "treatment_guidelines", "differential", "citations"):
         val = data.get(list_field)
         if val is None:
             data[list_field] = []

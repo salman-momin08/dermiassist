@@ -6,6 +6,7 @@
 import { generateEmbedding } from './embeddings';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/logger';
+import knowledgeBase from './datasets/dermatology-knowledge-base.json';
 
 export interface RetrievedMedicalChunk {
     id: string;
@@ -33,73 +34,33 @@ export interface RAGSearchOptions {
 }
 
 /**
- * Seed dataset of dermatological knowledge for local/fallback RAG retrieval.
+ * Curated, sourced dermatology knowledge base used for local/fallback RAG
+ * retrieval. This is the SAME real, attributable content ingested into pgvector
+ * (see ai_service/ingestion/ingest_knowledge_base.py), loaded from a single
+ * shared JSON so the primary (vector) and fallback (keyword) paths never drift.
  */
-const IN_MEMORY_MEDICAL_KNOWLEDGE = [
-    {
-        id: 'rag-001',
-        title: 'Acne Vulgaris Clinical Guidelines',
-        conditionCategory: 'Acne',
-        icdCode: 'L70.0',
-        source: 'American Academy of Dermatology (AAD) Clinical Guidelines 2024',
-        content: 'Acne vulgaris is a chronic inflammatory dermatosis characterized by open/closed comedones, papules, pustules, and nodules. First-line topical therapy includes benzoyl peroxide, topical retinoids (adapalene, tretinoin), and topical antibiotics. Systemic therapy (doxycycline, isotretinoin) is reserved for moderate-to-severe nodulocystic cases.',
-    },
-    {
-        id: 'rag-002',
-        title: 'Atopic Dermatitis Management & Care',
-        conditionCategory: 'Eczema',
-        icdCode: 'L20.9',
-        source: 'Journal of Investigative Dermatology - Eczema Care Protocol',
-        content: 'Atopic Dermatitis (Eczema) features pruritic, erythematous, dry skin lesions frequently located on flexural surfaces. Primary treatment involves daily emollients, short-course topical corticosteroids or calcineurin inhibitors (pimecrolimus, tacrolimus), and avoiding trigger factors like strong soaps and synthetic fabrics.',
-    },
-    {
-        id: 'rag-003',
-        title: 'Psoriasis Vulgaris Diagnostic & Therapeutic Framework',
-        conditionCategory: 'Psoriasis',
-        icdCode: 'L40.0',
-        source: 'National Psoriasis Foundation Clinical Practice Guidelines',
-        content: 'Psoriasis is an autoimmune skin disorder characterized by well-demarcated erythematous plaques with silvery-white scales, commonly on extensor surfaces (elbows, knees, scalp). Management includes high-potency topical corticosteroids combined with vitamin D3 analogs (calcipotriene), phototherapy (NB-UVB), and biologics (IL-17, IL-23 inhibitors).',
-    },
-    {
-        id: 'rag-004',
-        title: 'Tinea Corporis (Ringworm) Diagnostic Features',
-        conditionCategory: 'Fungal',
-        icdCode: 'B35.4',
-        source: 'CDC Fungal Diseases Guidelines',
-        content: 'Tinea corporis presents as an annular, erythematous plaque with a raised, scaly leading border and central clearing. Diagnosis is confirmed via KOH wet mount showing septate hyphae. First-line treatment is topical azoles (clotrimazole, terbinafine) for 2 to 4 weeks. Oral terbinafine is indicated for widespread infection.',
-    },
-    {
-        id: 'rag-005',
-        title: 'Malignant Melanoma Early Warning Indicators (ABCDE Criteria)',
-        conditionCategory: 'Melanoma',
-        icdCode: 'C43.9',
-        source: 'Skin Cancer Foundation Diagnostic Protocol',
-        content: 'Malignant melanoma is an aggressive cutaneous malignancy. Diagnostic ABCDE criteria: A - Asymmetry; B - Border irregularity; C - Color variation (multiple shades of brown, black, red, white); D - Diameter (>6mm); E - Evolving shape or size. Any suspicious pigmented lesion requires urgent full-thickness excisional biopsy.',
-    },
-    // NOTE: A set of "Empirical Clinical Cohort / DermiAssist Clinical Registry (N=500
-    // Multi-Center Cohort)" entries were removed here. They presented invented per-cohort
-    // statistics (mean severity scores, family-history percentages, patient counts) under
-    // an authoritative-sounding but non-existent registry citation. Surfacing fabricated
-    // empirical evidence to the diagnostic model violates the no-fabrication safety
-    // principle, so they are not included. Only genuinely attributable guideline
-    // references above are retained.
-    {
-        id: 'rag-006',
-        title: 'Rosacea Diagnostic Features',
-        conditionCategory: 'Rosacea',
-        icdCode: 'L71.9',
-        source: 'National Rosacea Society Diagnostic Guidelines',
-        content: 'Rosacea is a chronic inflammatory facial dermatosis characterized by central facial erythema, flushing, telangiectasias, and papulopustular lesions, with a notable absence of comedones (distinguishing it from acne vulgaris). Common triggers include thermal, dietary, and UV exposure. Management includes trigger avoidance, topical metronidazole or azelaic acid, and oral tetracyclines for papulopustular disease.',
-    },
-    {
-        id: 'rag-007',
-        title: 'Contact & Irritant Dermatitis Diagnostic Features',
-        conditionCategory: 'Dermatitis',
-        icdCode: 'L30.9',
-        source: 'American Academy of Dermatology (AAD) Contact Dermatitis Guidelines',
-        content: 'Contact dermatitis presents as localized acute vesicular eruptions or subacute eczematous weeping plaques corresponding to zones of exogenous exposure. Irritant contact dermatitis is dose-dependent, while allergic contact dermatitis is a delayed type IV hypersensitivity reaction. Patch testing is recommended for allergen identification. Management centers on identifying and avoiding the offending agent plus topical corticosteroids.',
-    },
-];
+interface KnowledgeBaseEntry {
+    id: string;
+    title: string;
+    conditionCategory: string;
+    icdCode?: string;
+    source: string;
+    content: string;
+    keywords?: string[];
+}
+const IN_MEMORY_MEDICAL_KNOWLEDGE: KnowledgeBaseEntry[] = knowledgeBase as KnowledgeBaseEntry[];
+
+/**
+ * Ubiquitous derm terms that appear in almost every entry and therefore carry no
+ * discriminating signal for keyword matching. Excluded from fallback scoring so
+ * specific presentation terms dominate (avoids e.g. grounding "acne" on "tinea"
+ * just because both mention "skin").
+ */
+const GENERIC_STOPWORDS = new Set([
+    'skin', 'rash', 'rashes', 'lesion', 'lesions', 'condition', 'area', 'areas',
+    'patch', 'patches', 'spot', 'spots', 'affected', 'weeks', 'week', 'days',
+    'month', 'months', 'symptom', 'symptoms', 'body', 'chronic', 'acute',
+]);
 
 /**
  * Retrieve grounded medical context for a diagnostic or user query.
@@ -172,22 +133,39 @@ export async function retrieveMedicalContext(
         }
     }
 
-    // Fallback: In-memory semantic keyword matching if vector DB returns no results
+    // Fallback: In-memory keyword-overlap matching if the vector DB returns no results.
     if (chunks.length === 0) {
+        // Tokenize the query into meaningful terms (drop short and generic tokens).
         const queryLower = query.toLowerCase();
-        const filtered = IN_MEMORY_MEDICAL_KNOWLEDGE.filter((item) => {
-            const matchesCategory = !categoryFilter || item.conditionCategory.toLowerCase() === categoryFilter.toLowerCase();
-            const matchesQuery = item.title.toLowerCase().includes(queryLower) ||
-                item.content.toLowerCase().includes(queryLower) ||
-                item.conditionCategory.toLowerCase().includes(queryLower);
-            return matchesCategory && matchesQuery;
-        });
+        const queryTerms = Array.from(
+            new Set(
+                queryLower
+                    .split(/[^a-z0-9]+/)
+                    .filter((t) => t.length >= 4 && !GENERIC_STOPWORDS.has(t))
+            )
+        );
 
-        // Only surface entries that actually matched the query. Previously this
-        // backfilled the first N knowledge entries when nothing matched, presenting
-        // irrelevant references as grounded context. Return nothing instead so the
-        // synthesis model is not grounded on unrelated material.
-        chunks = filtered.map((item) => ({
+        const scored = IN_MEMORY_MEDICAL_KNOWLEDGE
+            .filter((item) => !categoryFilter || item.conditionCategory.toLowerCase() === categoryFilter.toLowerCase())
+            .map((item) => {
+                const haystack = `${item.title} ${item.conditionCategory} ${item.content}`.toLowerCase();
+                // Base score: distinct query terms appearing in the entry text.
+                let score = queryTerms.reduce((acc, term) => acc + (haystack.includes(term) ? 1 : 0), 0);
+                // Boost: curated lay-term keywords found in the query are strong,
+                // condition-specific signals — weight them higher than generic text hits.
+                for (const kw of item.keywords ?? []) {
+                    if (queryLower.includes(kw.toLowerCase())) score += 3;
+                }
+                return { item, score };
+            })
+            .filter((s) => s.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, matchCount);
+
+        // Only surface entries that actually matched the query terms. We never
+        // backfill unrelated entries — an unmatched query yields no grounding
+        // rather than misleading references.
+        chunks = scored.map(({ item }) => ({
             id: item.id,
             title: item.title,
             conditionCategory: item.conditionCategory,

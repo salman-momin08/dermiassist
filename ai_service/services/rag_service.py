@@ -38,6 +38,32 @@ async def generate_embedding_python(text: str) -> List[float]:
         raise RuntimeError(f"Unexpected embedding dimensions: got {len(values)}, expected 768")
     return values
 
+async def count_knowledge_chunks() -> Optional[int]:
+    """Return the number of rows in medical_knowledge_chunks (grounding health).
+
+    Returns None if Supabase is not configured or the count cannot be read.
+    """
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return None
+    url = f"{SUPABASE_URL}/rest/v1/medical_knowledge_chunks?select=id"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Prefer": "count=exact",
+        "Range": "0-0",
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, headers=headers, timeout=10.0)
+            # Content-Range looks like "0-0/123"; the total is after the slash.
+            content_range = resp.headers.get("content-range", "")
+            if "/" in content_range:
+                total = content_range.split("/")[-1]
+                return int(total) if total.isdigit() else None
+    except Exception:
+        return None
+    return None
+
 async def search_vector_rag(query: str, category_filter: Optional[str] = None, match_count: int = 3) -> Dict[str, Any]:
     """Execute vector cosine search against Supabase pgvector.
 
