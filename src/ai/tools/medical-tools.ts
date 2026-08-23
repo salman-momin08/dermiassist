@@ -47,7 +47,10 @@ export async function checkDrugInteractionsTool(
         const fastApiUrl = process.env.PYTHON_AI_SERVICE_URL || process.env.FASTAPI_SERVICE_URL || 'http://localhost:8000';
         const resp = await fetch(`${fastApiUrl}/api/v1/tools/drug-interaction`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'x-internal-api-key': process.env.PYTHON_AI_SERVICE_API_KEY || '',
+            },
             body: JSON.stringify({ topical_medication: input.topicalMedication, oral_medication: input.oralMedication }),
             signal: AbortSignal.timeout(12000),
         });

@@ -11,6 +11,8 @@ import httpx
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 
+from ai_service.utils.url_safety import assert_public_http_url, UnsafeUrlError
+
 load_dotenv()
 
 HF_API_KEY = os.getenv("HUGGINGFACE_API_KEY", "") or os.getenv("HF_TOKEN", "")
@@ -44,6 +46,10 @@ async def classify_skin_lesion_hf(image_url: Optional[str] = None) -> Dict[str, 
         return _hf_failure("No image provided for lesion classification")
     if not HF_API_KEY:
         return _hf_failure("HUGGINGFACE_API_KEY not configured")
+    try:
+        assert_public_http_url(image_url)
+    except UnsafeUrlError as e:
+        return _hf_failure(f"Image URL rejected: {e}")
 
     try:
         api_url = f"https://api-inference.huggingface.co/models/{_HF_LESION_MODEL}"

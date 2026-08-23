@@ -144,10 +144,9 @@ export function DoctorProfileModal({
         setIsLoadingReviews(true);
         const supabase = createClient();
         const { data, error } = await supabase
-            .from('doctor_reviews')
+            .from('public_doctor_reviews')
             .select('id, rating, kudos, created_at')
             .eq('doctor_id', doctor.id)
-            .eq('is_public', true)
             .order('created_at', { ascending: false });
 
         if (!error && data) {

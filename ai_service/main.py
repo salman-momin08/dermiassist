@@ -5,8 +5,9 @@ and Distributed System Design Architecture (RRF Search, Token Budgeting, Circuit
 """
 
 import os
+import secrets
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from ai_service.schemas import (
     AnalysisRequest, AnalysisResponse,
@@ -36,14 +37,37 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Enable CORS for Next.js web client
+# CORS: this service is only ever meant to be called server-to-server by the
+# Next.js backend (see PYTHON_AI_SERVICE_API_KEY auth below), never directly
+# from a browser, so there is no legitimate cross-origin credentialed caller.
+_allowed_cors_origins = [o.strip() for o in os.getenv("ALLOWED_CORS_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_allowed_cors_origins or ["http://localhost:3000"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# Internal service authentication
+# ---------------------------------------------------------------------------
+# Every route below (except the public /health liveness check) requires this
+# shared secret. The only legitimate caller is the Next.js backend, which
+# sends it as PYTHON_AI_SERVICE_API_KEY in the x-internal-api-key header.
+# Fails closed: if the key isn't configured server-side, every protected
+# request is rejected rather than silently allowed through.
+_INTERNAL_API_KEY = os.getenv("PYTHON_AI_SERVICE_API_KEY", "")
+
+
+async def verify_internal_api_key(x_internal_api_key: str = Header(default="")):
+    if not _INTERNAL_API_KEY:
+        raise HTTPException(status_code=503, detail="Service authentication is not configured")
+    if not secrets.compare_digest(x_internal_api_key, _INTERNAL_API_KEY):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+_auth = [Depends(verify_internal_api_key)]
 
 @app.on_event("startup")
 async def _knowledge_base_startup_check():
@@ -87,7 +111,7 @@ async def health_check():
         "docs": "/docs"
     }
 
-@app.post("/api/v1/analyze/openai", tags=["AI Diagnostic Engine"])
+@app.post("/api/v1/analyze/openai", tags=["AI Diagnostic Engine"], dependencies=_auth)
 async def analyze_symptoms_openai(request: AnalysisRequest):
     """Trigger disease analysis using OpenAI GPT-4o clinical reasoning engine."""
     try:
@@ -99,7 +123,7 @@ async def analyze_symptoms_openai(request: AnalysisRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/v1/analyze", response_model=AnalysisResponse, tags=["AI Diagnostic Engine"])
+@app.post("/api/v1/analyze", response_model=AnalysisResponse, tags=["AI Diagnostic Engine"], dependencies=_auth)
 async def analyze_symptoms(request: AnalysisRequest):
     """Trigger the Multi-Agent Diagnostic Pipeline."""
     try:
@@ -113,7 +137,7 @@ async def analyze_symptoms(request: AnalysisRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/v1/rag/status", tags=["Vector RAG Engine"])
+@app.get("/api/v1/rag/status", tags=["Vector RAG Engine"], dependencies=_auth)
 async def rag_status():
     """Report RAG grounding health: how many curated chunks are live in pgvector."""
     count = await count_knowledge_chunks()
@@ -127,7 +151,7 @@ async def rag_status():
     }
 
 
-@app.post("/api/v1/admin/ingest-knowledge-base", tags=["Vector RAG Engine"])
+@app.post("/api/v1/admin/ingest-knowledge-base", tags=["Vector RAG Engine"], dependencies=_auth)
 async def admin_ingest_knowledge_base():
     """Trigger a real embed-and-upsert of the curated knowledge base into pgvector."""
     try:
@@ -136,7 +160,7 @@ async def admin_ingest_knowledge_base():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/v1/eval/run", tags=["AI Diagnostic Engine"])
+@app.get("/api/v1/eval/run", tags=["AI Diagnostic Engine"], dependencies=_auth)
 async def run_benchmark_evals(provider: str = "openai"):
     """
     Run the LLM-as-a-Judge benchmark suite against the REAL model engine.
@@ -148,7 +172,7 @@ async def run_benchmark_evals(provider: str = "openai"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/v1/jobs/submit", tags=["Async Background Worker Queue"])
+@app.post("/api/v1/jobs/submit", tags=["Async Background Worker Queue"], dependencies=_auth)
 async def submit_job(request: AnalysisRequest):
     """Submit heavy diagnostic task to Redis Async Task Worker Queue."""
     try:
@@ -161,12 +185,12 @@ async def submit_job(request: AnalysisRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/v1/jobs/{job_id}", tags=["Async Background Worker Queue"])
-async def poll_job(job_id: str):
-    """Poll execution status of an async background job."""
-    return get_job_status(job_id)
+@app.get("/api/v1/jobs/{job_id}", tags=["Async Background Worker Queue"], dependencies=_auth)
+async def poll_job(job_id: str, owner_token: str = ""):
+    """Poll execution status of an async background job. Requires the owner_token issued at submit time."""
+    return get_job_status(job_id, owner_token)
 
-@app.post("/api/v1/rag/hybrid-search", tags=["Vector RAG Engine"])
+@app.post("/api/v1/rag/hybrid-search", tags=["Vector RAG Engine"], dependencies=_auth)
 async def hybrid_search_rrf(request: RAGQueryRequest):
     """Execute Hybrid BM25 Keyword + Vector Cosine Distance Search via Reciprocal Rank Fusion (RRF)."""
     try:
@@ -179,7 +203,7 @@ async def hybrid_search_rrf(request: RAGQueryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/v1/system/token-budget", tags=["System Design & AI Budgeting"])
+@app.post("/api/v1/system/token-budget", tags=["System Design & AI Budgeting"], dependencies=_auth)
 async def analyze_token_budget(text: str, max_budget: int = 1024):
     """Analyze sub-word token count, enforce dynamic token budget, and calculate LLM billing cost."""
     try:
@@ -195,7 +219,7 @@ async def analyze_token_budget(text: str, max_budget: int = 1024):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/v1/system/circuit-breakers", tags=["System Design & AI Budgeting"])
+@app.get("/api/v1/system/circuit-breakers", tags=["System Design & AI Budgeting"], dependencies=_auth)
 async def get_circuit_breakers():
     """Retrieve status of API Circuit Breakers (Gemini & Hugging Face)."""
     return {
@@ -203,7 +227,7 @@ async def get_circuit_breakers():
         "huggingface": huggingface_circuit_breaker.get_status()
     }
 
-@app.post("/api/v1/huggingface/classify-lesion", tags=["Hugging Face Open-Source Models"])
+@app.post("/api/v1/huggingface/classify-lesion", tags=["Hugging Face Open-Source Models"], dependencies=_auth)
 async def classify_lesion_huggingface(image_url: str = ""):
     """Classify skin lesion photo using Hugging Face Open-Source Lesion Classifier (HAM10000)."""
     try:
@@ -212,7 +236,7 @@ async def classify_lesion_huggingface(image_url: str = ""):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/v1/huggingface/embed", tags=["Hugging Face Open-Source Models"])
+@app.post("/api/v1/huggingface/embed", tags=["Hugging Face Open-Source Models"], dependencies=_auth)
 async def embed_huggingface(text: str):
     """Generate 768-dim vector embedding using BAAI/bge-small-en-v1.5 via Hugging Face."""
     try:
@@ -221,7 +245,7 @@ async def embed_huggingface(text: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/v1/analytics/track-healing", response_model=HealingTrackResponse, tags=["Longitudinal Analytics"])
+@app.post("/api/v1/analytics/track-healing", response_model=HealingTrackResponse, tags=["Longitudinal Analytics"], dependencies=_auth)
 async def track_healing_analytics(request: HealingTrackRequest):
     """Calculate Longitudinal Lesion Healing Velocity and Progress Metrics."""
     try:
@@ -234,7 +258,7 @@ async def track_healing_analytics(request: HealingTrackRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/v1/tools/drug-interaction", response_model=DrugInteractionResponse, tags=["Agent Tools"])
+@app.post("/api/v1/tools/drug-interaction", response_model=DrugInteractionResponse, tags=["Agent Tools"], dependencies=_auth)
 async def check_drug_interaction_endpoint(request: DrugInteractionRequest):
     """Check a medication combination using curated contraindications + live openFDA labeling."""
     try:
@@ -245,7 +269,7 @@ async def check_drug_interaction_endpoint(request: DrugInteractionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/v1/mcp", tags=["Model Context Protocol"])
+@app.post("/api/v1/mcp", tags=["Model Context Protocol"], dependencies=_auth)
 async def handle_mcp_jsonrpc(payload: dict):
     """JSON-RPC 2.0 endpoint for MCP clients (Claude Desktop / Cursor)."""
     method = payload.get("method", "")
@@ -298,7 +322,7 @@ from ai_service.services.dermatology_graph import (
     execute_langgraph_suggestions
 )
 
-@app.post("/api/v1/langgraph/detect", response_model=LangGraphDetectResponse, tags=["LangGraph Multi-Agent Engine"])
+@app.post("/api/v1/langgraph/detect", response_model=LangGraphDetectResponse, tags=["LangGraph Multi-Agent Engine"], dependencies=_auth)
 async def langgraph_detect_condition(request: LangGraphDetectRequest):
     """Execute LangGraph vision agent to detect skin condition from image."""
     try:
@@ -311,7 +335,7 @@ async def langgraph_detect_condition(request: LangGraphDetectRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/v1/langgraph/next-question", response_model=LangGraphQuestionResponse, tags=["LangGraph Multi-Agent Engine"])
+@app.post("/api/v1/langgraph/next-question", response_model=LangGraphQuestionResponse, tags=["LangGraph Multi-Agent Engine"], dependencies=_auth)
 async def langgraph_next_question(request: LangGraphQuestionRequest):
     """Execute LangGraph dynamic proforma agent to generate the next personalized clinical question."""
     try:
@@ -327,7 +351,7 @@ async def langgraph_next_question(request: LangGraphQuestionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/v1/langgraph/evaluate", response_model=LangGraphEvalResponse, tags=["LangGraph Multi-Agent Engine"])
+@app.post("/api/v1/langgraph/evaluate", response_model=LangGraphEvalResponse, tags=["LangGraph Multi-Agent Engine"], dependencies=_auth)
 async def langgraph_final_evaluation(request: LangGraphEvalRequest):
     """Execute LangGraph synthesis agent to produce comprehensive clinical assessment."""
     try:
@@ -349,7 +373,7 @@ async def langgraph_final_evaluation(request: LangGraphEvalRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/v1/langgraph/suggestions", response_model=LangGraphSuggestionsResponse, tags=["LangGraph Multi-Agent Engine"])
+@app.post("/api/v1/langgraph/suggestions", response_model=LangGraphSuggestionsResponse, tags=["LangGraph Multi-Agent Engine"], dependencies=_auth)
 async def langgraph_generate_suggestions(request: LangGraphSuggestionsRequest):
     """Execute LangGraph suggestions agent to generate 3-4 tailored response chips."""
     try:

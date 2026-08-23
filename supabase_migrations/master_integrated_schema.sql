@@ -1306,3 +1306,103 @@ BEGIN
         ALTER TABLE appointments ALTER COLUMN type DROP NOT NULL;
     END IF;
 END $$;
+
+-- =====================================================
+-- RLS Policy Security Fixes (see 32_rls_policy_fixes.sql
+-- for full rationale/comments — duplicated here so a fresh
+-- deployment running only this consolidated file also gets them)
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION public.prevent_self_role_escalation()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT public.is_admin(auth.uid()) THEN
+        IF NEW.role IS DISTINCT FROM OLD.role OR NEW.verified IS DISTINCT FROM OLD.verified THEN
+            RAISE EXCEPTION 'Only an admin can change role or verified status';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_prevent_self_role_escalation ON profiles;
+CREATE TRIGGER trg_prevent_self_role_escalation
+    BEFORE UPDATE ON profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION public.prevent_self_role_escalation();
+
+CREATE OR REPLACE FUNCTION public.prevent_appointment_reassignment()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT public.is_admin(auth.uid()) THEN
+        IF NEW.patient_id IS DISTINCT FROM OLD.patient_id OR NEW.doctor_id IS DISTINCT FROM OLD.doctor_id THEN
+            RAISE EXCEPTION 'Cannot reassign an appointment to a different patient or doctor';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_prevent_appointment_reassignment ON appointments;
+CREATE TRIGGER trg_prevent_appointment_reassignment
+    BEFORE UPDATE ON appointments
+    FOR EACH ROW
+    EXECUTE FUNCTION public.prevent_appointment_reassignment();
+
+CREATE OR REPLACE FUNCTION public.prevent_connection_request_reassignment()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT public.is_admin(auth.uid()) THEN
+        IF NEW.patient_id IS DISTINCT FROM OLD.patient_id OR NEW.doctor_id IS DISTINCT FROM OLD.doctor_id THEN
+            RAISE EXCEPTION 'Cannot reassign a connection request to a different patient or doctor';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_prevent_connection_request_reassignment ON connection_requests;
+CREATE TRIGGER trg_prevent_connection_request_reassignment
+    BEFORE UPDATE ON connection_requests
+    FOR EACH ROW
+    EXECUTE FUNCTION public.prevent_connection_request_reassignment();
+
+DROP POLICY IF EXISTS "Doctors can create cases" ON doctor_cases;
+CREATE POLICY "Doctors can create cases" ON doctor_cases
+    FOR INSERT
+    WITH CHECK (
+        auth.uid() = doctor_id
+        AND EXISTS (
+            SELECT 1 FROM profiles
+            WHERE profiles.id = auth.uid()
+            AND profiles.role = 'doctor'
+            AND profiles.verified = true
+        )
+        AND (
+            EXISTS (
+                SELECT 1 FROM appointments
+                WHERE appointments.doctor_id = doctor_cases.doctor_id
+                AND appointments.patient_id = doctor_cases.patient_id
+            )
+            OR EXISTS (
+                SELECT 1 FROM connection_requests
+                WHERE connection_requests.doctor_id = doctor_cases.doctor_id
+                AND connection_requests.patient_id = doctor_cases.patient_id
+                AND connection_requests.status = 'accepted'
+            )
+        )
+    );
+
+DROP POLICY IF EXISTS "Public reviews are viewable by everyone" ON doctor_reviews;
+
+DROP POLICY IF EXISTS "Patients can view own reviews" ON doctor_reviews;
+CREATE POLICY "Patients can view own reviews" ON doctor_reviews
+    FOR SELECT
+    USING (auth.uid() = patient_id);
+
+CREATE OR REPLACE VIEW public_doctor_reviews AS
+SELECT id, doctor_id, rating, kudos, created_at
+FROM doctor_reviews
+WHERE is_public = true;
+
+GRANT SELECT ON public_doctor_reviews TO anon, authenticated;
