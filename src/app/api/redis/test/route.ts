@@ -12,6 +12,11 @@ import { testRedisConnection, redis, getCacheMetrics } from '@/lib/redis';
  * - Cache metrics
  */
 export async function GET() {
+    // Diagnostic endpoint that leaks infrastructure details — disable in production.
+    if (process.env.NODE_ENV === 'production') {
+        return NextResponse.json({ message: 'Not found' }, { status: 404 });
+    }
+
     try {
         // Test connection
         const isConnected = await testRedisConnection();

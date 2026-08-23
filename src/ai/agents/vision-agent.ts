@@ -19,7 +19,7 @@ export type VisionInput = z.infer<typeof VisionInputSchema>;
 export const VisionOutputSchema = z.object({
     lesionType: z.string().describe('Primary morphological classification (e.g. Macule, Papule, Plaque, Vesicle, Nodule).'),
     colorProfile: z.array(z.string()).describe('Dominant colors observed.'),
-    borderCharacteristics: z.enum(['well-demarcated', 'irregular', 'scaly-border', 'diffuse']).describe('Border clarity.'),
+    borderCharacteristics: z.enum(['well-demarcated', 'irregular', 'scaly-border', 'diffuse', 'not-assessed']).describe('Border clarity. "not-assessed" indicates no image was analyzed.'),
     suspectedConditions: z.array(z.string()).describe('Top visual differential possibilities.'),
     visualConfidence: z.number().min(0).max(100).describe('Visual feature detection confidence score.'),
 });
@@ -60,13 +60,11 @@ export async function runVisionAgent(input: VisionInput): Promise<VisionOutput> 
 
         return result.output;
     } catch (err) {
+        // Honest failure: fabricating a lesion type / suspected conditions / confidence
+        // would mask a broken vision model behind confident-looking output. Surface the
+        // failure so the caller can decide how to degrade (e.g. fall back to a
+        // "not analyzed" block) rather than inventing visual findings.
         logger.error('agent.vision.failed', { error: String(err) });
-        return {
-            lesionType: 'Plaque / Papule',
-            colorProfile: ['Erythematous Red'],
-            borderCharacteristics: 'well-demarcated',
-            suspectedConditions: ['Dermatitis', 'Eczema', 'Acne Vulgaris'],
-            visualConfidence: 75,
-        };
+        throw err instanceof Error ? err : new Error(String(err));
     }
 }

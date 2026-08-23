@@ -11,6 +11,11 @@ import { RateLimitMiddleware } from '@/lib/redis/middleware';
  */
 
 async function handler(req: NextRequest) {
+    // Diagnostic endpoint — disable in production to avoid leaking infra behavior.
+    if (process.env.NODE_ENV === 'production') {
+        return NextResponse.json({ message: 'Not found' }, { status: 404 });
+    }
+
     return NextResponse.json({
         success: true,
         message: 'Rate limit test successful',

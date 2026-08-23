@@ -179,7 +179,24 @@ export default function AIEngineeringDashboard() {
                                 )}
                             </Button>
 
-                            {pipelineResult && (
+                            {pipelineResult && (pipelineResult.success === false || (pipelineResult.error && !pipelineResult.report)) && (
+                                <div className="mt-6 p-4 rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/40 flex items-start gap-3">
+                                    <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="font-semibold text-red-700 dark:text-red-300">Diagnosis model failed — no report generated</p>
+                                        <p className="text-sm text-red-600 dark:text-red-400">{pipelineResult.error}</p>
+                                        {pipelineResult.model_metadata?.attempts?.length > 0 && (
+                                            <ul className="text-xs text-muted-foreground mt-2 space-y-0.5 font-mono">
+                                                {pipelineResult.model_metadata.attempts.map((a: any, idx: number) => (
+                                                    <li key={idx}>{a.provider} ({a.model}): {a.ok ? 'ok' : a.error}</li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {pipelineResult && pipelineResult.success !== false && pipelineResult.report && (
                                 <div className="mt-6 space-y-6 border-t pt-6">
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border">
@@ -201,9 +218,17 @@ export default function AIEngineeringDashboard() {
                                         <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border">
                                             <span className="text-xs text-muted-foreground block">Confidence Calibration</span>
                                             <span className="text-2xl font-bold text-emerald-600">
-                                                {pipelineResult.report?.confidenceScore}%
+                                                {pipelineResult.report?.confidenceScore ?? pipelineResult.report?.confidence_score}%
                                             </span>
                                         </div>
+                                        {pipelineResult.model_metadata?.model && (
+                                            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border md:col-span-4">
+                                                <span className="text-xs text-muted-foreground block">Diagnostic Model</span>
+                                                <span className="text-sm font-semibold">
+                                                    {pipelineResult.model_metadata.provider} · {pipelineResult.model_metadata.model}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Agent Execution Trace Graph */}
@@ -223,10 +248,10 @@ export default function AIEngineeringDashboard() {
 
                                     {/* Generated Report */}
                                     <div className="bg-muted/40 p-4 rounded-lg border space-y-3">
-                                        <h4 className="font-bold text-lg text-primary">{pipelineResult.report?.primaryConditionName}</h4>
+                                        <h4 className="font-bold text-lg text-primary">{pipelineResult.report?.primaryConditionName ?? pipelineResult.report?.primary_condition_name}</h4>
                                         <p className="text-sm">{pipelineResult.report?.summary}</p>
                                         <div className="flex flex-wrap gap-2 pt-2">
-                                            {pipelineResult.report?.citationsUsed?.map((cit: string, i: number) => (
+                                            {(pipelineResult.report?.citationsUsed ?? pipelineResult.report?.citations_used)?.map((cit: string, i: number) => (
                                                 <Badge key={i} variant="outline" className="text-xs bg-background">
                                                     📚 {cit}
                                                 </Badge>
@@ -312,8 +337,37 @@ export default function AIEngineeringDashboard() {
                                 )}
                             </Button>
 
-                            {evalReport && (
+                            {evalReport?.error && (
+                                <div className="mt-4 p-4 rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/40 flex items-start gap-3">
+                                    <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="font-semibold text-red-700 dark:text-red-300">Model engine unavailable</p>
+                                        <p className="text-sm text-red-600 dark:text-red-400">{evalReport.error}</p>
+                                        {evalReport.detail && (
+                                            <p className="text-xs text-muted-foreground mt-1 font-mono">{evalReport.detail}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {evalReport && !evalReport.error && (
                                 <div className="space-y-6 mt-6 border-t pt-6">
+                                    {evalReport.modelEngine && (
+                                        <div className={`p-3 rounded-lg border flex items-center gap-3 ${evalReport.modelEngine.available ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30' : 'border-red-300 bg-red-50 dark:bg-red-950/40'}`}>
+                                            {evalReport.modelEngine.available ? (
+                                                <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                                            ) : (
+                                                <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
+                                            )}
+                                            <span className="text-sm">
+                                                {evalReport.modelEngine.available ? (
+                                                    <>Model engine: <strong>{evalReport.modelEngine.provider} · {evalReport.modelEngine.model}</strong> — {evalReport.modelEngine.casesModelSucceeded}/{evalReport.totalCases} cases executed on the live model</>
+                                                ) : (
+                                                    <><strong>No live model executed.</strong> All {evalReport.totalCases} cases failed model synthesis ({evalReport.modelEngine.casesModelFailed} failures). Accuracy below reflects a broken/unconfigured model, not model quality.</>
+                                                )}
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <div className="bg-emerald-50 dark:bg-emerald-950/40 p-4 rounded-lg border border-emerald-200">
                                             <span className="text-xs text-muted-foreground block">Diagnostic Accuracy</span>
@@ -349,6 +403,8 @@ export default function AIEngineeringDashboard() {
                                                     <div className="flex items-center gap-3">
                                                         {item.passed ? (
                                                             <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                                        ) : item.modelStatus === 'failed' ? (
+                                                            <AlertTriangle className="h-5 w-5 text-red-500" />
                                                         ) : (
                                                             <AlertTriangle className="h-5 w-5 text-amber-500" />
                                                         )}
@@ -357,6 +413,11 @@ export default function AIEngineeringDashboard() {
                                                             <span className="text-xs text-muted-foreground">
                                                                 Expected: {item.expectedCondition} | Evaluated: {item.evaluatedCondition}
                                                             </span>
+                                                            {item.modelStatus === 'failed' ? (
+                                                                <span className="text-xs text-red-500 block">Model failed: {item.error}</span>
+                                                            ) : item.modelUsed ? (
+                                                                <span className="text-xs text-muted-foreground block">Model: {item.modelProvider} · {item.modelUsed}</span>
+                                                            ) : null}
                                                         </div>
                                                     </div>
                                                     <Badge variant="outline">{item.executionTimeMs}ms</Badge>

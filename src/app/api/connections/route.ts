@@ -15,22 +15,30 @@ const apiSecret = process.env.STREAM_API_SECRET!;
 export const POST = RateLimitMiddleware.strict(async (request: NextRequest) => {
     try {
         const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+
         const body = await request.json();
 
         // Check if this is a fetch request or create request
         if (body.action === 'fetch') {
-            const { userId, role } = body;
+            const { role } = body;
 
-            if (!userId || !role) {
-                return NextResponse.json({ message: 'Missing userId or role' }, { status: 400 });
+            if (!role) {
+                return NextResponse.json({ message: 'Missing role' }, { status: 400 });
             }
 
+            // Only allow fetching connections where the authenticated user is the party.
+            // Never trust a body-supplied userId for someone else.
             let query = supabase.from('connection_requests').select('*');
 
             if (role === 'doctor') {
-                query = query.eq('doctor_id', userId);
+                query = query.eq('doctor_id', user.id);
             } else {
-                query = query.eq('patient_id', userId);
+                query = query.eq('patient_id', user.id);
             }
 
             const { data, error } = await query;
@@ -42,11 +50,14 @@ export const POST = RateLimitMiddleware.strict(async (request: NextRequest) => {
             return NextResponse.json({ data });
         }
 
-        // Create connection request
-        const { doctorId, patientId } = body;
+        // Create connection request. The authenticated user is always the patient
+        // (matches the RLS policy: insert allowed only when auth.uid() = patient_id).
+        // Derive patientId from the session so a user cannot forge requests for others.
+        const { doctorId } = body;
+        const patientId = user.id;
 
-        if (!doctorId || !patientId) {
-            return NextResponse.json({ message: 'Missing doctorId or patientId' }, { status: 400 });
+        if (!doctorId) {
+            return NextResponse.json({ message: 'Missing doctorId' }, { status: 400 });
         }
 
         const { data, error } = await supabase
@@ -109,10 +120,32 @@ export const POST = RateLimitMiddleware.strict(async (request: NextRequest) => {
 export const PATCH = RateLimitMiddleware.strict(async (request: NextRequest) => {
     try {
         const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+
         const { requestId, status } = await request.json();
 
         if (!requestId || !['accepted', 'rejected'].includes(status)) {
             return NextResponse.json({ message: 'Invalid request' }, { status: 400 });
+        }
+
+        // 0. Verify the authenticated user is the doctor party to this specific
+        //    request before mutating its status or provisioning a Stream channel.
+        const { data: existing, error: fetchError } = await supabase
+            .from('connection_requests')
+            .select('doctor_id')
+            .eq('id', requestId)
+            .single();
+
+        if (fetchError || !existing) {
+            return NextResponse.json({ message: 'Connection request not found' }, { status: 404 });
+        }
+
+        if (existing.doctor_id !== user.id) {
+            return NextResponse.json({ message: 'Forbidden: Only the recipient doctor can respond to this request' }, { status: 403 });
         }
 
         // 1. Update the request status

@@ -18,14 +18,21 @@ export const DrugInteractionInputSchema = z.object({
 });
 
 export interface DrugInteractionResult {
-    safeToCombine: boolean;
-    interactionRiskLevel: 'none' | 'moderate' | 'severe';
+    // `null` = not assessed / unknown. We must never assert `true` (safe) for a
+    // combination that was not actually checked against a known rule or database.
+    safeToCombine: boolean | null;
+    interactionRiskLevel: 'none' | 'moderate' | 'severe' | 'potential' | 'unknown';
     warningMessage: string;
     recommendedSpacingHours?: number;
+    sources?: string[];
 }
 
 /**
  * Executable Tool: Check drug interactions between topical and oral skin medications.
+ *
+ * Primary path: the Python service (curated contraindications + live openFDA drug
+ * labeling). If that service is unreachable, we fall back to the local curated
+ * rules below and otherwise return an honest "not assessed" — never a false "safe".
  */
 export async function checkDrugInteractionsTool(
     input: z.infer<typeof DrugInteractionInputSchema>
@@ -34,6 +41,30 @@ export async function checkDrugInteractionsTool(
     const oral = (input.oralMedication || '').toLowerCase();
 
     logger.info('tool.drug_interaction.executed', { topical, oral });
+
+    // Primary: real-time Python engine (curated rules + openFDA labels).
+    try {
+        const fastApiUrl = process.env.PYTHON_AI_SERVICE_URL || process.env.FASTAPI_SERVICE_URL || 'http://localhost:8000';
+        const resp = await fetch(`${fastApiUrl}/api/v1/tools/drug-interaction`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topical_medication: input.topicalMedication, oral_medication: input.oralMedication }),
+            signal: AbortSignal.timeout(12000),
+        });
+        if (resp.ok) {
+            const d = await resp.json();
+            return {
+                safeToCombine: d.safe_to_combine ?? null,
+                interactionRiskLevel: d.interaction_risk_level ?? 'unknown',
+                warningMessage: d.warning_message,
+                recommendedSpacingHours: d.recommended_spacing_hours ?? undefined,
+                sources: d.sources ?? [],
+            };
+        }
+    } catch (err) {
+        logger.warn('tool.drug_interaction.python_unavailable', { error: err instanceof Error ? err.message : String(err) });
+    }
+    // Fallback: local curated rules only (below).
 
     // Severe Contraindication: Oral Isotretinoin + Oral Tetracyclines (Doxycycline) -> Pseudotumor Cerebri
     if (oral.includes('isotretinoin') && (oral.includes('doxycycline') || oral.includes('tetracycline'))) {
@@ -64,10 +95,13 @@ export async function checkDrugInteractionsTool(
         };
     }
 
+    // Unrecognized combination: the built-in rule set only covers a small number of
+    // known interactions. Asserting "safe" here would be a false safety claim, so we
+    // return an explicit "not assessed" result instead.
     return {
-        safeToCombine: true,
-        interactionRiskLevel: 'none',
-        warningMessage: 'No major clinical drug interaction detected between specified medications.',
+        safeToCombine: null,
+        interactionRiskLevel: 'unknown',
+        warningMessage: 'This medication combination is not covered by the built-in interaction rules and has NOT been assessed for safety. Do not assume it is safe to combine — please consult a pharmacist or the prescribing clinician.',
     };
 }
 
@@ -83,7 +117,9 @@ export interface DoctorSlotResult {
     doctorName: string;
     specialization: string;
     location: string;
-    nextAvailableSlot: string;
+    // `null` = availability was not queried. The `profiles` table does not store
+    // appointment slots, so we do not synthesize a date that was never looked up.
+    nextAvailableSlot: string | null;
 }
 
 /**
@@ -91,7 +127,7 @@ export interface DoctorSlotResult {
  */
 export async function queryDoctorAvailabilityTool(
     input: z.infer<typeof DoctorAvailabilityInputSchema>
-): Promise<{ doctors: DoctorSlotResult[] }> {
+): Promise<{ doctors: DoctorSlotResult[]; error?: string }> {
     logger.info('tool.doctor_availability.executed', input);
 
     try {
@@ -109,37 +145,27 @@ export async function queryDoctorAvailabilityTool(
 
         const { data, error } = await query;
 
-        if (!error && data && data.length > 0) {
-            const doctors: DoctorSlotResult[] = data.map((doc, idx) => ({
-                doctorId: doc.id,
-                doctorName: doc.display_name || 'Dr. Certified Dermatologist',
-                specialization: doc.specialization || 'General Dermatology',
-                location: doc.location || doc.city || 'Online Consultation',
-                nextAvailableSlot: new Date(Date.now() + (idx + 1) * 86400000).toISOString().split('T')[0] + ' 10:00 AM',
-            }));
-            return { doctors };
+        if (error) {
+            // Surface the real DB error instead of synthesizing fake doctors.
+            logger.error('tool.doctor_availability.db_error', { error: error.message });
+            return { doctors: [], error: error.message };
         }
-    } catch (err) {
-        logger.warn('tool.doctor_availability.fallback', { error: String(err) });
-    }
 
-    // Fallback response
-    return {
-        doctors: [
-            {
-                doctorId: 'doc-001',
-                doctorName: 'Dr. Sarah Jenkins, MD',
-                specialization: 'General Dermatology',
-                location: 'Telehealth Online',
-                nextAvailableSlot: new Date(Date.now() + 86400000).toISOString().split('T')[0] + ' 09:30 AM',
-            },
-            {
-                doctorId: 'doc-002',
-                doctorName: 'Dr. Rajesh Patel, MD',
-                specialization: 'Pediatric & Cosmetic Dermatology',
-                location: 'Central Dermatology Clinic',
-                nextAvailableSlot: new Date(Date.now() + 172800000).toISOString().split('T')[0] + ' 02:00 PM',
-            },
-        ],
-    };
+        const doctors: DoctorSlotResult[] = (data ?? []).map((doc) => ({
+            doctorId: doc.id,
+            doctorName: doc.display_name || 'Verified Dermatologist',
+            specialization: doc.specialization || 'General Dermatology',
+            location: doc.location || doc.city || 'Online Consultation',
+            // Availability is not stored in `profiles`; do not synthesize a slot date.
+            nextAvailableSlot: null,
+        }));
+
+        return { doctors };
+    } catch (err) {
+        // On failure, return an empty list and surface the error — never fabricate
+        // doctors or appointment slots that were never queried.
+        const message = err instanceof Error ? err.message : String(err);
+        logger.error('tool.doctor_availability.failed', { error: message });
+        return { doctors: [], error: message };
+    }
 }

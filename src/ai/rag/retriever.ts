@@ -6,6 +6,7 @@
 import { generateEmbedding } from './embeddings';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/logger';
+import knowledgeBase from './datasets/dermatology-knowledge-base.json';
 
 export interface RetrievedMedicalChunk {
     id: string;
@@ -14,8 +15,15 @@ export interface RetrievedMedicalChunk {
     content: string;
     source: string;
     icdCode?: string;
-    similarity: number;
+    /**
+     * Cosine similarity from the pgvector search, or `null` for in-memory keyword
+     * fallback matches (which are NOT cosine-scored and must not be presented as
+     * ranked vector matches).
+     */
+    similarity: number | null;
     formattedCitation: string;
+    /** True when this chunk came from the in-memory keyword fallback, not pgvector. */
+    isFallback?: boolean;
 }
 
 export interface RAGSearchOptions {
@@ -26,90 +34,33 @@ export interface RAGSearchOptions {
 }
 
 /**
- * Seed dataset of dermatological knowledge for local/fallback RAG retrieval.
+ * Curated, sourced dermatology knowledge base used for local/fallback RAG
+ * retrieval. This is the SAME real, attributable content ingested into pgvector
+ * (see ai_service/ingestion/ingest_knowledge_base.py), loaded from a single
+ * shared JSON so the primary (vector) and fallback (keyword) paths never drift.
  */
-const IN_MEMORY_MEDICAL_KNOWLEDGE = [
-    {
-        id: 'rag-001',
-        title: 'Acne Vulgaris Clinical Guidelines',
-        conditionCategory: 'Acne',
-        icdCode: 'L70.0',
-        source: 'American Academy of Dermatology (AAD) Clinical Guidelines 2024',
-        content: 'Acne vulgaris is a chronic inflammatory dermatosis characterized by open/closed comedones, papules, pustules, and nodules. First-line topical therapy includes benzoyl peroxide, topical retinoids (adapalene, tretinoin), and topical antibiotics. Systemic therapy (doxycycline, isotretinoin) is reserved for moderate-to-severe nodulocystic cases.',
-    },
-    {
-        id: 'rag-002',
-        title: 'Atopic Dermatitis Management & Care',
-        conditionCategory: 'Eczema',
-        icdCode: 'L20.9',
-        source: 'Journal of Investigative Dermatology - Eczema Care Protocol',
-        content: 'Atopic Dermatitis (Eczema) features pruritic, erythematous, dry skin lesions frequently located on flexural surfaces. Primary treatment involves daily emollients, short-course topical corticosteroids or calcineurin inhibitors (pimecrolimus, tacrolimus), and avoiding trigger factors like strong soaps and synthetic fabrics.',
-    },
-    {
-        id: 'rag-003',
-        title: 'Psoriasis Vulgaris Diagnostic & Therapeutic Framework',
-        conditionCategory: 'Psoriasis',
-        icdCode: 'L40.0',
-        source: 'National Psoriasis Foundation Clinical Practice Guidelines',
-        content: 'Psoriasis is an autoimmune skin disorder characterized by well-demarcated erythematous plaques with silvery-white scales, commonly on extensor surfaces (elbows, knees, scalp). Management includes high-potency topical corticosteroids combined with vitamin D3 analogs (calcipotriene), phototherapy (NB-UVB), and biologics (IL-17, IL-23 inhibitors).',
-    },
-    {
-        id: 'rag-004',
-        title: 'Tinea Corporis (Ringworm) Diagnostic Features',
-        conditionCategory: 'Fungal',
-        icdCode: 'B35.4',
-        source: 'CDC Fungal Diseases Guidelines',
-        content: 'Tinea corporis presents as an annular, erythematous plaque with a raised, scaly leading border and central clearing. Diagnosis is confirmed via KOH wet mount showing septate hyphae. First-line treatment is topical azoles (clotrimazole, terbinafine) for 2 to 4 weeks. Oral terbinafine is indicated for widespread infection.',
-    },
-    {
-        id: 'rag-005',
-        title: 'Malignant Melanoma Early Warning Indicators (ABCDE Criteria)',
-        conditionCategory: 'Melanoma',
-        icdCode: 'C43.9',
-        source: 'Skin Cancer Foundation Diagnostic Protocol',
-        content: 'Malignant melanoma is an aggressive cutaneous malignancy. Diagnostic ABCDE criteria: A - Asymmetry; B - Border irregularity; C - Color variation (multiple shades of brown, black, red, white); D - Diameter (>6mm); E - Evolving shape or size. Any suspicious pigmented lesion requires urgent full-thickness excisional biopsy.',
-    },
-    {
-        id: 'cbr-001',
-        title: 'Empirical Clinical Cohort: Acne Vulgaris Diagnostic Profile (N=115)',
-        conditionCategory: 'Acne',
-        icdCode: 'L70.0',
-        source: 'DermiAssist Clinical Registry (N=500 Multi-Center Cohort)',
-        content: 'In a validated clinical cohort of 115 confirmed Acne Vulgaris patients (mean age 43.5 years, 57.4% male): Mean Erythema score was 1.46/3, Scaling was 1.63/3, and Itching was 1.51/3. Positive family history was present in 48.7% of cases. Hallmark presentation includes inflammatory papulopustular lesions with localized follicular plugging. Differential diagnosis from Rosacea is established by presence of comedones and distinct age/gender distribution.',
-    },
-    {
-        id: 'cbr-002',
-        title: 'Empirical Clinical Cohort: Atopic Eczema Severity & Demographics (N=100)',
-        conditionCategory: 'Eczema',
-        icdCode: 'L20.9',
-        source: 'DermiAssist Clinical Registry (N=500 Multi-Center Cohort)',
-        content: 'Analysis of 100 confirmed Eczema/Atopic Dermatitis patient cases (mean age 47.6 years, 56.0% male): Mean Erythema severity was 1.46/3, Scaling was 1.44/3, and Itching severity was 1.27/3. Strong genetic predisposition observed with 52.0% positive family history. Key diagnostic markers: pruritic xerotic patches with flexural lichenification. First-line therapy responds to intensive barrier emollients and topical calcineurin/corticosteroid pulse therapy.',
-    },
-    {
-        id: 'cbr-003',
-        title: 'Empirical Clinical Cohort: Psoriasis Vulgaris Presentation Matrix (N=91)',
-        conditionCategory: 'Psoriasis',
-        icdCode: 'L40.0',
-        source: 'DermiAssist Clinical Registry (N=500 Multi-Center Cohort)',
-        content: 'Clinical profile of 91 confirmed Psoriasis Vulgaris cases (mean age 43.6 years, 52.7% male): Marked by prominent Scaling (mean 1.56/3) and Erythema (mean 1.33/3), with Itching at 1.54/3. Family history reported in 36.3%. Diagnostic hallmark: well-demarcated salmon-colored plaques with micaceous silvery scales on extensor surfaces (knees, elbows, scalp). Differential distinguished from eczema by distinct plaque demarcation and Auspitz sign.',
-    },
-    {
-        id: 'cbr-004',
-        title: 'Empirical Clinical Cohort: Rosacea Papulopustular & Erythematotelangiectatic Matrix (N=109)',
-        conditionCategory: 'Rosacea',
-        icdCode: 'L71.9',
-        source: 'DermiAssist Clinical Registry (N=500 Multi-Center Cohort)',
-        content: 'Cohort analysis of 109 confirmed Rosacea patients (mean age 39.8 years, 53.2% female): Demonstrates highest Erythema severity index (mean 1.52/3), Itching at 1.55/3, and lower Scaling (1.41/3). Highest family history correlation in cohort at 56.9%. Characterized by central facial erythema, flushing, telangiectasias, and absence of comedones. Exacerbated by thermal, dietary, and UV triggers.',
-    },
-    {
-        id: 'cbr-005',
-        title: 'Empirical Clinical Cohort: Contact & Irritant Dermatitis Profile (N=85)',
-        conditionCategory: 'Dermatitis',
-        icdCode: 'L30.9',
-        source: 'DermiAssist Clinical Registry (N=500 Multi-Center Cohort)',
-        content: 'Evaluation of 85 confirmed Dermatitis patients (mean age 40.4 years, 54.1% male): Mean Scaling of 1.61/3, Itching of 1.42/3, and Erythema of 1.25/3. Family history positive in 51.8%. Clinical picture dominated by localized acute vesicular eruptions or subacute eczematous weeping plaques corresponding to exogenous exposure zones. Patch testing recommended for allergen identification.',
-    },
-];
+interface KnowledgeBaseEntry {
+    id: string;
+    title: string;
+    conditionCategory: string;
+    icdCode?: string;
+    source: string;
+    content: string;
+    keywords?: string[];
+}
+const IN_MEMORY_MEDICAL_KNOWLEDGE: KnowledgeBaseEntry[] = knowledgeBase as KnowledgeBaseEntry[];
+
+/**
+ * Ubiquitous derm terms that appear in almost every entry and therefore carry no
+ * discriminating signal for keyword matching. Excluded from fallback scoring so
+ * specific presentation terms dominate (avoids e.g. grounding "acne" on "tinea"
+ * just because both mention "skin").
+ */
+const GENERIC_STOPWORDS = new Set([
+    'skin', 'rash', 'rashes', 'lesion', 'lesions', 'condition', 'area', 'areas',
+    'patch', 'patches', 'spot', 'spots', 'affected', 'weeks', 'week', 'days',
+    'month', 'months', 'symptom', 'symptoms', 'body', 'chronic', 'acute',
+]);
 
 /**
  * Retrieve grounded medical context for a diagnostic or user query.
@@ -130,69 +81,101 @@ export async function retrieveMedicalContext(
 
     logger.info('rag.search.started', { query, categoryFilter });
 
-    // Step 1: Generate vector embedding for the query
-    const queryEmbedding = await generateEmbedding(query);
-
-    let chunks: RetrievedMedicalChunk[] = [];
-
+    // Step 1: Generate vector embedding for the query. If embedding generation fails
+    // (e.g. missing API key), we do NOT fabricate a vector — we skip the pgvector path
+    // and degrade to real in-memory keyword matching below.
+    let queryEmbedding: number[] | null = null;
     try {
-        // Attempt Supabase pgvector search
-        const supabase = await createServerClient();
-        const { data, error } = await supabase.rpc('match_medical_knowledge', {
-            query_embedding: queryEmbedding,
-            match_threshold: matchThreshold,
-            match_count: matchCount,
-            category_filter: categoryFilter ?? null,
-        });
-
-        if (!error && data && data.length > 0) {
-            chunks = data.map((item: {
-                id: string;
-                title: string;
-                condition_category: string;
-                content: string;
-                source: string;
-                icd_code?: string;
-                similarity: number;
-            }) => ({
-                id: item.id,
-                title: item.title,
-                conditionCategory: item.condition_category,
-                content: item.content,
-                source: item.source,
-                icdCode: item.icd_code,
-                similarity: item.similarity,
-                formattedCitation: `[Source: ${item.source} ${item.icd_code ? `(ICD-10: ${item.icd_code})` : ''}]`,
-            }));
-        }
+        queryEmbedding = await generateEmbedding(query);
     } catch (err) {
-        logger.warn('rag.supabase.query_fallback', {
+        logger.warn('rag.embedding_unavailable', {
             error: err instanceof Error ? err.message : String(err),
         });
     }
 
-    // Fallback: In-memory semantic keyword matching if vector DB returns no results
+    let chunks: RetrievedMedicalChunk[] = [];
+
+    if (queryEmbedding) {
+        try {
+            // Attempt Supabase pgvector search
+            const supabase = await createServerClient();
+            const { data, error } = await supabase.rpc('match_medical_knowledge', {
+                query_embedding: queryEmbedding,
+                match_threshold: matchThreshold,
+                match_count: matchCount,
+                category_filter: categoryFilter ?? null,
+            });
+
+            if (!error && data && data.length > 0) {
+                chunks = data.map((item: {
+                    id: string;
+                    title: string;
+                    condition_category: string;
+                    content: string;
+                    source: string;
+                    icd_code?: string;
+                    similarity: number;
+                }) => ({
+                    id: item.id,
+                    title: item.title,
+                    conditionCategory: item.condition_category,
+                    content: item.content,
+                    source: item.source,
+                    icdCode: item.icd_code,
+                    similarity: item.similarity,
+                    formattedCitation: `[Source: ${item.source} ${item.icd_code ? `(ICD-10: ${item.icd_code})` : ''}]`,
+                }));
+            }
+        } catch (err) {
+            logger.warn('rag.supabase.query_fallback', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
+
+    // Fallback: In-memory keyword-overlap matching if the vector DB returns no results.
     if (chunks.length === 0) {
+        // Tokenize the query into meaningful terms (drop short and generic tokens).
         const queryLower = query.toLowerCase();
-        const filtered = IN_MEMORY_MEDICAL_KNOWLEDGE.filter((item) => {
-            const matchesCategory = !categoryFilter || item.conditionCategory.toLowerCase() === categoryFilter.toLowerCase();
-            const matchesQuery = item.title.toLowerCase().includes(queryLower) ||
-                item.content.toLowerCase().includes(queryLower) ||
-                item.conditionCategory.toLowerCase().includes(queryLower);
-            return matchesCategory && matchesQuery;
-        });
+        const queryTerms = Array.from(
+            new Set(
+                queryLower
+                    .split(/[^a-z0-9]+/)
+                    .filter((t) => t.length >= 4 && !GENERIC_STOPWORDS.has(t))
+            )
+        );
 
-        const targetList = filtered.length > 0 ? filtered : IN_MEMORY_MEDICAL_KNOWLEDGE.slice(0, matchCount);
+        const scored = IN_MEMORY_MEDICAL_KNOWLEDGE
+            .filter((item) => !categoryFilter || item.conditionCategory.toLowerCase() === categoryFilter.toLowerCase())
+            .map((item) => {
+                const haystack = `${item.title} ${item.conditionCategory} ${item.content}`.toLowerCase();
+                // Base score: distinct query terms appearing in the entry text.
+                let score = queryTerms.reduce((acc, term) => acc + (haystack.includes(term) ? 1 : 0), 0);
+                // Boost: curated lay-term keywords found in the query are strong,
+                // condition-specific signals — weight them higher than generic text hits.
+                for (const kw of item.keywords ?? []) {
+                    if (queryLower.includes(kw.toLowerCase())) score += 3;
+                }
+                return { item, score };
+            })
+            .filter((s) => s.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, matchCount);
 
-        chunks = targetList.map((item, idx) => ({
+        // Only surface entries that actually matched the query terms. We never
+        // backfill unrelated entries — an unmatched query yields no grounding
+        // rather than misleading references.
+        chunks = scored.map(({ item }) => ({
             id: item.id,
             title: item.title,
             conditionCategory: item.conditionCategory,
             content: item.content,
             source: item.source,
             icdCode: item.icdCode,
-            similarity: 0.95 - idx * 0.05,
-            formattedCitation: `[Source: ${item.source} (ICD-10: ${item.icdCode})]`,
+            // In-memory keyword matches are NOT cosine-scored — do not fabricate a score.
+            similarity: null,
+            isFallback: true,
+            formattedCitation: `[Reference (in-memory keyword match): ${item.source}${item.icdCode ? ` (ICD-10: ${item.icdCode})` : ''}]`,
         }));
     }
 

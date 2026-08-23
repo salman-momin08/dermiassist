@@ -1,8 +1,8 @@
-# 🏥 DermiAssist-AI: Enterprise Distributed AI Engineering & Telemedicine Platform
+# 🤖 DermiAssist-AI: An AI Engineering Systems Project (Applied to Dermatology Triage)
 
 <div align="center">
 
-**Production-Grade Polyglot AI System Featuring Vector RAG, Multi-Agent LLM Orchestration, Model Context Protocol (MCP), Hugging Face HAM10000 Models, Hybrid BM25+Vector RRF Search, Token Budget Allocator, Circuit Breakers & Async Task Queues**
+**A Production-Grade AI Engineering Portfolio Project: Multi-Agent LLM Orchestration, Vector RAG, Hybrid BM25+Vector RRF Search, Model Context Protocol (MCP), Dynamic Token Budgeting, Circuit Breaker Resilience, Async Task Queues & LLM-as-a-Judge Evaluation — Built on a Full-Stack Telemedicine Application**
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.5-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -61,9 +61,9 @@
 
 ## 1. Executive Summary & Value Proposition
 
-**DermiAssist-AI** is an enterprise-grade, **polyglot microservices medical application** designed to bridge patient care and dermatological expertise. Built using **Next.js 15 (App Router)**, **FastAPI (Python AI Engine)**, **React 19**, **Google Gemini 2.5 Flash / Vision**, **Hugging Face Open-Source Lesion Classifier (HAM10000)**, **Model Context Protocol (MCP)**, and **Supabase (pgvector)**, the platform demonstrates advanced AI System Design principles alongside robust healthcare software engineering.
+**DermiAssist-AI** is an AI engineering project focused on the system-design problems that sit around a production LLM application: **multi-agent orchestration**, **retrieval-augmented generation (vector + hybrid BM25/RRF search)**, **evaluation (LLM-as-a-judge)**, **resilience (circuit breakers, async task workers)**, **cost/latency control (dynamic token budgeting, semantic caching)**, and **interoperability (a Model Context Protocol server)**. These patterns are implemented against a real, non-trivial domain — dermatology triage and telemedicine — rather than a toy demo, using **Next.js 15 (App Router)**, **FastAPI (Python AI Engine)**, **React 19**, **Google Gemini 2.5 Flash / Vision**, **Hugging Face Open-Source Lesion Classifier (HAM10000)**, and **Supabase (pgvector)**.
 
-The system serves three primary user personas:
+The telemedicine surface is the application that exercises this AI engine and serves three primary user personas:
 - **👤 Patients**: Submit skin lesion photos, complete an interactive proforma, receive grounded differential reports with citations, track longitudinal healing over time, search verified doctors, book appointments, and launch WebRTC video calls.
 - **👨‍⚕️ Doctors**: Manage patient consultation schedules, review AI-synthesized patient cases, record private clinical notes, review longitudinal healing curves, and host video calls.
 - **👑 Administrators**: Manage doctor role verification requests, inspect platform telemetry, monitor API Circuit Breakers, and execute live LLM-as-a-Judge benchmark evaluations via the **AI Engineering Control Center**.
@@ -515,9 +515,9 @@ graph TD
 
 ```mermaid
 graph TD
-    BenchmarkData[Ground Truth Dataset: dermatology-benchmarks.json] --> CaseRunner[Eval Runner: eval-harness.ts]
-    CaseRunner --> PipelineExec[Multi-Agent Pipeline Execution]
-    PipelineExec --> OutputEval[Output Evaluation Engine]
+    BenchmarkData[Ground Truth Dataset: dermatology-benchmarks.json] --> CaseRunner[Eval Runner: ai_service/services/eval_harness.py]
+    CaseRunner --> PipelineExec[Real Multi-Agent Pipeline Execution - Gemini/OpenAI]
+    PipelineExec --> OutputEval[Output Evaluation Engine - honest per-case model status]
     
     subgraph Metric Scorers
         OutputEval --> Metric1[Diagnostic Condition Accuracy %]

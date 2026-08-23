@@ -1,0 +1,272 @@
+[
+  {
+    "id": "kb-acne-vulgaris",
+    "title": "Acne Vulgaris — Diagnosis and Management",
+    "conditionCategory": "Acne",
+    "icdCode": "L70.0",
+    "source": "American Academy of Dermatology (AAD) Guidelines of care for the management of acne vulgaris, J Am Acad Dermatol 2024",
+    "keywords": ["acne", "pimple", "pimples", "bumps", "papule", "pustule", "comedone", "blackhead", "whitehead", "oily", "greasy", "forehead", "chin", "cheeks", "cystic", "breakout", "nodule", "sebum"],
+    "content": "Acne vulgaris is a chronic inflammatory disease of the pilosebaceous unit. Lesions include non-inflammatory comedones (open/blackheads and closed/whiteheads) and inflammatory papules, pustules, nodules, and cysts, typically on the face, chest, and back. Pathogenesis involves follicular hyperkeratinization, increased sebum production, Cutibacterium acnes proliferation, and inflammation. First-line topical therapy: benzoyl peroxide, topical retinoids (adapalene, tretinoin), and topical antibiotics (clindamycin) — antibiotics should be combined with benzoyl peroxide to limit resistance. Moderate-to-severe or nodulocystic disease may require oral antibiotics (doxycycline), hormonal therapy (combined oral contraceptives, spironolactone) in appropriate patients, or oral isotretinoin. Distinguish from rosacea by the presence of comedones."
+  },
+  {
+    "id": "kb-atopic-dermatitis",
+    "title": "Atopic Dermatitis (Eczema) — Diagnosis and Management",
+    "conditionCategory": "Eczema",
+    "icdCode": "L20.9",
+    "source": "American Academy of Dermatology (AAD) Guidelines of care for atopic dermatitis; NICE guidance",
+    "keywords": ["eczema", "atopic", "itchy", "itching", "pruritic", "dry", "flaky", "red patches", "inner elbows", "behind knees", "flexural", "cracked", "scratching", "rash", "lichenified"],
+    "content": "Atopic dermatitis is a chronic, relapsing, intensely pruritic inflammatory skin disease associated with impaired skin barrier function and atopy (asthma, allergic rhinitis). Morphology varies with age: infants show facial and extensor involvement; children and adults show flexural (antecubital and popliteal fossae) lichenified, dry, erythematous patches and plaques. Diagnosis is clinical (pruritus plus typical morphology/distribution and chronic-relapsing course). Cornerstone management: liberal daily emollients/moisturizers, gentle skin care, and trigger avoidance. Flares are treated with topical corticosteroids (potency matched to site/severity) or topical calcineurin inhibitors (tacrolimus, pimecrolimus) for sensitive areas. Moderate-to-severe refractory disease may require phototherapy or systemic agents (dupilumab, JAK inhibitors)."
+  },
+  {
+    "id": "kb-psoriasis-vulgaris",
+    "title": "Plaque Psoriasis (Psoriasis Vulgaris) — Diagnosis and Management",
+    "conditionCategory": "Psoriasis",
+    "icdCode": "L40.0",
+    "source": "American Academy of Dermatology–National Psoriasis Foundation (AAD-NPF) joint guidelines",
+    "keywords": ["psoriasis", "plaque", "plaques", "silver", "silvery", "scaly", "scales", "thick", "elbows", "knees", "scalp", "extensor", "flaking", "well demarcated", "auspitz"],
+    "content": "Plaque psoriasis is a chronic immune-mediated disease characterized by well-demarcated, erythematous plaques with adherent silvery-white scale, typically over extensor surfaces (elbows, knees), scalp, and lumbosacral region. Auspitz sign (pinpoint bleeding on scale removal) and the Koebner phenomenon may be present. Nail pitting/onycholysis and psoriatic arthritis are associated. Localized disease: topical corticosteroids, vitamin D analogues (calcipotriene), often in combination. Widespread or refractory disease: phototherapy (narrowband UVB), and systemic/biologic therapy (methotrexate, apremilast, or TNF/IL-17/IL-23 inhibitors). Screen for psoriatic arthritis and cardiometabolic comorbidities."
+  },
+  {
+    "id": "kb-tinea-corporis",
+    "title": "Tinea Corporis (Ringworm) — Diagnosis and Management",
+    "conditionCategory": "Fungal",
+    "icdCode": "B35.4",
+    "source": "Centers for Disease Control and Prevention (CDC) — Ringworm; DermNet",
+    "keywords": ["ringworm", "tinea", "annular", "ring shaped", "ring-shaped", "circular", "clear center", "central clearing", "raised border", "scaly border", "fungal", "fungus"],
+    "content": "Tinea corporis is a superficial dermatophyte infection of glabrous skin. Classic lesion: an annular (ring-shaped), erythematous, scaly plaque with a raised, active advancing border and relative central clearing; mild pruritus is common. Diagnosis is supported by KOH microscopy of skin scrapings showing septate branching hyphae, or fungal culture. First-line treatment for limited disease: topical antifungals (terbinafine, clotrimazole, or other azoles) for 2–4 weeks, continued at least one week after clearance. Extensive, recurrent, or follicular involvement (tinea/Majocchi granuloma) requires oral antifungals (terbinafine, itraconazole). Avoid topical corticosteroid monotherapy, which causes tinea incognito."
+  },
+  {
+    "id": "kb-melanoma",
+    "title": "Cutaneous Melanoma — Early Recognition (ABCDE) and Referral",
+    "conditionCategory": "Melanoma",
+    "icdCode": "C43.9",
+    "source": "Skin Cancer Foundation; American Academy of Dermatology (AAD)",
+    "keywords": ["melanoma", "mole", "changing mole", "irregular border", "asymmetry", "asymmetric", "multiple colors", "growing", "bleeding mole", "dark spot", "abcde", "new mole", "evolving"],
+    "content": "Melanoma is a malignant tumor of melanocytes and the deadliest common skin cancer; early detection is critical. ABCDE warning features of a pigmented lesion: A — Asymmetry; B — Border irregularity; C — Color variegation (multiple shades of brown/black, or red/white/blue); D — Diameter greater than 6 mm; E — Evolution (change in size, shape, color, or new symptoms such as itching or bleeding). The 'ugly duckling' sign (a nevus that looks different from the patient's others) is also useful. Any lesion suspicious for melanoma warrants prompt dermatologic evaluation and biopsy (excisional/full-thickness when feasible); definitive diagnosis is histopathologic. Do not delay referral."
+  },
+  {
+    "id": "kb-rosacea",
+    "title": "Rosacea — Diagnosis and Management",
+    "conditionCategory": "Rosacea",
+    "icdCode": "L71.9",
+    "source": "National Rosacea Society; American Acne & Rosacea Society updated management guidelines",
+    "keywords": ["rosacea", "flushing", "facial redness", "red face", "cheeks", "nose", "telangiectasia", "visible blood vessels", "blushing", "papulopustular", "rhinophyma"],
+    "content": "Rosacea is a chronic inflammatory facial dermatosis. Phenotypes/features include persistent centrofacial erythema, flushing, telangiectasias, inflammatory papules and pustules, phymatous change (e.g., rhinophyma), and ocular involvement. Comedones are characteristically ABSENT, distinguishing rosacea from acne vulgaris. Common triggers: heat, sun exposure, spicy food, alcohol, and emotional stress. Management: gentle skin care, daily broad-spectrum sunscreen, and trigger avoidance; topical therapy (metronidazole, azelaic acid, ivermectin, and brimonidine for erythema); oral tetracyclines (doxycycline) for papulopustular disease; laser/light for telangiectasia; ocular rosacea needs lid hygiene and may need ophthalmology input."
+  },
+  {
+    "id": "kb-contact-dermatitis",
+    "title": "Contact Dermatitis (Allergic and Irritant) — Diagnosis and Management",
+    "conditionCategory": "Dermatitis",
+    "icdCode": "L25.9",
+    "source": "American Academy of Dermatology (AAD) contact dermatitis resources; DermNet",
+    "keywords": ["contact dermatitis", "allergic reaction", "irritant", "nickel", "jewelry", "latex", "fragrance", "poison ivy", "after touching", "new product", "blisters", "weeping", "vesicles"],
+    "content": "Contact dermatitis is inflammation from direct exposure to an external agent. Irritant contact dermatitis (most common) is a non-immunologic, dose-dependent reaction (e.g., soaps, solvents, frequent handwashing). Allergic contact dermatitis is a delayed (type IV) hypersensitivity reaction to an allergen (e.g., nickel, fragrances, preservatives, poison ivy/urushiol) in sensitized individuals. Lesions are eczematous — erythema, vesicles, weeping in acute cases; scaling and lichenification in chronic cases — often with a distribution matching the contact area. Patch testing identifies causative allergens. Management: identify and avoid the offending agent, restore the barrier with emollients, and use topical corticosteroids; severe/widespread cases may need a short oral corticosteroid course."
+  },
+  {
+    "id": "kb-seborrheic-dermatitis",
+    "title": "Seborrheic Dermatitis — Diagnosis and Management",
+    "conditionCategory": "Dermatitis",
+    "icdCode": "L21.9",
+    "source": "DermNet; American Academy of Dermatology (AAD)",
+    "keywords": ["seborrheic", "dandruff", "flaky scalp", "greasy scale", "oily flakes", "eyebrows", "nasolabial", "cradle cap", "yellow scale", "flaking"],
+    "content": "Seborrheic dermatitis is a common chronic relapsing dermatitis affecting sebaceous-rich areas: scalp (dandruff), eyebrows, nasolabial folds, ears, and central chest. Lesions are erythematous patches with greasy yellowish scale. Malassezia yeast and host response contribute to pathogenesis; flares are associated with stress, cold weather, and immunosuppression. Treatment: antifungal shampoos/creams (ketoconazole, ciclopirox, zinc pyrithione, selenium sulfide) and short courses of low-potency topical corticosteroids or topical calcineurin inhibitors for the face. Infantile (cradle cap) form is usually self-limited."
+  },
+  {
+    "id": "kb-urticaria",
+    "title": "Urticaria (Hives) — Diagnosis and Management",
+    "conditionCategory": "Allergic",
+    "icdCode": "L50.9",
+    "source": "Joint Task Force on Practice Parameters / international urticaria guidelines",
+    "keywords": ["hives", "urticaria", "welts", "wheals", "raised itchy", "comes and goes", "transient", "swelling", "angioedema", "allergic"],
+    "content": "Urticaria presents as transient, intensely pruritic, edematous wheals (hives) that individually resolve within 24 hours without bruising, due to mast-cell mediated histamine release. It may be acute (<6 weeks, often post-infectious, drug, or food related) or chronic (>=6 weeks, frequently spontaneous/idiopathic). Angioedema (deeper swelling of lips, tongue, face) can accompany it; involvement of the airway is an emergency. First-line treatment: second-generation non-sedating H1 antihistamines, up-dosed as needed; refractory chronic cases may need omalizumab. Identify and avoid triggers. Seek emergency care for any breathing difficulty, throat tightness, or tongue/lip swelling."
+  },
+  {
+    "id": "kb-tinea-pedis",
+    "title": "Tinea Pedis (Athlete's Foot) — Diagnosis and Management",
+    "conditionCategory": "Fungal",
+    "icdCode": "B35.3",
+    "source": "Centers for Disease Control and Prevention (CDC); DermNet",
+    "keywords": ["athlete's foot", "athletes foot", "tinea pedis", "feet", "toes", "between toes", "web space", "foot peeling", "foot itching", "cracked heels", "fungal foot"],
+    "content": "Tinea pedis is a dermatophyte infection of the feet. Presentations: interdigital maceration, scaling and fissuring (most common, especially the 4th web space); a chronic 'moccasin' hyperkeratotic scaling pattern of the soles/sides; or a vesiculobullous inflammatory form. Pruritus and malodor are common. Diagnosis is clinical, supported by KOH microscopy. Treatment: topical antifungals (terbinafine, azoles) with foot-drying measures; extensive or moccasin-type disease and coexisting onychomycosis often need oral antifungals. Prevent by keeping feet dry, changing socks, and avoiding walking barefoot in communal areas."
+  },
+  {
+    "id": "kb-scabies",
+    "title": "Scabies — Diagnosis and Management",
+    "conditionCategory": "Infestation",
+    "icdCode": "B86",
+    "source": "Centers for Disease Control and Prevention (CDC) — Scabies",
+    "keywords": ["scabies", "mite", "mites", "burrows", "intense itching", "itchy at night", "night itching", "finger webs", "wrists", "contagious itch"],
+    "content": "Scabies is an infestation by the mite Sarcoptes scabiei. Hallmark symptom is intense pruritus, characteristically worse at night. Findings: burrows (thin serpiginous lines), papules, and excoriations in a typical distribution — finger web spaces, wrists, axillae, umbilicus, genitalia, and, in infants, palms/soles and scalp. It spreads via prolonged skin-to-skin contact. Diagnosis is clinical, confirmed by microscopy of skin scrapings showing mites, eggs, or feces. Treatment: topical permethrin 5% (repeated in ~1 week) or oral ivermectin; treat all close contacts simultaneously and launder bedding/clothing in hot water. Pruritus may persist for weeks after successful treatment."
+  },
+  {
+    "id": "kb-herpes-zoster",
+    "title": "Herpes Zoster (Shingles) — Diagnosis and Management",
+    "conditionCategory": "Viral",
+    "icdCode": "B02.9",
+    "source": "Centers for Disease Control and Prevention (CDC) — Shingles (Herpes Zoster)",
+    "keywords": ["shingles", "herpes zoster", "painful rash", "blisters", "band of blisters", "one side", "dermatomal", "burning pain", "tingling", "nerve pain"],
+    "content": "Herpes zoster results from reactivation of latent varicella-zoster virus. It presents as a painful, unilateral vesicular eruption grouped on an erythematous base, confined to one (occasionally adjacent) dermatome and not crossing the midline; a prodrome of pain, burning, or paresthesia often precedes the rash. Antiviral therapy (acyclovir, valacyclovir, or famciclovir) started within 72 hours of rash onset reduces severity and duration. Postherpetic neuralgia is the most common complication. Ophthalmic involvement (herpes zoster ophthalmicus, hutchinson sign on the nose tip) requires urgent ophthalmology evaluation. Vaccination (recombinant zoster vaccine) is recommended for prevention in eligible adults."
+  },
+  {
+    "id": "kb-impetigo",
+    "title": "Impetigo — Diagnosis and Management",
+    "conditionCategory": "Bacterial",
+    "icdCode": "L01.0",
+    "source": "Infectious Diseases Society of America (IDSA) skin and soft tissue infection guidelines",
+    "keywords": ["impetigo", "honey colored crust", "golden crust", "crusting", "around mouth", "around nose", "contagious", "children rash", "bullae", "oozing sores"],
+    "content": "Impetigo is a contagious superficial bacterial skin infection, most common in children, caused by Staphylococcus aureus and/or Streptococcus pyogenes. Non-bullous impetigo shows papules/pustules evolving into characteristic honey-colored (golden) crusts, often around the nose and mouth. Bullous impetigo shows flaccid bullae that rupture leaving a collarette of scale. Treatment: topical antibiotics (mupirocin) for limited disease; oral antibiotics for widespread involvement or multiple lesions. Good hygiene limits spread. Post-streptococcal glomerulonephritis is a rare complication."
+  },
+  {
+    "id": "kb-basal-cell-carcinoma",
+    "title": "Basal Cell Carcinoma — Recognition and Referral",
+    "conditionCategory": "Malignant",
+    "icdCode": "C44.91",
+    "source": "American Academy of Dermatology (AAD); Skin Cancer Foundation",
+    "keywords": ["basal cell carcinoma", "bcc", "pearly", "pearly bump", "translucent", "rolled border", "non-healing sore", "bleeds easily", "rodent ulcer", "skin cancer", "shiny papule"],
+    "content": "Basal cell carcinoma (BCC) is the most common skin cancer, arising in sun-exposed skin and rarely metastasizing but capable of significant local destruction. The classic nodular BCC is a pearly, translucent papule with rolled borders, telangiectasias, and possible central ulceration ('rodent ulcer'); superficial BCC appears as an erythematous scaly patch. Risk factors include cumulative UV exposure, fair skin, and immunosuppression. Diagnosis is by skin biopsy. Treatment depends on subtype/site/size and includes surgical excision, Mohs micrographic surgery for high-risk facial lesions, electrodesiccation and curettage, and topical/systemic options in selected cases. Any non-healing, bleeding, or enlarging lesion warrants dermatologic evaluation."
+  },
+  {
+    "id": "kb-squamous-cell-carcinoma",
+    "title": "Cutaneous Squamous Cell Carcinoma — Recognition and Referral",
+    "conditionCategory": "Malignant",
+    "icdCode": "C44.92",
+    "source": "American Academy of Dermatology (AAD); NCCN",
+    "keywords": ["squamous cell carcinoma", "scc", "scaly patch", "crusted", "hyperkeratotic", "non-healing", "bleeding lesion", "rough patch", "actinic keratosis", "skin cancer", "ulcerated"],
+    "content": "Cutaneous squamous cell carcinoma (SCC) is the second most common skin cancer, arising from keratinocytes in sun-damaged skin and with greater metastatic potential than BCC. It presents as a firm, hyperkeratotic or scaly papule, plaque, or nodule that may ulcerate, crust, or bleed; it can be tender. Actinic keratoses are precursor lesions. Risk factors: chronic UV exposure, fair skin, immunosuppression (notably organ transplant recipients), and HPV. Diagnosis is by biopsy. Treatment: surgical excision or Mohs surgery for high-risk lesions; radiation or systemic therapy for advanced disease. Prompt referral is indicated for enlarging, ulcerated, or non-healing lesions."
+  },
+  {
+    "id": "kb-melasma",
+    "title": "Melasma — Diagnosis and Management",
+    "conditionCategory": "Pigmentation",
+    "icdCode": "L81.1",
+    "source": "DermNet; American Academy of Dermatology (AAD)",
+    "keywords": ["melasma", "brown patches", "dark patches", "hyperpigmentation", "cheeks", "upper lip", "forehead", "pregnancy mask", "symmetric patches", "discoloration"],
+    "content": "Melasma is an acquired disorder of hyperpigmentation presenting as symmetric brown-to-gray-brown macules and patches on sun-exposed areas of the face (cheeks, forehead, upper lip, chin). It is more common in women and in individuals with darker skin phototypes; contributing factors include UV/visible light exposure, pregnancy and hormonal influences (oral contraceptives), and genetic predisposition. Management centers on strict photoprotection (broad-spectrum sunscreen including tinted/iron-oxide products covering visible light), topical lightening agents (hydroquinone, azelaic acid, and combination triple therapy), and procedural options (chemical peels, selected lasers) used cautiously. Recurrence is common without sustained sun protection."
+  },
+  {
+    "id": "kb-vitiligo",
+    "title": "Vitiligo — Diagnosis and Management",
+    "conditionCategory": "Pigmentation",
+    "icdCode": "L80",
+    "source": "American Academy of Dermatology (AAD); DermNet",
+    "keywords": ["vitiligo", "white patches", "depigmentation", "loss of color", "milk white", "pale patches", "symmetric white", "hands", "around eyes", "around mouth"],
+    "content": "Vitiligo is an autoimmune disorder causing loss of functioning melanocytes, producing well-demarcated depigmented (chalk/milk-white) macules and patches that fluoresce sharply under Wood lamp. Common sites include the face, hands, and areas around body orifices and over bony prominences; the Koebner phenomenon can occur. It is associated with other autoimmune conditions (notably thyroid disease). Management options: topical corticosteroids and topical calcineurin inhibitors, topical JAK inhibitor (ruxolitinib), phototherapy (narrowband UVB) for more extensive disease, and photoprotection. Psychosocial impact should be addressed."
+  },
+  {
+    "id": "kb-onychomycosis",
+    "title": "Onychomycosis (Fungal Nail Infection) — Diagnosis and Management",
+    "conditionCategory": "Fungal",
+    "icdCode": "B35.1",
+    "source": "DermNet; British Association of Dermatologists guidance",
+    "keywords": ["onychomycosis", "fungal nail", "nail fungus", "thick nail", "discolored nail", "yellow nail", "crumbling nail", "toenail", "brittle nail", "nail separation"],
+    "content": "Onychomycosis is a fungal infection of the nail, most often by dermatophytes. Findings: nail thickening, subungual hyperkeratosis, yellow-brown discoloration, onycholysis (separation from the nail bed), and crumbling; toenails are affected more than fingernails. Because clinical appearance overlaps with psoriasis and trauma, diagnosis should be confirmed (KOH microscopy, culture, or PAS/histology) before prolonged therapy. Treatment: oral antifungals (terbinafine first-line for dermatophytes; itraconazole) achieve higher cure rates than topicals; topical agents (efinaconazole, ciclopirox) suit mild disease or when oral therapy is contraindicated. Treatment is prolonged and recurrence is common."
+  },
+  {
+    "id": "kb-hidradenitis-suppurativa",
+    "title": "Hidradenitis Suppurativa — Diagnosis and Management",
+    "conditionCategory": "Inflammatory",
+    "icdCode": "L73.2",
+    "source": "United States and Canadian Hidradenitis Suppurativa Foundations joint management guidelines",
+    "keywords": ["hidradenitis", "boils", "recurrent boils", "armpit lumps", "groin lumps", "abscess", "painful nodules", "sinus tracts", "underarm", "inframammary", "draining"],
+    "content": "Hidradenitis suppurativa (HS) is a chronic, recurrent inflammatory disease of the follicular unit affecting intertriginous, apocrine-gland-bearing areas (axillae, groin, inframammary, perineal). It presents with painful inflammatory nodules and abscesses that can progress to draining sinus tracts and rope-like scarring. Smoking and obesity are risk factors. Hurley staging guides therapy. Management: topical clindamycin and antiseptic washes for mild disease; oral antibiotics (tetracyclines, or clindamycin+rifampin), hormonal therapy, and biologics (adalimumab) for moderate-to-severe disease; surgery for chronic sinus tracts. Lifestyle measures (smoking cessation, weight management) are advised."
+  },
+  {
+    "id": "kb-molluscum-contagiosum",
+    "title": "Molluscum Contagiosum — Diagnosis and Management",
+    "conditionCategory": "Viral",
+    "icdCode": "B08.1",
+    "source": "American Academy of Dermatology (AAD); DermNet",
+    "keywords": ["molluscum", "small bumps", "pearly bumps", "dimpled", "umbilicated", "flesh colored bumps", "children bumps", "contagious bumps", "dome shaped"],
+    "content": "Molluscum contagiosum is a common self-limited poxvirus infection, most frequent in children and in skin-to-skin/contact settings. It presents as discrete, firm, dome-shaped, flesh-colored to pearly papules with a characteristic central umbilication (dimple). Lesions can spread by autoinoculation and are usually asymptomatic though sometimes mildly itchy. In most immunocompetent people it resolves spontaneously over months. Options when treatment is desired: cryotherapy, curettage, cantharidin, or topical agents. Widespread or persistent lesions in an immunocompromised patient warrant evaluation."
+  },
+  {
+    "id": "kb-verruca-warts",
+    "title": "Common Warts (Verruca Vulgaris) — Diagnosis and Management",
+    "conditionCategory": "Viral",
+    "icdCode": "B07.9",
+    "source": "American Academy of Dermatology (AAD); DermNet",
+    "keywords": ["wart", "warts", "verruca", "rough bump", "hard bump", "plantar wart", "hands warts", "hpv", "cauliflower", "black dots"],
+    "content": "Common warts are benign epidermal proliferations caused by human papillomavirus (HPV). They appear as firm, rough, hyperkeratotic papules with a cauliflower-like surface and thrombosed capillaries seen as tiny black dots; plantar warts occur on the soles and can be painful. Many resolve spontaneously, especially in children. Treatments include topical salicylic acid, cryotherapy (liquid nitrogen), and, for resistant lesions, other destructive or immunotherapy options. Recurrence is common. Reassure that they are generally benign but contagious by direct contact."
+  },
+  {
+    "id": "kb-cellulitis",
+    "title": "Cellulitis — Recognition and Management",
+    "conditionCategory": "Bacterial",
+    "icdCode": "L03.90",
+    "source": "Infectious Diseases Society of America (IDSA) skin and soft tissue infection guidelines",
+    "keywords": ["cellulitis", "spreading redness", "hot skin", "swollen", "warm tender", "red hot swollen", "fever", "leg infection", "expanding redness", "skin infection"],
+    "content": "Cellulitis is an acute bacterial infection of the dermis and subcutaneous tissue, usually by streptococci or Staphylococcus aureus, most often on the lower leg. It presents as an area of spreading erythema that is warm, tender, and swollen, frequently with poorly demarcated borders; fever and malaise may occur. It is typically unilateral. Rapidly spreading infection, severe pain out of proportion, bullae, necrosis, or systemic toxicity suggests a serious infection (e.g., necrotizing fasciitis) and is a medical emergency. Management: oral or IV antibiotics depending on severity, limb elevation, and marking the border to monitor progression. Seek urgent care for rapid spread, high fever, or severe pain."
+  },
+  {
+    "id": "kb-folliculitis",
+    "title": "Folliculitis — Diagnosis and Management",
+    "conditionCategory": "Bacterial",
+    "icdCode": "L73.9",
+    "source": "DermNet; American Academy of Dermatology (AAD)",
+    "keywords": ["folliculitis", "hair follicle", "razor bumps", "shaving bumps", "itchy pustules", "small pustules", "hot tub rash", "ingrown hair", "beard bumps"],
+    "content": "Folliculitis is inflammation of hair follicles presenting as clusters of small erythematous papules and pustules, often pierced by a central hair, with itching or mild tenderness. Causes include bacterial infection (commonly S. aureus), irritation from shaving, occlusion, and Pseudomonas ('hot tub' folliculitis); Malassezia (fungal) folliculitis affects the trunk. Most mild cases resolve with antiseptic washes and avoiding shaving/occlusion. Bacterial cases may need topical or oral antibiotics; suspected fungal folliculitis needs antifungals rather than antibiotics. Recurrent or deep lesions warrant evaluation."
+  },
+  {
+    "id": "kb-alopecia-areata",
+    "title": "Alopecia Areata — Diagnosis and Management",
+    "conditionCategory": "Hair",
+    "icdCode": "L63.9",
+    "source": "American Academy of Dermatology (AAD); National Alopecia Areata Foundation",
+    "keywords": ["alopecia", "hair loss", "bald patch", "bald spot", "patchy hair loss", "round bald", "eyebrow loss", "beard loss", "sudden hair loss"],
+    "content": "Alopecia areata is an autoimmune condition causing non-scarring hair loss. It classically presents as smooth, round-to-oval patches of complete hair loss with preserved follicular openings; 'exclamation-mark' hairs may be seen at the margins. It can progress to loss of all scalp hair (alopecia totalis) or all body hair (alopecia universalis) and may affect eyebrows, beard, or eyelashes. Nail pitting can accompany it. Course is unpredictable with possible spontaneous regrowth. Treatments include intralesional or topical corticosteroids, topical immunotherapy, and, for extensive disease, oral JAK inhibitors. Address psychosocial impact."
+  },
+  {
+    "id": "kb-seborrheic-keratosis",
+    "title": "Seborrheic Keratosis — Recognition",
+    "conditionCategory": "Benign Growth",
+    "icdCode": "L82.1",
+    "source": "American Academy of Dermatology (AAD); DermNet",
+    "keywords": ["seborrheic keratosis", "stuck on", "waxy", "warty growth", "brown growth", "wart like", "barnacle", "benign growth", "raised brown"],
+    "content": "Seborrheic keratosis is a very common benign epidermal growth in older adults. Lesions are well-demarcated, waxy, 'stuck-on'-appearing papules or plaques ranging from tan to dark brown to black, with a verrucous or greasy surface; they may have visible keratin plugs. They are harmless. Because heavily pigmented lesions can occasionally mimic melanoma, any lesion with atypical features, rapid change, or diagnostic uncertainty should be evaluated (and biopsied if needed). Removal (cryotherapy, curettage, shave) is optional and typically cosmetic or for irritated lesions."
+  },
+  {
+    "id": "kb-actinic-keratosis",
+    "title": "Actinic Keratosis (Solar Keratosis) — Diagnosis and Management",
+    "conditionCategory": "Premalignant",
+    "icdCode": "L57.0",
+    "source": "American Academy of Dermatology (AAD); Skin Cancer Foundation",
+    "keywords": ["actinic keratosis", "solar keratosis", "rough patch", "sandpaper", "sun damage", "scaly spot", "precancerous", "sun exposed", "crusty spot"],
+    "content": "Actinic keratoses are rough, scaly, erythematous or skin-colored patches on chronically sun-exposed skin (face, scalp, ears, dorsal hands) that are often better felt (sandpaper texture) than seen. They are precancerous, with a small risk of progression to squamous cell carcinoma, so persistent, thickened, tender, or bleeding lesions warrant evaluation. Management: field therapy (topical 5-fluorouracil, imiquimod, or photodynamic therapy) for multiple lesions and cryotherapy for isolated ones, plus strict sun protection. Any lesion that is indurated, ulcerated, or rapidly growing should be biopsied to exclude SCC."
+  },
+  {
+    "id": "kb-pityriasis-rosea",
+    "title": "Pityriasis Rosea — Diagnosis and Management",
+    "conditionCategory": "Inflammatory",
+    "icdCode": "L42",
+    "source": "DermNet; American Academy of Dermatology (AAD)",
+    "keywords": ["pityriasis rosea", "herald patch", "christmas tree", "oval patches", "scaly oval", "trunk rash", "collarette scale", "self limiting rash"],
+    "content": "Pityriasis rosea is a common self-limited eruption, likely viral (HHV-6/7) associated. It classically begins with a single larger 'herald patch' (a scaly oval plaque with a trailing collarette of scale), followed days later by smaller oval scaly plaques on the trunk oriented along skin cleavage lines in a 'Christmas-tree' pattern. Mild itch is common. It typically resolves over 6–8 weeks without treatment; management is symptomatic (emollients, antihistamines or topical steroids for itch). Because early secondary syphilis can mimic it, atypical presentations (palms/soles involvement, risk factors) warrant testing."
+  },
+  {
+    "id": "kb-lichen-planus",
+    "title": "Lichen Planus — Diagnosis and Management",
+    "conditionCategory": "Inflammatory",
+    "icdCode": "L43.9",
+    "source": "American Academy of Dermatology (AAD); DermNet",
+    "keywords": ["lichen planus", "purple bumps", "violaceous", "flat topped", "itchy purple", "wickham", "wrists ankles", "oral white lace", "polygonal papules"],
+    "content": "Lichen planus is an inflammatory condition characterized by the 'six Ps': pruritic, polygonal, planar (flat-topped), purple (violaceous) papules and plaques, often with fine white reticulated lines (Wickham striae). Common sites are the flexor wrists, forearms, and ankles; oral involvement shows lacy white streaks, and nail and scalp forms occur. It may koebnerize. Most cutaneous disease is self-limited over months to a couple of years. Treatment: high-potency topical corticosteroids first-line, with phototherapy or systemic agents for widespread or erosive disease. Consider drug-induced lichenoid reactions and hepatitis C association in appropriate patients."
+  },
+  {
+    "id": "kb-dyshidrotic-eczema",
+    "title": "Dyshidrotic Eczema (Pompholyx) — Diagnosis and Management",
+    "conditionCategory": "Eczema",
+    "icdCode": "L30.1",
+    "source": "DermNet; American Academy of Dermatology (AAD)",
+    "keywords": ["dyshidrotic", "pompholyx", "tiny blisters", "hand blisters", "finger blisters", "itchy blisters", "sides of fingers", "tapioca", "foot blisters", "peeling hands"],
+    "content": "Dyshidrotic eczema (pompholyx) is a form of eczema presenting with crops of intensely itchy, deep-seated small vesicles ('tapioca-like') on the palms, sides of the fingers, and soles, which may coalesce and later desquamate. Flares are associated with stress, sweating, and contact irritants/allergens (e.g., nickel). Management: frequent emollients, avoidance of irritants and known allergens, potent topical corticosteroids during flares, and cool compresses for oozing; severe/refractory cases may need phototherapy or systemic therapy. Secondary bacterial infection should be treated if present."
+  },
+  {
+    "id": "kb-perioral-dermatitis",
+    "title": "Perioral Dermatitis — Diagnosis and Management",
+    "conditionCategory": "Dermatitis",
+    "icdCode": "L71.0",
+    "source": "DermNet; American Academy of Dermatology (AAD)",
+    "keywords": ["perioral dermatitis", "around mouth", "around nose", "small red bumps mouth", "sparing lip border", "steroid rash", "papulopustular face", "burning rash face"],
+    "content": "Perioral dermatitis is a papulopustular facial eruption of small erythematous papules, pustules, and scaling clustered around the mouth (characteristically sparing a clear zone at the vermilion border), and sometimes around the nose and eyes. Burning or stinging is more typical than itch. Topical corticosteroid use is a common precipitant/aggravator. Management: STOP topical steroids and heavy cosmetics/occlusive products ('zero therapy'), and use topical metronidazole, azelaic acid, or erythromycin; oral tetracyclines for more resistant cases. Improvement can take several weeks, and a transient flare after stopping steroids is common."
+  }
+]

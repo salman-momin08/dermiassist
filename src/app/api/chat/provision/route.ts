@@ -21,9 +21,40 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: 'Missing patientId' }, { status: 400 });
         }
 
-        // In a real production app, you would query the DB here to ensure the 
-        // doctor (user.id) and patient (patientId) actually have an active appointment/connection.
-        // For this implementation, we rely on the caller being the authenticated doctor.
+        // Confirm the caller is a verified doctor.
+        const { data: callerProfile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role, verified')
+            .eq('id', user.id)
+            .single();
+
+        if (profileError || !callerProfile || callerProfile.role !== 'doctor' || !callerProfile.verified) {
+            return NextResponse.json(
+                { message: 'Forbidden: Only verified doctors can provision consultation channels' },
+                { status: 403 }
+            );
+        }
+
+        // Confirm an ACCEPTED connection exists between this doctor and the target patient
+        // before creating/joining the channel.
+        const { data: connection, error: connectionError } = await supabase
+            .from('connection_requests')
+            .select('id')
+            .eq('doctor_id', user.id)
+            .eq('patient_id', patientId)
+            .eq('status', 'accepted')
+            .maybeSingle();
+
+        if (connectionError) {
+            return NextResponse.json({ message: connectionError.message }, { status: 500 });
+        }
+
+        if (!connection) {
+            return NextResponse.json(
+                { message: 'Forbidden: No accepted connection with this patient' },
+                { status: 403 }
+            );
+        }
 
         const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY!;
         const apiSecret = process.env.STREAM_API_SECRET!;

@@ -46,7 +46,9 @@ export const telemetry = {
         flowName: string;
         executionTimeMs: number;
         success: boolean;
-        tokensUsed: number;
+        // Real token usage reported by the model, when available. Omitted/null when
+        // the underlying flow does not surface usage — never a fabricated estimate.
+        tokensUsed?: number | null;
         metadata?: Record<string, unknown>;
     }): void {
         logger.info('telemetry.ai.execution', event);
@@ -150,7 +152,7 @@ export function recordAiTelemetry(event: {
     flowName: string;
     executionTimeMs: number;
     success: boolean;
-    tokensUsed: number;
+    tokensUsed?: number | null;
     metadata?: Record<string, unknown>;
 }): void {
     telemetry.recordAiTelemetry(event);

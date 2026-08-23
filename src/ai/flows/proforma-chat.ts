@@ -86,7 +86,9 @@ Based on the patient's conversation history and suspected condition (${input.con
             nextQuestion: response.output.nextQuestion,
             suggestedAnswers: response.output.suggestedAnswers || [],
             isComplete: Boolean(response.output.isComplete),
-            confidenceScore: typeof response.output.confidenceScore === 'number' ? response.output.confidenceScore : 75,
+            // Pass through the model's real confidence; leave undefined (unknown) when the
+            // model did not provide one rather than inventing a passing default.
+            confidenceScore: typeof response.output.confidenceScore === 'number' ? response.output.confidenceScore : undefined,
           };
         }
 
@@ -96,7 +98,8 @@ Based on the patient's conversation history and suspected condition (${input.con
           return {
             nextQuestion: rawText,
             isComplete: false,
-            confidenceScore: 70,
+            // Confidence unknown for raw-text fallback — do not fabricate a number.
+            confidenceScore: undefined,
           };
         }
       } catch (err: any) {

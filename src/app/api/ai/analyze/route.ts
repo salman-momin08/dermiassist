@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeMultiAgentPipeline } from '@/ai/orchestrator';
 import { checkRateLimit, RateLimitPresets } from '@/lib/redis/rate-limit';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
     try {
@@ -31,38 +32,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Handle OpenAI GPT-4o direct provider execution
-        if (provider === 'openai') {
-            const { runOpenAIDiseaseSynthesis } = await import('@/ai/providers/openai-service');
-            const openaiReport = await runOpenAIDiseaseSynthesis({
-                patientSymptoms: symptoms,
-                triage: {
-                    riskLevel: 'routine',
-                    clinicalRecommendation: 'Evaluated by OpenAI GPT-4o Reasoning Engine.',
-                    redFlagsDetected: [],
-                },
-                vision: {
-                    lesionType: 'Macule / Plaque',
-                    colorProfile: ['Erythematous Red'],
-                    borderCharacteristics: 'well-demarcated',
-                    suspectedConditions: ['Eczema', 'Dermatitis', 'Psoriasis'],
-                    visualConfidence: 93,
-                },
-                ragGroundingText: 'Standard Clinical Dermatology Guidelines (ICD-10 Grounded)',
-                citations: ['American Academy of Dermatology Guidelines 2024'],
-            });
-
-            return NextResponse.json({
-                success: true,
-                cached: false,
-                report: openaiReport,
-                executionTimeMs: 1250,
-                provider: 'OpenAI (GPT-4o)',
-                microservice: 'Next.js (OpenAI Engine)',
-            });
-        }
-
-        // 1. Try FastAPI Python Microservice (Port 8000)
+        // 1. Primary engine: FastAPI Python Microservice — REAL Gemini/OpenAI
+        //    inference with honest failure (no fabricated diagnosis). Both
+        //    providers route here so model health is reported consistently.
         try {
             const fastApiUrl = process.env.PYTHON_AI_SERVICE_URL || process.env.FASTAPI_SERVICE_URL || 'http://localhost:8000';
             const fastApiResponse = await fetch(`${fastApiUrl}/api/v1/analyze`, {
@@ -72,8 +44,10 @@ export async function POST(request: NextRequest) {
                     symptoms,
                     image_url: imageUrl,
                     body_location: bodyLocation,
+                    provider: provider === 'openai' ? 'openai' : 'gemini',
                 }),
-                signal: AbortSignal.timeout(500), // 500ms fast connection timeout
+                // Real model calls take time; allow the pipeline to complete.
+                signal: AbortSignal.timeout(30000),
             });
 
             if (fastApiResponse.ok) {
@@ -83,11 +57,29 @@ export async function POST(request: NextRequest) {
                     microservice: 'FastAPI (Python)',
                 });
             }
-        } catch {
-            // FastAPI offline -> Seamless fallback to TypeScript Genkit Engine
+
+            // Primary engine reachable but returned a non-OK status — surface it in
+            // monitoring so a degraded Python engine is not silently masked.
+            logger.error('ai.analyze.primary_engine_failed', {
+                reason: 'non_ok_response',
+                status: fastApiResponse.status,
+                userId,
+            });
+        } catch (primaryError) {
+            // FastAPI offline / timeout -> fall back to the TypeScript Genkit engine below.
+            // Log the failure so a down primary engine is visible in monitoring.
+            logger.error('ai.analyze.primary_engine_failed', {
+                reason: 'unreachable',
+                errorMessage: primaryError instanceof Error ? primaryError.message : String(primaryError),
+                userId,
+            });
         }
 
         // 2. TypeScript Multi-Agent Orchestrator Fallback Engine
+        logger.warn('ai.analyze.fallback_engine_served', {
+            engine: 'Next.js (TypeScript Engine)',
+            userId,
+        });
         const result = await executeMultiAgentPipeline({
             symptoms,
             imageUrl,

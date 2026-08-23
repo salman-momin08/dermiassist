@@ -79,19 +79,11 @@ export async function runSynthesisAgent(input: z.infer<typeof SynthesisInputSche
 
         return result.output;
     } catch (err) {
+        // Honest failure: the synthesis model is the diagnostic authority here.
+        // Rather than fabricating a differential (which would mask a broken model
+        // behind confident-looking output), surface the failure so the caller can
+        // report it and it can be fixed on priority.
         logger.error('agent.synthesis.failed', { error: String(err) });
-        return {
-            primaryConditionName: input.vision.suspectedConditions[0] || 'Dermatitis',
-            icdCode: 'L30.9',
-            confidenceScore: input.vision.visualConfidence || 75,
-            severity: 'Moderate',
-            summary: 'Preliminary analysis indicates skin irritation consistent with dermatitis. Grounded literature recommends gentle skin care.',
-            dosAndDonts: {
-                dos: ['Apply fragrance-free moisturizers twice daily', 'Keep skin clean and dry', 'Consult a dermatologist for confirmation'],
-                donts: ['Scratch or pick at affected area', 'Apply harsh chemical soaps', 'Delay seeking professional medical advice'],
-            },
-            treatmentGuidelines: ['Topical emollient therapy', 'Over-the-counter hydrocortisone 1% cream if approved by physician'],
-            citationsUsed: input.citations.length > 0 ? input.citations : ['American Academy of Dermatology Guidelines'],
-        };
+        throw err instanceof Error ? err : new Error(String(err));
     }
 }
