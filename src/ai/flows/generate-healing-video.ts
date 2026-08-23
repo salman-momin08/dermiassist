@@ -87,11 +87,13 @@ const generateHealingVideoFlow = ai.defineFlow(
         throw new Error('Failed to find the generated video');
     }
 
-    // Veo returns a URL, we need to fetch it and convert to a data URI for the client
+    // Veo returns a URL, we need to fetch it and convert to a data URI for the client.
+    // Key goes in a header, not the URL query string, so it can't leak via logs,
+    // proxies, or an error message that echoes the request URL.
     const fetch = (await import('node-fetch')).default;
-    const videoDownloadResponse = await fetch(
-        `${video.media.url}&key=${process.env.GEMINI_API_KEY}`
-    );
+    const videoDownloadResponse = await fetch(video.media.url!, {
+        headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY || '' },
+    });
 
     if (!videoDownloadResponse.ok || !videoDownloadResponse.body) {
         throw new Error(`Failed to download video: ${videoDownloadResponse.statusText}`);

@@ -107,7 +107,7 @@ async def analyze_symptoms(request: AnalysisRequest):
             symptoms=request.symptoms,
             image_url=request.image_url,
             body_location=request.body_location,
-            provider=request.provider or "gemini"
+            provider=request.provider or "openai"
         )
         return res
     except Exception as e:
@@ -137,7 +137,7 @@ async def admin_ingest_knowledge_base():
 
 
 @app.get("/api/v1/eval/run", tags=["AI Diagnostic Engine"])
-async def run_benchmark_evals(provider: str = "gemini"):
+async def run_benchmark_evals(provider: str = "openai"):
     """
     Run the LLM-as-a-Judge benchmark suite against the REAL model engine.
     Reports true diagnostic accuracy plus explicit model-health status — a case

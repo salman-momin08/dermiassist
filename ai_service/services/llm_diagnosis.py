@@ -15,12 +15,17 @@ Design principles (per product decision):
     so a broken model is caught and fixed on priority instead of silently serving
     fake clinical output.
 
-Provider order: Google Gemini 2.5 Flash (primary) -> OpenAI GPT-4o (secondary).
-Both are attempted only with a configured API key; the circuit breaker short-
-circuits providers that are repeatedly failing.
+Provider order: OpenAI GPT-4o (primary) -> Google Gemini (secondary).
+GPT-4o is the dedicated clinical-reasoning engine for differential diagnosis;
+Gemini is kept only as a fallback so the app still returns a report if OpenAI
+errors or rate-limits, rather than depending on a single always-on-call
+generalist model for the diagnostic path. Both are attempted only with a
+configured API key; the circuit breaker short-circuits providers that are
+repeatedly failing.
 """
 
 import os
+import re
 import json
 import time
 import logging
@@ -45,7 +50,7 @@ GEMINI_API_KEY = (
 )
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3-flash"
 OPENAI_MODEL = "gpt-4o"
 
 # Required keys the model must return for a diagnosis to count as well-formed.
@@ -104,6 +109,23 @@ def _build_user_prompt(
     )
 
 
+def _sanitize_error(message: str) -> str:
+    """
+    Strip API keys/secrets out of an error string before it is logged or
+    returned to any client. Errors from the underlying HTTP client (httpx)
+    include the raw request URL/headers, which must never surface a secret —
+    this is defense-in-depth on top of never putting keys in URLs.
+    """
+    sanitized = message
+    for secret in (GEMINI_API_KEY, OPENAI_API_KEY):
+        if secret:
+            sanitized = sanitized.replace(secret, "[REDACTED]")
+    # Catch any remaining `key=<value>` query-param style leaks (e.g. from a
+    # future call site that forgets this convention).
+    sanitized = re.sub(r"([?&]key=)[^&\s'\"]+", r"\1[REDACTED]", sanitized)
+    return sanitized
+
+
 def _extract_json(text: str) -> Dict[str, Any]:
     """Parse a JSON object from a model response, tolerating markdown fences."""
     cleaned = text.strip()
@@ -131,10 +153,11 @@ def _validate_diagnosis(data: Dict[str, Any]) -> Dict[str, Any]:
 
 async def _call_gemini(user_prompt: str) -> Dict[str, Any]:
     """Call Gemini via the REST API. Raises on any failure."""
-    url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-    )
+    # Key goes in a header, never the URL query string — httpx's auto-generated
+    # error messages (and any logs/UI that surface them) include the request
+    # URL verbatim, so a `?key=...` query param would leak the secret on every
+    # failed call.
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
     payload = {
         "system_instruction": {"parts": [{"text": _SYSTEM_INSTRUCTION}]},
         "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
@@ -144,7 +167,7 @@ async def _call_gemini(user_prompt: str) -> Dict[str, Any]:
         },
     }
     async with httpx.AsyncClient(timeout=20.0) as client:
-        resp = await client.post(url, json=payload)
+        resp = await client.post(url, json=payload, headers={"x-goog-api-key": GEMINI_API_KEY})
         resp.raise_for_status()
         data = resp.json()
         text = data["candidates"][0]["content"]["parts"][0]["text"]
@@ -181,7 +204,7 @@ async def generate_differential_diagnosis(
     vision_findings: Optional[Dict[str, Any]] = None,
     rag_grounding: Optional[str] = None,
     body_location: Optional[str] = None,
-    preferred_provider: str = "gemini",
+    preferred_provider: str = "openai",
 ) -> Dict[str, Any]:
     """
     Produce a structured differential diagnosis via a real LLM call.
@@ -241,8 +264,9 @@ async def generate_differential_diagnosis(
                 }
             except Exception as e:
                 gemini_circuit_breaker.record_failure()
-                logger.error(f"Gemini diagnosis failed: {e}")
-                attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": str(e)})
+                safe_error = _sanitize_error(str(e))
+                logger.error(f"Gemini diagnosis failed: {safe_error}")
+                attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": safe_error})
 
         else:  # OpenAI
             if not OPENAI_API_KEY:
@@ -260,8 +284,9 @@ async def generate_differential_diagnosis(
                     "data": data,
                 }
             except Exception as e:
-                logger.error(f"OpenAI diagnosis failed: {e}")
-                attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": str(e)})
+                safe_error = _sanitize_error(str(e))
+                logger.error(f"OpenAI diagnosis failed: {safe_error}")
+                attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": safe_error})
 
     # Every provider failed — surface the failure, do NOT fabricate a diagnosis.
     error_summary = "; ".join(

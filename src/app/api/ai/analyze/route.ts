@@ -44,7 +44,9 @@ export async function POST(request: NextRequest) {
                     symptoms,
                     image_url: imageUrl,
                     body_location: bodyLocation,
-                    provider: provider === 'openai' ? 'openai' : 'gemini',
+                    // Detection/analysis defaults to OpenAI (dedicated diagnostic-reasoning
+                    // engine); Gemini is only used for this path if explicitly requested.
+                    provider: provider === 'gemini' ? 'gemini' : 'openai',
                 }),
                 // Real model calls take time; allow the pipeline to complete.
                 signal: AbortSignal.timeout(30000),

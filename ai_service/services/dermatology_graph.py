@@ -38,7 +38,7 @@ class DermatologyState(TypedDict):
     final_evaluation: Optional[Dict[str, Any]]
     error: Optional[str]
 
-def _get_gemini_model(model_name: str = "gemini-2.5-flash"):
+def _get_gemini_model(model_name: str = "gemini-3-flash"):
     """Initialize Google Gemini client safely."""
     genai = _get_genai_module()
     if not genai:
@@ -86,7 +86,7 @@ Do not provide any other information, summary, or recommendations. Return ONLY t
             elif "image/webp" in header:
                 mime_type = "image/webp"
 
-        model = _get_gemini_model("gemini-2.5-flash")
+        model = _get_gemini_model("gemini-3-flash")
         if not model:
             raise RuntimeError("Gemini model not initialized")
         
@@ -169,7 +169,7 @@ Rules:
 Based on the above patient history and the suspected condition ({condition_name}), ask the single most important next clinical question:"""
 
     try:
-        model = _get_gemini_model("gemini-2.5-flash")
+        model = _get_gemini_model("gemini-3-flash")
         if not model:
             raise RuntimeError("Gemini model not initialized")
         
@@ -242,7 +242,7 @@ Return a valid JSON object matching this exact structure:
 Return ONLY valid JSON."""
 
     try:
-        model = _get_gemini_model("gemini-2.5-flash")
+        model = _get_gemini_model("gemini-3-flash")
         if not model:
             raise RuntimeError("Gemini model not initialized")
         
@@ -368,7 +368,7 @@ Rules:
 2. Return ONLY a JSON list of 3-4 strings. Example: ["Option 1", "Option 2", "Option 3"]
 """
     try:
-        model = _get_gemini_model("gemini-2.5-flash")
+        model = _get_gemini_model("gemini-3-flash")
         if model:
             res = await asyncio.to_thread(model.generate_content, prompt)
             text = res.text.strip()

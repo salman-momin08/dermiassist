@@ -25,11 +25,16 @@ async def generate_embedding_python(text: str) -> List[float]:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY not configured; cannot generate embedding")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={GEMINI_API_KEY}"
+    # Key goes in a header, not the URL query string — httpx's auto-generated
+    # error messages include the request URL verbatim, so a `?key=...` query
+    # param would leak the secret to logs/clients on every failed call.
+    url = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
     payload = {"content": {"parts": [{"text": text}]}}
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=payload, timeout=10.0)
+        resp = await client.post(
+            url, json=payload, timeout=10.0, headers={"x-goog-api-key": GEMINI_API_KEY}
+        )
         resp.raise_for_status()
         data = resp.json()
 
