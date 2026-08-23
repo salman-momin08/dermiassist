@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        const provider = request.nextUrl.searchParams.get('provider') || 'gemini';
+        const provider = request.nextUrl.searchParams.get('provider') || 'openai';
         const fastApiUrl =
             process.env.PYTHON_AI_SERVICE_URL ||
             process.env.FASTAPI_SERVICE_URL ||

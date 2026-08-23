@@ -59,11 +59,13 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
     for (const modelName of modelsToTry) {
         try {
+            // Key goes in a header, not the URL query string — a `?key=...` query
+            // param can end up in logs, error messages, or network traces.
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:embedContent?key=${apiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:embedContent`,
                 {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
                     body: JSON.stringify({
                         content: {
                             parts: [{ text }],

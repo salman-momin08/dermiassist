@@ -10,7 +10,7 @@ import { Cpu, Database, Zap, Award, Activity, RefreshCw, CheckCircle2, AlertTria
 
 export default function AIEngineeringDashboard() {
     const [symptomsInput, setSymptomsInput] = useState('Itchy red elevated rash on inner elbows for 3 weeks, dry skin');
-    const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'openai'>('gemini');
+    const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'openai'>('openai');
     const [loading, setLoading] = useState(false);
     const [evalLoading, setEvalLoading] = useState(false);
     const [mcpLoading, setMcpLoading] = useState(false);

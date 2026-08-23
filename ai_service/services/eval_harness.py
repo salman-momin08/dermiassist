@@ -90,7 +90,7 @@ async def _evaluate_case(case: Dict[str, Any], provider: str) -> Dict[str, Any]:
     }
 
 
-async def run_eval_harness(provider: str = "gemini") -> Dict[str, Any]:
+async def run_eval_harness(provider: str = "openai") -> Dict[str, Any]:
     """Run all benchmark cases concurrently against the real model engine."""
     benchmarks = _load_benchmarks()
 

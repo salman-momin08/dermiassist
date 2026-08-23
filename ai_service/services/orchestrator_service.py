@@ -24,7 +24,7 @@ async def run_multi_agent_pipeline(
     symptoms: str,
     image_url: Optional[str] = None,
     body_location: Optional[str] = None,
-    provider: str = "gemini",
+    provider: str = "openai",
 ) -> Dict[str, Any]:
     start_time = time.time()
     trace = []

@@ -98,7 +98,7 @@ const explainReportMultimodalFlow = ai.defineFlow(
     
     // 2. Generate the TTS audio from the explanation text
     const { media } = await ai.generate({
-      model: googleAI.model('gemini-2.5-flash-preview-tts'),
+      model: googleAI.model('gemini-3.1-flash-tts-preview'),
       config: {
         responseModalities: ['AUDIO'],
         speechConfig: {
