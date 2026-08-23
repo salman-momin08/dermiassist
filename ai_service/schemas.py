@@ -12,15 +12,18 @@ class AnalysisRequest(BaseModel):
     symptoms: str = Field(..., description="Detailed patient symptoms, onset, and duration.", example="Itchy red elevated rash on inner elbows for 3 weeks")
     image_url: Optional[str] = Field(None, description="Cloudinary URL of lesion photo")
     body_location: Optional[str] = Field(None, description="Body location of lesion", example="inner arms")
+    provider: Optional[str] = Field("gemini", description="Preferred LLM provider: 'gemini' or 'openai'")
 
 class DiagnosticReport(BaseModel):
     primary_condition_name: str
     icd_code: str
-    severity: str  # Mild | Moderate | Severe
+    severity: str  # Mild | Moderate | Severe | Critical
     confidence_score: float
     summary: str
     key_findings: List[str]
     recommended_treatments: List[str]
+    dos: List[str] = []
+    donts: List[str] = []
     citations_used: List[str]
     disclaimer: str
 
@@ -28,12 +31,28 @@ class AgentTraceStep(BaseModel):
     agent: str
     duration_ms: float
     status: str
+    model: Optional[str] = None
+
+class ModelAttempt(BaseModel):
+    provider: str
+    model: str
+    ok: bool
+    error: Optional[str] = None
+
+class ModelMetadata(BaseModel):
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    synthesis_latency_ms: Optional[float] = None
+    attempts: List[ModelAttempt] = []
 
 class AnalysisResponse(BaseModel):
     success: bool
     execution_time_ms: float
     cached: bool
-    report: DiagnosticReport
+    # report is None on honest model failure — no diagnosis is fabricated.
+    report: Optional[DiagnosticReport] = None
+    model_metadata: Optional[ModelMetadata] = None
+    error: Optional[str] = None
     agent_trace: List[AgentTraceStep]
 
 # ── 2. RAG VECTOR SEARCH SCHEMAS ─────────────────────────────────
@@ -65,8 +84,9 @@ class DrugInteractionRequest(BaseModel):
     oral_medication: Optional[str] = Field(None, example="Isotretinoin")
 
 class DrugInteractionResponse(BaseModel):
-    safe_to_combine: bool
-    interaction_risk_level: str  # none | moderate | severe
+    # None = not assessed by the rule set (do NOT interpret as "safe").
+    safe_to_combine: Optional[bool] = None
+    interaction_risk_level: str  # none | moderate | severe | unknown
     warning_message: str
     recommended_spacing_hours: Optional[int] = None
 
@@ -91,17 +111,24 @@ class HealingTrackRequest(BaseModel):
     current_image_url: str = Field(..., description="Follow-up lesion photo Cloudinary URL")
     days_elapsed: int = Field(14, ge=1, le=365, description="Days between baseline and follow-up photo")
 
-class HealingMetrics(BaseModel):
-    surface_area_reduction_percentage: float
-    erythema_fading_index: float
-    healing_velocity_score: float
-    clinical_trajectory: str
+class LesionAssessment(BaseModel):
+    success: bool
+    top_prediction: Optional[str] = None
+    confidence: Optional[float] = None
+    model_used: Optional[str] = None
+    error: Optional[str] = None
 
 class HealingTrackResponse(BaseModel):
     success: bool
-    metrics: HealingMetrics
-    summary_report: str
-    is_healing_satisfactorily: bool
+    days_elapsed: int
+    baseline_assessment: LesionAssessment
+    followup_assessment: LesionAssessment
+    # Quantitative surface-area / erythema metrics require real image
+    # segmentation, which is NOT implemented — we do not fabricate them.
+    quantitative_metrics_available: bool = False
+    classification_changed: Optional[bool] = None
+    note: str
+    error: Optional[str] = None
 
 
 # ── 5. LANGGRAPH MULTI-AGENT DIAGNOSTIC SCHEMAS ──────────────────

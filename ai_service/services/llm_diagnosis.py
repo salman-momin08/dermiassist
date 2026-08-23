@@ -1,0 +1,259 @@
+"""
+Dynamic LLM Differential Diagnosis Service (Python).
+
+This is the single source of truth for turning symptoms (+ optional vision/RAG
+context) into a structured dermatological differential using a REAL model call.
+
+Design principles (per product decision):
+  * Dynamic, not hardcoded — the condition, ICD code, severity, and guidance all
+    come from the model's response, never from a canned template.
+  * Transparent — every result reports exactly which provider/model produced it
+    and how long it took.
+  * Honest failure — if the model cannot be reached (no key, quota, timeout,
+    circuit open, malformed output), we return success=False with the error and
+    NO fabricated diagnosis. Callers must surface the failure rather than mask it,
+    so a broken model is caught and fixed on priority instead of silently serving
+    fake clinical output.
+
+Provider order: Google Gemini 2.5 Flash (primary) -> OpenAI GPT-4o (secondary).
+Both are attempted only with a configured API key; the circuit breaker short-
+circuits providers that are repeatedly failing.
+"""
+
+import os
+import json
+import time
+import logging
+from typing import Dict, Any, Optional, List
+
+import httpx
+from dotenv import load_dotenv
+
+from ai_service.utils.circuit_breaker import (
+    gemini_circuit_breaker,
+    CircuitBreakerOpenException,
+)
+
+load_dotenv()
+logger = logging.getLogger("LLMDiagnosis")
+
+GEMINI_API_KEY = (
+    os.getenv("GEMINI_API_KEY")
+    or os.getenv("GOOGLE_GENAI_API_KEY")
+    or os.getenv("GOOGLE_API_KEY")
+    or ""
+)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+GEMINI_MODEL = "gemini-2.5-flash"
+OPENAI_MODEL = "gpt-4o"
+
+# Required keys the model must return for a diagnosis to count as well-formed.
+_REQUIRED_FIELDS = {"condition", "icd_code", "confidence", "severity", "summary"}
+
+_SYSTEM_INSTRUCTION = (
+    "You are an expert board-certified dermatologist AI performing differential "
+    "diagnosis. Analyze the patient's symptoms together with any vision findings "
+    "and grounded literature provided. Respond with STRICTLY VALID JSON only "
+    "(no markdown, no prose) matching exactly this schema:\n"
+    "{\n"
+    '  "condition": "most likely primary condition name",\n'
+    '  "icd_code": "ICD-10 code",\n'
+    '  "confidence": 0-100 number,\n'
+    '  "severity": "Mild" | "Moderate" | "Severe" | "Critical",\n'
+    '  "summary": "concise clinical summary",\n'
+    '  "dos": ["3 specific care steps"],\n'
+    '  "donts": ["3 specific things to avoid"],\n'
+    '  "treatment_guidelines": ["standard treatment pathways"],\n'
+    '  "differential": ["2-4 alternative conditions to consider"]\n'
+    "}"
+)
+
+
+def _build_user_prompt(
+    symptoms: str,
+    vision_findings: Optional[Dict[str, Any]],
+    rag_grounding: Optional[str],
+    body_location: Optional[str],
+) -> str:
+    return (
+        f"Patient symptoms: {symptoms}\n"
+        f"Body location: {body_location or 'unspecified'}\n"
+        f"Vision findings: {json.dumps(vision_findings or {}, ensure_ascii=False)}\n"
+        f"Grounded medical literature:\n{rag_grounding or 'None provided'}\n\n"
+        "Return the diagnosis JSON now:"
+    )
+
+
+def _extract_json(text: str) -> Dict[str, Any]:
+    """Parse a JSON object from a model response, tolerating markdown fences."""
+    cleaned = text.strip()
+    if "```json" in cleaned:
+        cleaned = cleaned.split("```json", 1)[1].split("```", 1)[0].strip()
+    elif "```" in cleaned:
+        cleaned = cleaned.split("```", 1)[1].split("```", 1)[0].strip()
+    return json.loads(cleaned)
+
+
+def _validate_diagnosis(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure the model output has the required fields; raise if malformed."""
+    missing = _REQUIRED_FIELDS - set(data.keys())
+    if missing:
+        raise ValueError(f"Model output missing required fields: {sorted(missing)}")
+    # Normalize optional list fields so downstream consumers get consistent types.
+    for list_field in ("dos", "donts", "treatment_guidelines", "differential"):
+        val = data.get(list_field)
+        if val is None:
+            data[list_field] = []
+        elif not isinstance(val, list):
+            data[list_field] = [str(val)]
+    return data
+
+
+async def _call_gemini(user_prompt: str) -> Dict[str, Any]:
+    """Call Gemini via the REST API. Raises on any failure."""
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    )
+    payload = {
+        "system_instruction": {"parts": [{"text": _SYSTEM_INSTRUCTION}]},
+        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "responseMimeType": "application/json",
+        },
+    }
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.post(url, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+    return _validate_diagnosis(_extract_json(text))
+
+
+async def _call_openai(user_prompt: str) -> Dict[str, Any]:
+    """Call OpenAI Chat Completions. Raises on any failure."""
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+    }
+    payload = {
+        "model": OPENAI_MODEL,
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"},
+        "messages": [
+            {"role": "system", "content": _SYSTEM_INSTRUCTION},
+            {"role": "user", "content": user_prompt},
+        ],
+    }
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.post(
+            "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        text = data["choices"][0]["message"]["content"]
+    return _validate_diagnosis(_extract_json(text))
+
+
+async def generate_differential_diagnosis(
+    symptoms: str,
+    vision_findings: Optional[Dict[str, Any]] = None,
+    rag_grounding: Optional[str] = None,
+    body_location: Optional[str] = None,
+    preferred_provider: str = "gemini",
+) -> Dict[str, Any]:
+    """
+    Produce a structured differential diagnosis via a real LLM call.
+
+    Returns a dict:
+      On success:
+        {
+          "success": True,
+          "provider": "Google Gemini" | "OpenAI",
+          "model": "<model id>",
+          "latency_ms": float,
+          "attempts": [ {provider, model, ok, error?} , ... ],
+          "data": { condition, icd_code, confidence, severity, summary,
+                    dos, donts, treatment_guidelines, differential }
+        }
+      On failure (NO diagnosis fabricated):
+        {
+          "success": False,
+          "provider": None,
+          "model": None,
+          "latency_ms": float,
+          "attempts": [ ... per-provider errors ... ],
+          "error": "human-readable summary of why every provider failed",
+          "data": None
+        }
+    """
+    start = time.time()
+    user_prompt = _build_user_prompt(symptoms, vision_findings, rag_grounding, body_location)
+    attempts: List[Dict[str, Any]] = []
+
+    # Order providers by caller preference, but always keep the other as backup.
+    provider_plan = (
+        [("Google Gemini", GEMINI_MODEL), ("OpenAI", OPENAI_MODEL)]
+        if preferred_provider != "openai"
+        else [("OpenAI", OPENAI_MODEL), ("Google Gemini", GEMINI_MODEL)]
+    )
+
+    for provider_name, model_id in provider_plan:
+        if provider_name == "Google Gemini":
+            if not GEMINI_API_KEY:
+                attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": "GEMINI_API_KEY not configured"})
+                continue
+            if not gemini_circuit_breaker.can_execute():
+                attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": "circuit breaker OPEN"})
+                continue
+            try:
+                data = await _call_gemini(user_prompt)
+                gemini_circuit_breaker.record_success()
+                attempts.append({"provider": provider_name, "model": model_id, "ok": True})
+                return {
+                    "success": True,
+                    "provider": provider_name,
+                    "model": model_id,
+                    "latency_ms": round((time.time() - start) * 1000, 2),
+                    "attempts": attempts,
+                    "data": data,
+                }
+            except Exception as e:
+                gemini_circuit_breaker.record_failure()
+                logger.error(f"Gemini diagnosis failed: {e}")
+                attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": str(e)})
+
+        else:  # OpenAI
+            if not OPENAI_API_KEY:
+                attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": "OPENAI_API_KEY not configured"})
+                continue
+            try:
+                data = await _call_openai(user_prompt)
+                attempts.append({"provider": provider_name, "model": model_id, "ok": True})
+                return {
+                    "success": True,
+                    "provider": provider_name,
+                    "model": model_id,
+                    "latency_ms": round((time.time() - start) * 1000, 2),
+                    "attempts": attempts,
+                    "data": data,
+                }
+            except Exception as e:
+                logger.error(f"OpenAI diagnosis failed: {e}")
+                attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": str(e)})
+
+    # Every provider failed — surface the failure, do NOT fabricate a diagnosis.
+    error_summary = "; ".join(
+        f"{a['provider']}: {a.get('error', 'unknown error')}" for a in attempts if not a["ok"]
+    ) or "No diagnosis provider configured"
+    return {
+        "success": False,
+        "provider": None,
+        "model": None,
+        "latency_ms": round((time.time() - start) * 1000, 2),
+        "attempts": attempts,
+        "error": error_summary,
+        "data": None,
+    }

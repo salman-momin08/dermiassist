@@ -1,7 +1,8 @@
 /**
  * @fileOverview Fast Clinical Triage Agent.
- * Evaluates patient symptoms and history using deterministic fast-path red-flag rules (<1ms)
- * with Genkit LLM fallback for complex cases.
+ * Evaluates patient symptoms and history using purely deterministic, rule-based
+ * regex red-flag matching (<1ms). This agent does NOT call an LLM — triage is
+ * intentionally fully deterministic so risk classification is reproducible and auditable.
  */
 
 import { z } from 'zod';

@@ -14,8 +14,15 @@ export interface RetrievedMedicalChunk {
     content: string;
     source: string;
     icdCode?: string;
-    similarity: number;
+    /**
+     * Cosine similarity from the pgvector search, or `null` for in-memory keyword
+     * fallback matches (which are NOT cosine-scored and must not be presented as
+     * ranked vector matches).
+     */
+    similarity: number | null;
     formattedCitation: string;
+    /** True when this chunk came from the in-memory keyword fallback, not pgvector. */
+    isFallback?: boolean;
 }
 
 export interface RAGSearchOptions {
@@ -69,45 +76,28 @@ const IN_MEMORY_MEDICAL_KNOWLEDGE = [
         source: 'Skin Cancer Foundation Diagnostic Protocol',
         content: 'Malignant melanoma is an aggressive cutaneous malignancy. Diagnostic ABCDE criteria: A - Asymmetry; B - Border irregularity; C - Color variation (multiple shades of brown, black, red, white); D - Diameter (>6mm); E - Evolving shape or size. Any suspicious pigmented lesion requires urgent full-thickness excisional biopsy.',
     },
+    // NOTE: A set of "Empirical Clinical Cohort / DermiAssist Clinical Registry (N=500
+    // Multi-Center Cohort)" entries were removed here. They presented invented per-cohort
+    // statistics (mean severity scores, family-history percentages, patient counts) under
+    // an authoritative-sounding but non-existent registry citation. Surfacing fabricated
+    // empirical evidence to the diagnostic model violates the no-fabrication safety
+    // principle, so they are not included. Only genuinely attributable guideline
+    // references above are retained.
     {
-        id: 'cbr-001',
-        title: 'Empirical Clinical Cohort: Acne Vulgaris Diagnostic Profile (N=115)',
-        conditionCategory: 'Acne',
-        icdCode: 'L70.0',
-        source: 'DermiAssist Clinical Registry (N=500 Multi-Center Cohort)',
-        content: 'In a validated clinical cohort of 115 confirmed Acne Vulgaris patients (mean age 43.5 years, 57.4% male): Mean Erythema score was 1.46/3, Scaling was 1.63/3, and Itching was 1.51/3. Positive family history was present in 48.7% of cases. Hallmark presentation includes inflammatory papulopustular lesions with localized follicular plugging. Differential diagnosis from Rosacea is established by presence of comedones and distinct age/gender distribution.',
-    },
-    {
-        id: 'cbr-002',
-        title: 'Empirical Clinical Cohort: Atopic Eczema Severity & Demographics (N=100)',
-        conditionCategory: 'Eczema',
-        icdCode: 'L20.9',
-        source: 'DermiAssist Clinical Registry (N=500 Multi-Center Cohort)',
-        content: 'Analysis of 100 confirmed Eczema/Atopic Dermatitis patient cases (mean age 47.6 years, 56.0% male): Mean Erythema severity was 1.46/3, Scaling was 1.44/3, and Itching severity was 1.27/3. Strong genetic predisposition observed with 52.0% positive family history. Key diagnostic markers: pruritic xerotic patches with flexural lichenification. First-line therapy responds to intensive barrier emollients and topical calcineurin/corticosteroid pulse therapy.',
-    },
-    {
-        id: 'cbr-003',
-        title: 'Empirical Clinical Cohort: Psoriasis Vulgaris Presentation Matrix (N=91)',
-        conditionCategory: 'Psoriasis',
-        icdCode: 'L40.0',
-        source: 'DermiAssist Clinical Registry (N=500 Multi-Center Cohort)',
-        content: 'Clinical profile of 91 confirmed Psoriasis Vulgaris cases (mean age 43.6 years, 52.7% male): Marked by prominent Scaling (mean 1.56/3) and Erythema (mean 1.33/3), with Itching at 1.54/3. Family history reported in 36.3%. Diagnostic hallmark: well-demarcated salmon-colored plaques with micaceous silvery scales on extensor surfaces (knees, elbows, scalp). Differential distinguished from eczema by distinct plaque demarcation and Auspitz sign.',
-    },
-    {
-        id: 'cbr-004',
-        title: 'Empirical Clinical Cohort: Rosacea Papulopustular & Erythematotelangiectatic Matrix (N=109)',
+        id: 'rag-006',
+        title: 'Rosacea Diagnostic Features',
         conditionCategory: 'Rosacea',
         icdCode: 'L71.9',
-        source: 'DermiAssist Clinical Registry (N=500 Multi-Center Cohort)',
-        content: 'Cohort analysis of 109 confirmed Rosacea patients (mean age 39.8 years, 53.2% female): Demonstrates highest Erythema severity index (mean 1.52/3), Itching at 1.55/3, and lower Scaling (1.41/3). Highest family history correlation in cohort at 56.9%. Characterized by central facial erythema, flushing, telangiectasias, and absence of comedones. Exacerbated by thermal, dietary, and UV triggers.',
+        source: 'National Rosacea Society Diagnostic Guidelines',
+        content: 'Rosacea is a chronic inflammatory facial dermatosis characterized by central facial erythema, flushing, telangiectasias, and papulopustular lesions, with a notable absence of comedones (distinguishing it from acne vulgaris). Common triggers include thermal, dietary, and UV exposure. Management includes trigger avoidance, topical metronidazole or azelaic acid, and oral tetracyclines for papulopustular disease.',
     },
     {
-        id: 'cbr-005',
-        title: 'Empirical Clinical Cohort: Contact & Irritant Dermatitis Profile (N=85)',
+        id: 'rag-007',
+        title: 'Contact & Irritant Dermatitis Diagnostic Features',
         conditionCategory: 'Dermatitis',
         icdCode: 'L30.9',
-        source: 'DermiAssist Clinical Registry (N=500 Multi-Center Cohort)',
-        content: 'Evaluation of 85 confirmed Dermatitis patients (mean age 40.4 years, 54.1% male): Mean Scaling of 1.61/3, Itching of 1.42/3, and Erythema of 1.25/3. Family history positive in 51.8%. Clinical picture dominated by localized acute vesicular eruptions or subacute eczematous weeping plaques corresponding to exogenous exposure zones. Patch testing recommended for allergen identification.',
+        source: 'American Academy of Dermatology (AAD) Contact Dermatitis Guidelines',
+        content: 'Contact dermatitis presents as localized acute vesicular eruptions or subacute eczematous weeping plaques corresponding to zones of exogenous exposure. Irritant contact dermatitis is dose-dependent, while allergic contact dermatitis is a delayed type IV hypersensitivity reaction. Patch testing is recommended for allergen identification. Management centers on identifying and avoiding the offending agent plus topical corticosteroids.',
     },
 ];
 
@@ -130,45 +120,56 @@ export async function retrieveMedicalContext(
 
     logger.info('rag.search.started', { query, categoryFilter });
 
-    // Step 1: Generate vector embedding for the query
-    const queryEmbedding = await generateEmbedding(query);
+    // Step 1: Generate vector embedding for the query. If embedding generation fails
+    // (e.g. missing API key), we do NOT fabricate a vector — we skip the pgvector path
+    // and degrade to real in-memory keyword matching below.
+    let queryEmbedding: number[] | null = null;
+    try {
+        queryEmbedding = await generateEmbedding(query);
+    } catch (err) {
+        logger.warn('rag.embedding_unavailable', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
 
     let chunks: RetrievedMedicalChunk[] = [];
 
-    try {
-        // Attempt Supabase pgvector search
-        const supabase = await createServerClient();
-        const { data, error } = await supabase.rpc('match_medical_knowledge', {
-            query_embedding: queryEmbedding,
-            match_threshold: matchThreshold,
-            match_count: matchCount,
-            category_filter: categoryFilter ?? null,
-        });
+    if (queryEmbedding) {
+        try {
+            // Attempt Supabase pgvector search
+            const supabase = await createServerClient();
+            const { data, error } = await supabase.rpc('match_medical_knowledge', {
+                query_embedding: queryEmbedding,
+                match_threshold: matchThreshold,
+                match_count: matchCount,
+                category_filter: categoryFilter ?? null,
+            });
 
-        if (!error && data && data.length > 0) {
-            chunks = data.map((item: {
-                id: string;
-                title: string;
-                condition_category: string;
-                content: string;
-                source: string;
-                icd_code?: string;
-                similarity: number;
-            }) => ({
-                id: item.id,
-                title: item.title,
-                conditionCategory: item.condition_category,
-                content: item.content,
-                source: item.source,
-                icdCode: item.icd_code,
-                similarity: item.similarity,
-                formattedCitation: `[Source: ${item.source} ${item.icd_code ? `(ICD-10: ${item.icd_code})` : ''}]`,
-            }));
+            if (!error && data && data.length > 0) {
+                chunks = data.map((item: {
+                    id: string;
+                    title: string;
+                    condition_category: string;
+                    content: string;
+                    source: string;
+                    icd_code?: string;
+                    similarity: number;
+                }) => ({
+                    id: item.id,
+                    title: item.title,
+                    conditionCategory: item.condition_category,
+                    content: item.content,
+                    source: item.source,
+                    icdCode: item.icd_code,
+                    similarity: item.similarity,
+                    formattedCitation: `[Source: ${item.source} ${item.icd_code ? `(ICD-10: ${item.icd_code})` : ''}]`,
+                }));
+            }
+        } catch (err) {
+            logger.warn('rag.supabase.query_fallback', {
+                error: err instanceof Error ? err.message : String(err),
+            });
         }
-    } catch (err) {
-        logger.warn('rag.supabase.query_fallback', {
-            error: err instanceof Error ? err.message : String(err),
-        });
     }
 
     // Fallback: In-memory semantic keyword matching if vector DB returns no results
@@ -182,17 +183,21 @@ export async function retrieveMedicalContext(
             return matchesCategory && matchesQuery;
         });
 
-        const targetList = filtered.length > 0 ? filtered : IN_MEMORY_MEDICAL_KNOWLEDGE.slice(0, matchCount);
-
-        chunks = targetList.map((item, idx) => ({
+        // Only surface entries that actually matched the query. Previously this
+        // backfilled the first N knowledge entries when nothing matched, presenting
+        // irrelevant references as grounded context. Return nothing instead so the
+        // synthesis model is not grounded on unrelated material.
+        chunks = filtered.map((item) => ({
             id: item.id,
             title: item.title,
             conditionCategory: item.conditionCategory,
             content: item.content,
             source: item.source,
             icdCode: item.icdCode,
-            similarity: 0.95 - idx * 0.05,
-            formattedCitation: `[Source: ${item.source} (ICD-10: ${item.icdCode})]`,
+            // In-memory keyword matches are NOT cosine-scored — do not fabricate a score.
+            similarity: null,
+            isFallback: true,
+            formattedCitation: `[Reference (in-memory keyword match): ${item.source}${item.icdCode ? ` (ICD-10: ${item.icdCode})` : ''}]`,
         }));
     }
 

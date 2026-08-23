@@ -8,12 +8,19 @@ export async function getAnalysesForUser(userId: string) {
     }
 
     const supabase = await createClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from('analyses')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
+    // A real query failure must not be masked as "no history".
+    if (error) {
+        console.error('Supabase Error in getAnalysesForUser: ', error);
+        throw new Error(`Failed to load analyses: ${error.message}`);
+    }
+
+    // No error + no rows is a legitimate empty history.
     if (!data) return [];
 
     return data.map(item => ({
@@ -34,10 +41,14 @@ export async function getVerifiedDoctorsBySpecialization(specialization: string)
         .eq('verified', true)
         .eq('specialization', specialization);
 
-    if (error || !doctors) {
+    // Distinguish a real query failure from a legitimate empty result so a
+    // datastore outage is not silently shown to a patient as "no doctors".
+    if (error) {
         console.error("Supabase Error in getVerifiedDoctorsBySpecialization: ", error);
-        return [];
+        throw new Error(`Failed to load doctors: ${error.message}`);
     }
+
+    if (!doctors) return [];
 
     return doctors.map(doc => {
         return {

@@ -88,8 +88,10 @@ export async function getCachedDoctorList(
                             logger.warn(`[Doctor Cache] Network error fetching doctors, retrying...`, error.message);
                             throw error;
                         }
+                        // Throw so a query failure is NOT cached (would otherwise persist
+                        // a transient outage as "no doctors available" for the TTL).
                         logger.error(`[Doctor Cache] Error fetching doctors:`, error);
-                        return [];
+                        throw new Error(`Failed to fetch doctor list: ${error.message}`);
                     }
 
                     return (data as DoctorProfile[]) || [];
@@ -142,8 +144,13 @@ export async function getCachedDoctorProfile(doctorId: string): Promise<DoctorPr
                         console.warn(`[Doctor Cache] Network error fetching doctor ${doctorId}, retrying...`, error.message);
                         throw error;
                     }
+                    // PGRST116 = no rows: a legitimate "not found" that is safe to cache as null.
+                    if (error.code === 'PGRST116') {
+                        return null;
+                    }
+                    // Any other query failure must NOT be cached — throw so it is not persisted.
                     console.error(`[Doctor Cache] Error fetching doctor:`, error);
-                    return null;
+                    throw new Error(`Failed to fetch doctor profile: ${error.message}`);
                 }
 
                 return data as DoctorProfile;

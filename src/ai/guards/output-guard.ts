@@ -9,7 +9,8 @@ import { logger } from '@/lib/logger';
 export interface GuardrailOutputResult<T = unknown> {
     valid: boolean;
     data: T;
-    confidenceScore: number;
+    /** `null` when the model omitted a confidence score (treated as unknown/high-risk). */
+    confidenceScore: number | null;
     hallucinationRisk: 'low' | 'medium' | 'high';
     disclaimerAppended: boolean;
     violations: string[];
@@ -29,11 +30,16 @@ export function validateOutputSafety<T extends { reportData?: Record<string, unk
     let disclaimerAppended = false;
 
     // 1. Confidence Calibration Check
-    const confidenceScore = typeof rawOutput.confidenceScore === 'number' 
-        ? rawOutput.confidenceScore 
-        : 75;
+    // A missing confidence score must NOT be treated as a passing default (previously 75).
+    // Absence of a confidence signal is itself a red flag, so treat it as unknown => high risk.
+    const confidenceScore: number | null = typeof rawOutput.confidenceScore === 'number'
+        ? rawOutput.confidenceScore
+        : null;
 
-    if (confidenceScore < 50) {
+    if (confidenceScore === null) {
+        violations.push('Missing AI confidence score. Confidence unknown — mandatory clinical verification required.');
+        hallucinationRisk = 'high';
+    } else if (confidenceScore < 50) {
         violations.push('Low AI confidence score (< 50%). Mandatory clinical verification required.');
         hallucinationRisk = 'high';
     } else if (confidenceScore < 70) {

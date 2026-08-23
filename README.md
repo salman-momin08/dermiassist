@@ -515,9 +515,9 @@ graph TD
 
 ```mermaid
 graph TD
-    BenchmarkData[Ground Truth Dataset: dermatology-benchmarks.json] --> CaseRunner[Eval Runner: eval-harness.ts]
-    CaseRunner --> PipelineExec[Multi-Agent Pipeline Execution]
-    PipelineExec --> OutputEval[Output Evaluation Engine]
+    BenchmarkData[Ground Truth Dataset: dermatology-benchmarks.json] --> CaseRunner[Eval Runner: ai_service/services/eval_harness.py]
+    CaseRunner --> PipelineExec[Real Multi-Agent Pipeline Execution - Gemini/OpenAI]
+    PipelineExec --> OutputEval[Output Evaluation Engine - honest per-case model status]
     
     subgraph Metric Scorers
         OutputEval --> Metric1[Diagnostic Condition Accuracy %]

@@ -61,10 +61,15 @@ def _get_openai_client():
 # Node 1: Vision Diagnostic Condition Detection
 # =====================================================================
 async def detect_condition_node(state: DermatologyState) -> Dict[str, Any]:
-    """Analyze image using multimodal vision reasoning to detect primary skin condition."""
+    """Analyze image using multimodal vision reasoning to detect primary skin condition.
+
+    Raises on failure — we never fabricate a condition name. A wrong or invented
+    diagnosis in a medical app is worse than an explicit failure the caller can
+    handle (retry, fall back to another real provider, or surface to the user).
+    """
     photo_uri = state.get("photo_data_uri")
     if not photo_uri:
-        return {"condition_name": "Unknown Dermatological Condition", "error": "No image provided"}
+        raise ValueError("No image provided for condition detection")
 
     prompt = """You are an expert dermatologist AI. Analyze the provided image of a skin condition.
 Your ONLY task is to identify the most likely skin condition and return its common medical name (e.g. Psoriasis, Eczema, Acne Vulgaris, Rosacea, Seborrheic Dermatitis, Contact Dermatitis, Melanocytic Nevus).
@@ -103,7 +108,8 @@ Do not provide any other information, summary, or recommendations. Return ONLY t
         }
     except Exception as e:
         print(f"[LangGraph Vision Node Error]: {e}")
-        # Fallback to OpenAI if Gemini fails
+        # Real provider fallback: OpenAI GPT-4o vision (a genuine second model,
+        # not a canned answer). If it also succeeds we return its real result.
         openai_client = _get_openai_client()
         if openai_client:
             try:
@@ -120,12 +126,18 @@ Do not provide any other information, summary, or recommendations. Return ONLY t
                     ],
                     max_tokens=50
                 )
-                detected = res.choices[0].message.content.strip()
-                return {"condition_name": detected, "turn_count": 0}
+                detected = (res.choices[0].message.content or "").strip()
+                if detected:
+                    return {"condition_name": detected, "turn_count": 0}
+                raise RuntimeError("OpenAI vision returned empty condition")
             except Exception as oai_err:
                 print(f"[LangGraph OpenAI Vision Fallback Error]: {oai_err}")
+                raise RuntimeError(
+                    f"Vision detection failed on all providers. Gemini: {e}; OpenAI: {oai_err}"
+                ) from oai_err
 
-        return {"condition_name": "Psoriasis", "error": str(e)}
+        # No real provider available — surface the failure, never guess a diagnosis.
+        raise RuntimeError(f"Vision detection failed and no fallback provider is configured: {e}") from e
 
 # =====================================================================
 # Node 2: Dynamic Proforma Question Generation
@@ -171,6 +183,7 @@ Based on the above patient history and the suspected condition ({condition_name}
         }
     except Exception as e:
         print(f"[LangGraph Proforma Question Node Error]: {e}")
+        # Real provider fallback: OpenAI GPT-4o.
         openai_client = _get_openai_client()
         if openai_client:
             try:
@@ -182,20 +195,22 @@ Based on the above patient history and the suspected condition ({condition_name}
                     ],
                     max_tokens=150
                 )
-                question = res.choices[0].message.content.strip().replace('"', '')
-                return {
-                    "current_question": question,
-                    "turn_count": state.get("turn_count", 0) + 1
-                }
+                question = (res.choices[0].message.content or "").strip().replace('"', '')
+                if question:
+                    return {
+                        "current_question": question,
+                        "turn_count": state.get("turn_count", 0) + 1
+                    }
+                raise RuntimeError("OpenAI returned empty question")
             except Exception as oai_err:
                 print(f"[LangGraph OpenAI Question Fallback Error]: {oai_err}")
+                raise RuntimeError(
+                    f"Clinical question generation failed on all providers. Gemini: {e}; OpenAI: {oai_err}"
+                ) from oai_err
 
-        # Fallback question
-        return {
-            "current_question": f"How long have you noticed this presentation of {condition_name}, and are you experiencing any itching or discomfort?",
-            "turn_count": state.get("turn_count", 0) + 1,
-            "error": str(e)
-        }
+        # The follow-up question is part of the clinical interview — do not fake
+        # one. Surface the failure so the consultation can be retried/handled.
+        raise RuntimeError(f"Clinical question generation failed and no fallback provider is configured: {e}") from e
 
 # =====================================================================
 # Node 3: Multi-Agent Final Clinical Evaluation
@@ -252,26 +267,10 @@ Return ONLY valid JSON."""
         return {"final_evaluation": data}
     except Exception as e:
         print(f"[LangGraph Final Eval Error]: {e}")
-        # Construct resilient clinical report
-        return {
-            "final_evaluation": {
-                "conditionName": condition_name,
-                "condition": f"Clinical assessment for {condition_name}. Presentation exhibits characteristic morphological patterns consistent with {condition_name}.",
-                "dos": [
-                    "Apply prescribed soothing emollient or moisturizer twice daily.",
-                    "Keep the affected skin clean, dry, and protected from friction.",
-                    "Monitor lesion borders and document any progression."
-                ],
-                "donts": [
-                    "Avoid scratching, scrubbing, or picking at the skin.",
-                    "Do not apply harsh astringents or fragranced soaps.",
-                    "Avoid known environmental triggers and extreme temperature exposure."
-                ],
-                "recommendations": f"The clinical presentation corresponds with {condition_name}. Continue symptomatic care and consult a certified dermatologist for prescription treatment.",
-                "otherConsiderations": f"Differential diagnoses include related eczematous dermatitis, contact dermatitis, and localized inflammatory dermatoses."
-            },
-            "error": str(e)
-        }
+        # The final evaluation IS the clinical report shown to the patient. If the
+        # model failed, we must not fabricate dos/donts/recommendations — that
+        # would be inventing medical advice. Surface the failure instead.
+        raise RuntimeError(f"Final clinical evaluation failed: {e}") from e
 
 # =====================================================================
 # LangGraph State Machine Builder
@@ -398,13 +397,8 @@ Rules:
             except Exception as oai_err:
                 print(f"[LangGraph Suggestions OpenAI Fallback Error]: {oai_err}")
 
-    # Fallback generic options
-    return {
-        "suggestions": [
-            "Yes, experiencing this symptom",
-            "No, not present",
-            "Mild discomfort only",
-            "Started a few days ago"
-        ]
-    }
+    # Suggestions are non-diagnostic UI quick-replies. Rather than fake them
+    # (which would hide that the model is down), return none with an explicit
+    # error so the UI degrades to free-text entry instead of canned chips.
+    return {"suggestions": [], "error": "Suggestion model unavailable"}
 

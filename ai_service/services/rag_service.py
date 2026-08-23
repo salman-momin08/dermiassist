@@ -16,36 +16,46 @@ SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "") or os.getenv("NEXT_PUB
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_GENAI_API_KEY", "")
 
 async def generate_embedding_python(text: str) -> List[float]:
-    """Generate 768-dim vector embedding using Gemini text-embedding-004."""
+    """Generate a real 768-dim embedding using Gemini text-embedding-004.
+
+    Raises on failure. A pseudo-random fallback vector would make cosine search
+    return meaningless "matches" that look like real retrieval — so we never
+    substitute one.
+    """
     if not GEMINI_API_KEY:
-        return _generate_mock_vector(text)
+        raise RuntimeError("GEMINI_API_KEY not configured; cannot generate embedding")
 
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={GEMINI_API_KEY}"
-        payload = {"content": {"parts": [{"text": text}]}}
-        
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload, timeout=10.0)
-            if resp.status_code == 200:
-                data = resp.json()
-                values = data.get("embedding", {}).get("values", [])
-                if values and len(values) == 768:
-                    return values
-    except Exception:
-        pass
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={GEMINI_API_KEY}"
+    payload = {"content": {"parts": [{"text": text}]}}
 
-    return _generate_mock_vector(text)
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(url, json=payload, timeout=10.0)
+        resp.raise_for_status()
+        data = resp.json()
 
-def _generate_mock_vector(text: str) -> List[float]:
-    """Deterministic fallback 768-dim pseudo-vector."""
-    hash_val = sum(ord(c) for c in text)
-    return [math.sin(hash_val + i) * 0.5 for i in range(768)]
+    values = data.get("embedding", {}).get("values", [])
+    if not values or len(values) != 768:
+        raise RuntimeError(f"Unexpected embedding dimensions: got {len(values)}, expected 768")
+    return values
 
 async def search_vector_rag(query: str, category_filter: Optional[str] = None, match_count: int = 3) -> Dict[str, Any]:
-    """Execute vector cosine distance search against Supabase pgvector."""
-    query_vector = await generate_embedding_python(query)
-    
-    # RPC payload
+    """Execute vector cosine search against Supabase pgvector.
+
+    On failure (embedding or RPC), returns success=False with NO grounding and NO
+    fabricated citations. RAG is supplementary — the diagnosis can proceed without
+    it — but we never invent a source, ICD code, or similarity score.
+    """
+    try:
+        query_vector = await generate_embedding_python(query)
+    except Exception as e:
+        return {
+            "success": False,
+            "query": query,
+            "matched_chunks": [],
+            "grounding_prompt_text": "",
+            "error": f"Embedding unavailable, RAG grounding skipped: {e}",
+        }
+
     rpc_url = f"{SUPABASE_URL}/rest/v1/rpc/match_medical_knowledge"
     headers = {
         "apikey": SUPABASE_KEY,
@@ -56,30 +66,25 @@ async def search_vector_rag(query: str, category_filter: Optional[str] = None, m
         "query_embedding": query_vector,
         "match_threshold": 0.35,
         "match_count": match_count,
-        "category_filter": category_filter
+        "category_filter": category_filter,
     }
 
-    chunks = []
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(rpc_url, json=payload, headers=headers, timeout=10.0)
-            if resp.status_code == 200:
-                chunks = resp.json()
-    except Exception:
-        pass
+            resp.raise_for_status()
+            chunks = resp.json()
+    except Exception as e:
+        return {
+            "success": False,
+            "query": query,
+            "matched_chunks": [],
+            "grounding_prompt_text": "",
+            "error": f"Vector search failed, RAG grounding skipped: {e}",
+        }
 
-    if not chunks:
-        chunks = [
-            {
-                "id": "fallback-01",
-                "title": "Atopic Dermatitis Management Protocol",
-                "condition_category": category_filter or "Eczema",
-                "content": "Atopic dermatitis presents as pruritic, erythematous lesions on flexural surfaces. Apply thick barrier creams and short-course topical corticosteroids.",
-                "source": "Journal of Investigative Dermatology",
-                "icd_code": "L20.9",
-                "similarity": 0.88
-            }
-        ]
+    if not isinstance(chunks, list):
+        chunks = []
 
     prompt_lines = ["GROUNDED MEDICAL LITERATURE CONTEXT:"]
     for c in chunks:
@@ -89,5 +94,5 @@ async def search_vector_rag(query: str, category_filter: Optional[str] = None, m
         "success": True,
         "query": query,
         "matched_chunks": chunks,
-        "grounding_prompt_text": "\n".join(prompt_lines)
+        "grounding_prompt_text": "\n".join(prompt_lines) if chunks else "",
     }

@@ -19,6 +19,7 @@ from ai_service.services.huggingface_service import classify_skin_lesion_hf, gen
 from ai_service.services.healing_tracker import track_longitudinal_healing
 from ai_service.services.hybrid_search import search_hybrid_rrf
 from ai_service.services.openai_service import analyze_disease_with_openai
+from ai_service.services.eval_harness import run_eval_harness
 from ai_service.utils.token_budget import estimate_token_count, truncate_to_token_budget, calculate_llm_cost
 from ai_service.utils.circuit_breaker import gemini_circuit_breaker, huggingface_circuit_breaker
 from ai_service.queue.task_worker import submit_async_job, get_job_status
@@ -73,9 +74,22 @@ async def analyze_symptoms(request: AnalysisRequest):
         res = await run_multi_agent_pipeline(
             symptoms=request.symptoms,
             image_url=request.image_url,
-            body_location=request.body_location
+            body_location=request.body_location,
+            provider=request.provider or "gemini"
         )
         return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/eval/run", tags=["AI Diagnostic Engine"])
+async def run_benchmark_evals(provider: str = "gemini"):
+    """
+    Run the LLM-as-a-Judge benchmark suite against the REAL model engine.
+    Reports true diagnostic accuracy plus explicit model-health status — a case
+    only passes if the model actually ran and matched the expected condition.
+    """
+    try:
+        return await run_eval_harness(provider=provider)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -187,10 +201,13 @@ async def check_drug_interaction(request: DrugInteractionRequest):
             "recommended_spacing_hours": 12
         }
 
+    # This tool only knows a small set of hardcoded rules. For any combination it
+    # has NOT actually evaluated, it must NOT assert safety — a false "safe to
+    # combine" is a dangerous false negative. Return an explicit "not assessed".
     return {
-        "safe_to_combine": True,
-        "interaction_risk_level": "none",
-        "warning_message": "No major clinical drug interaction detected.",
+        "safe_to_combine": None,
+        "interaction_risk_level": "unknown",
+        "warning_message": "This combination was not assessed by the built-in rule set. Do not assume it is safe — consult a pharmacist or physician before combining.",
         "recommended_spacing_hours": None
     }
 
@@ -223,10 +240,11 @@ async def handle_mcp_jsonrpc(payload: dict):
             }
         }
 
+    # Unrecognized method — return a proper JSON-RPC error, not a fake "executed".
     return {
         "jsonrpc": "2.0",
         "id": req_id,
-        "result": {"status": "executed", "method": method}
+        "error": {"code": -32601, "message": f"Method not found: {method}"}
     }
 
 # =====================================================================

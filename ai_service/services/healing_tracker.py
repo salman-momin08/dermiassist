@@ -1,64 +1,75 @@
 """
-Longitudinal Lesion Healing Analytics & Progress Tracker Service.
-Uses Gemini Vision & Hugging Face Feature Extraction to analyze sequential skin photos
-over time (e.g., Day 1 vs. Day 14 vs. Day 30) and compute quantitative healing metrics.
+Longitudinal Lesion Healing Tracker Service.
+
+Runs the HAM10000 classifier on the baseline and follow-up photos and reports the
+REAL per-image classification for each.
+
+IMPORTANT: quantitative healing metrics (surface-area reduction %, erythema
+fading index, healing velocity) require pixel-level image segmentation that is
+NOT implemented. The previous version fabricated these from `days_elapsed` alone,
+with no relationship to the actual images — dangerous in a medical app. Until a
+real segmentation pipeline exists, we report only what the model genuinely
+produces and explicitly flag quantitative metrics as unavailable.
 """
 
-import time
-import math
-from typing import Dict, Any, Optional
+from typing import Dict, Any
+
 from ai_service.services.huggingface_service import classify_skin_lesion_hf
+
+
+def _assessment(analysis: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "success": bool(analysis.get("success")),
+        "top_prediction": analysis.get("top_prediction"),
+        "confidence": analysis.get("confidence_score"),
+        "model_used": analysis.get("model_used"),
+        "error": analysis.get("error"),
+    }
+
 
 async def track_longitudinal_healing(
     initial_image_url: str,
     current_image_url: str,
     days_elapsed: int = 14
 ) -> Dict[str, Any]:
-    """
-    Compare baseline vs follow-up lesion images and compute quantitative healing metrics.
-    """
-    start_time = time.time()
-
-    # 1. Analyze initial baseline image
+    """Classify baseline vs follow-up images. No fabricated healing metrics."""
     initial_analysis = await classify_skin_lesion_hf(initial_image_url)
-
-    # 2. Analyze follow-up image
     current_analysis = await classify_skin_lesion_hf(current_image_url)
 
-    # 3. Compute quantitative metrics based on elapsed time and classification confidence deltas
-    base_confidence = initial_analysis.get("confidence_score", 72.4)
-    curr_confidence = current_analysis.get("confidence_score", 65.0)
+    baseline = _assessment(initial_analysis)
+    followup = _assessment(current_analysis)
 
-    # Simulated/Estimated surface area reduction and redness fading
-    reduction_percentage = round(min(95.0, max(10.0, 15.0 + (days_elapsed * 3.5))), 1)
-    erythema_fading_index = round(min(10.0, max(1.0, 2.5 + (days_elapsed * 0.4))), 1)
-    healing_velocity_score = round((reduction_percentage / max(1, days_elapsed)) * 10, 1)
+    both_ok = baseline["success"] and followup["success"]
 
-    trajectory = "Accelerated Healing" if reduction_percentage > 50 else "Stable / Moderate Progress"
-    if reduction_percentage < 25:
-        trajectory = "Stagnant / Re-evaluation Indicated"
+    classification_changed = None
+    if both_ok:
+        classification_changed = baseline["top_prediction"] != followup["top_prediction"]
+
+    if both_ok:
+        note = (
+            "Per-image classification from the HAM10000 model is provided. "
+            "Quantitative healing metrics (surface-area reduction, erythema fading) "
+            "require image segmentation, which is not yet implemented, so they are "
+            "not reported. Classification labels are not a substitute for a "
+            "clinician's assessment of healing."
+        )
+        error = None
+    else:
+        note = "One or both images could not be classified; see per-image errors."
+        error = "; ".join(
+            e for e in [
+                None if baseline["success"] else f"baseline: {baseline['error']}",
+                None if followup["success"] else f"followup: {followup['error']}",
+            ] if e
+        )
 
     return {
-        "success": True,
+        "success": both_ok,
         "days_elapsed": days_elapsed,
-        "metrics": {
-            "surface_area_reduction_percentage": reduction_percentage,
-            "erythema_fading_index": erythema_fading_index,  # 1-10 scale
-            "healing_velocity_score": healing_velocity_score,
-            "clinical_trajectory": trajectory,
-        },
-        "baseline_assessment": {
-            "top_prediction": initial_analysis.get("top_prediction", "Erythematous Lesion"),
-            "confidence": base_confidence,
-        },
-        "followup_assessment": {
-            "top_prediction": current_analysis.get("top_prediction", "Resolving Erythematous Lesion"),
-            "confidence": curr_confidence,
-        },
-        "recommendations": [
-            "Continue current topical barrier application twice daily.",
-            "Maintain strict sun protection (SPF 50+) over healing tissue.",
-            "Schedule follow-up evaluation if surface area reduction plateaus."
-        ],
-        "processing_time_ms": round((time.time() - start_time) * 1000, 2)
+        "baseline_assessment": baseline,
+        "followup_assessment": followup,
+        "quantitative_metrics_available": False,
+        "classification_changed": classification_changed,
+        "note": note,
+        "error": error,
     }

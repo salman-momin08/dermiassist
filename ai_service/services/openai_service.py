@@ -64,32 +64,33 @@ async def analyze_disease_with_openai(
             
             async with httpx.AsyncClient(timeout=20.0) as client:
                 resp = await client.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    content = data["choices"][0]["message"]["content"]
-                    parsed = json.loads(content)
-                    return {
-                        "success": True,
-                        "provider": "OpenAI (GPT-4o)",
-                        "data": parsed
-                    }
+                resp.raise_for_status()
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"]
+                parsed = json.loads(content)
+                return {
+                    "success": True,
+                    "provider": "OpenAI (GPT-4o)",
+                    "model": "gpt-4o",
+                    "data": parsed
+                }
         except Exception as e:
             logger.error(f"OpenAI API exception: {e}")
-            
-    # Deterministic fallback
+            # Honest failure — do NOT fabricate a diagnosis. Surface the error so
+            # a broken/misconfigured model is caught and fixed on priority.
+            return {
+                "success": False,
+                "provider": "OpenAI (GPT-4o)",
+                "model": "gpt-4o",
+                "error": str(e),
+                "data": None
+            }
+
+    # No API key configured — this is a real, reportable failure, not a diagnosis.
     return {
-        "success": True,
-        "provider": "OpenAI GPT-4o (Heuristic Engine)",
-        "data": {
-            "condition": "Atopic Dermatitis (Eczema)",
-            "icd_code": "L20.9",
-            "confidence": 94,
-            "severity": "Moderate",
-            "summary": "Clinical evaluation by OpenAI GPT-4o reasoning framework indicates inflammatory eczematous dermatitis.",
-            "treatment_guidelines": [
-                "Twice daily ceramide-rich barrier emollients",
-                "Topical hydrocortisone 1% cream for active flares"
-            ],
-            "citations": ["American Academy of Dermatology Atopic Dermatitis Guidelines 2024"]
-        }
+        "success": False,
+        "provider": "OpenAI (GPT-4o)",
+        "model": "gpt-4o",
+        "error": "OPENAI_API_KEY not configured",
+        "data": None
     }

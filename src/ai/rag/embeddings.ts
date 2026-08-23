@@ -48,11 +48,10 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
     if (!apiKey) {
-        logger.warn('gemini.embedding.missing_key', { message: 'GEMINI_API_KEY is not set. Using pseudo-vector fallback.' });
-        const mock = generateMockEmbedding(text);
-        evictOldestIfNeeded();
-        embeddingCache.set(cacheKey, mock);
-        return mock;
+        // Never fabricate a pseudo-vector: a mock embedding would silently corrupt
+        // similarity search and semantic caching for medical content. Fail loudly.
+        logger.error('gemini.embedding.missing_key', { message: 'GEMINI_API_KEY / GOOGLE_GENAI_API_KEY is not set.' });
+        throw new Error('Embedding generation failed: no Gemini API key configured.');
     }
 
     // 2. Try Gemini Embedding API (use fastest model first)
@@ -101,27 +100,11 @@ export async function generateEmbedding(text: string): Promise<number[]> {
         }
     }
 
-    logger.warn('gemini.embedding.fallback', { message: 'Using deterministic pseudo-embedding fallback.' });
-    const fallback = generateMockEmbedding(text);
-    evictOldestIfNeeded();
-    embeddingCache.set(cacheKey, fallback);
-    return fallback;
-}
-
-/**
- * Deterministic fallback embedding generator for testing without API keys.
- */
-function generateMockEmbedding(text: string): number[] {
-    const vector = new Array(768).fill(0);
-    let hash = 0;
-    for (let i = 0; i < text.length; i++) {
-        hash = (hash << 5) - hash + text.charCodeAt(i);
-        hash |= 0;
-    }
-    for (let i = 0; i < 768; i++) {
-        vector[i] = Math.sin(hash + i) * 0.5;
-    }
-    return vector;
+    // All embedding models failed. Do NOT return a deterministic pseudo-vector — a fake
+    // embedding would silently produce meaningless similarity scores and cache hits for
+    // medical queries. Propagate the failure so callers can degrade honestly.
+    logger.error('gemini.embedding.failed', { message: 'All Gemini embedding models failed to return a vector.' });
+    throw new Error('Embedding generation failed: no embedding model returned a valid vector.');
 }
 
 /**

@@ -11,6 +11,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
+import { AIOutputError } from '@/lib/errors';
 
 const FinalEvaluationInputSchema = z.object({
   photoDataUri: z
@@ -110,26 +111,13 @@ const finalEvaluationFlow = ai.defineFlow(
       }
     }
 
-    // Fallback: If upstream API experienced a connection abort or transient failure,
-    // construct a high-quality clinical decision support report from the initial diagnosis
-    const condition = input.initialCondition || 'Dermatological Condition';
-    console.warn('[finalEvaluationFlow] Using resilient fallback evaluation for:', condition, lastError?.message);
-
-    return {
-      conditionName: condition,
-      condition: `Clinical evaluation for ${condition}. Based on morphological features and patient consultation responses, the presentation is characteristic of ${condition}.`,
-      dos: [
-        'Apply prescribed or gentle over-the-counter soothing emollient twice daily.',
-        'Keep the affected area clean, dry, and protected from abrasive clothing.',
-        'Document any changes in lesion size, coloration, or symptom intensity.'
-      ],
-      donts: [
-        'Avoid scratching, picking, or scrubbing the affected cutaneous area.',
-        'Do not apply harsh astringents, heavily fragranced soaps, or unverified home remedies.',
-        'Avoid known triggers including extreme temperatures and harsh detergents.'
-      ],
-      recommendations: `The clinical presentation strongly corresponds with ${condition}. Please continue conservative symptomatic management and consult a licensed dermatologist for definitive clinical confirmation and tailored prescription therapy.`,
-      otherConsiderations: `Based on patient answers: ${input.userAnswers.substring(0, 300)}. Differential considerations include related eczematous dermatitis, contact reactions, or localized inflammatory dermatoses.`
-    };
+    // Honest failure: both the Python LangGraph engine and the Genkit retries have
+    // failed. Fabricating a clinical report here would mask a broken model behind a
+    // confident-looking diagnosis, so surface the failure to the caller/UI instead.
+    console.error('[finalEvaluationFlow] Evaluation failed after retries:', lastError?.message || lastError);
+    throw new AIOutputError(
+      `Failed to generate final evaluation report: ${lastError?.message || 'Model returned null or incomplete output'}`,
+      { flow: 'finalEvaluationFlow', initialCondition: input.initialCondition }
+    );
   }
 );

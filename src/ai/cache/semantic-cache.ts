@@ -78,11 +78,25 @@ export async function getSemanticCache<T>(query: string): Promise<T | null> {
         return null;
     }
 
-    try {
-        evictExpired();
-        const queryEmbedding = await generateEmbedding(query);
+    evictExpired();
 
+    // Embedding generation can now fail (e.g. missing API key). If it does, treat the
+    // semantic path as a MISS rather than matching a medical report over a fabricated
+    // vector. The exact-match fast path above is unaffected.
+    let queryEmbedding: number[];
+    try {
+        queryEmbedding = await generateEmbedding(query);
+    } catch (err) {
+        logger.warn('ai.cache.embedding_unavailable', { error: String(err) });
+        logger.info('ai.cache.miss');
+        return null;
+    }
+
+    try {
         for (const [cachedKey, entry] of IN_MEMORY_CACHE.entries()) {
+            // Skip entries stored without a usable vector — never match over an empty
+            // or mismatched embedding.
+            if (!entry.embedding || entry.embedding.length !== queryEmbedding.length) continue;
             const similarity = cosineSimilarity(queryEmbedding, entry.embedding);
             if (similarity >= SIMILARITY_THRESHOLD) {
                 logger.info('ai.cache.hit.semantic', {
@@ -106,7 +120,16 @@ export async function getSemanticCache<T>(query: string): Promise<T | null> {
 export async function setSemanticCache<T>(query: string, data: T): Promise<void> {
     try {
         const normalizedQuery = query.trim().toLowerCase();
-        const embedding = await generateEmbedding(query);
+
+        // Attempt to compute a real embedding for the semantic path. If it fails, store
+        // the entry with NO vector so the exact-match path still works, but this entry can
+        // never produce a semantic hit computed over a fabricated embedding.
+        let embedding: number[] = [];
+        try {
+            embedding = await generateEmbedding(query);
+        } catch (err) {
+            logger.warn('ai.cache.embedding_unavailable_on_store', { error: String(err) });
+        }
 
         IN_MEMORY_CACHE.set(normalizedQuery, {
             embedding,
@@ -120,7 +143,7 @@ export async function setSemanticCache<T>(query: string, data: T): Promise<void>
             if (firstKey) IN_MEMORY_CACHE.delete(firstKey);
         }
 
-        logger.info('ai.cache.stored', { cacheSize: IN_MEMORY_CACHE.size });
+        logger.info('ai.cache.stored', { cacheSize: IN_MEMORY_CACHE.size, semanticEnabled: embedding.length > 0 });
     } catch (err) {
         logger.warn('ai.cache.store_failed', { error: String(err) });
     }

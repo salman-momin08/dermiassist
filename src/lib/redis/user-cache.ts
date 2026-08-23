@@ -49,8 +49,14 @@ export async function getCachedUserProfile(userId: string): Promise<UserProfile 
                             logger.warn(`[User Cache] Network error fetching profile for ${userId}, retrying...`, error.message);
                             throw error; // Trigger retry
                         }
+                        // PGRST116 = no rows: a legitimate "not found" that is safe to cache as null.
+                        if (error.code === 'PGRST116') {
+                            return null;
+                        }
+                        // Any other query failure must NOT be cached — throw so a transient
+                        // outage is not persisted as "profile not found" for the TTL.
                         logger.error(`[User Cache] Error fetching profile:`, error);
-                        return null;
+                        throw new Error(`Failed to fetch user profile: ${error.message}`);
                     }
 
                     return data as UserProfile;

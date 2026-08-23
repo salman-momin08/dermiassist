@@ -17,12 +17,13 @@ export interface EvalCaseResult {
     caseId: string;
     caseTitle: string;
     passed: boolean;
-    conditionMatchScore: number;
     hasDisclaimers: boolean;
     hasCitations: boolean;
     executionTimeMs: number;
     evaluatedCondition: string;
     expectedCondition: string;
+    /** Populated when the pipeline threw (e.g. synthesis model failure). */
+    error?: string;
 }
 
 export interface AggregateEvalReport {
@@ -59,7 +60,6 @@ async function evaluateSingleCase(testCase: {
     const conditionMatch = evaluatedCondition.toLowerCase().includes(expectedCondition.toLowerCase()) ||
         expectedCondition.toLowerCase().includes(evaluatedCondition.toLowerCase());
 
-    const conditionMatchScore = conditionMatch ? 100 : 50;
     const hasDisclaimers = pipelineResult.safety.disclaimerAppended || pipelineResult.report.summary.includes('Medical Disclaimer');
     const hasCitations = pipelineResult.report.citationsUsed.length > 0;
 
@@ -67,7 +67,6 @@ async function evaluateSingleCase(testCase: {
         caseId: testCase.id,
         caseTitle: testCase.caseTitle,
         passed: conditionMatch,
-        conditionMatchScore,
         hasDisclaimers,
         hasCitations,
         executionTimeMs,
@@ -94,7 +93,7 @@ export async function runAIEvalHarness(): Promise<AggregateEvalReport> {
     let citationsCount = 0;
     let disclaimersCount = 0;
 
-    for (const settled of settledResults) {
+    settledResults.forEach((settled, idx) => {
         if (settled.status === 'fulfilled') {
             const result = settled.value;
             results.push(result);
@@ -103,11 +102,30 @@ export async function runAIEvalHarness(): Promise<AggregateEvalReport> {
             if (result.hasCitations) citationsCount++;
             if (result.hasDisclaimers) disclaimersCount++;
         } else {
-            logger.error('ai.eval.case.failed', { reason: settled.reason });
+            // A rejected run means the pipeline threw (e.g. the synthesis model failed).
+            // Count it as a FAILED case so accuracy reflects real model failures instead
+            // of silently excluding them and inflating the pass rate.
+            const testCase = benchmarks[idx];
+            const errorMessage = settled.reason instanceof Error
+                ? settled.reason.message
+                : String(settled.reason);
+            logger.error('ai.eval.case.failed', { reason: errorMessage });
+            results.push({
+                caseId: testCase?.id ?? `unknown-${idx}`,
+                caseTitle: testCase?.caseTitle ?? 'Unknown case',
+                passed: false,
+                hasDisclaimers: false,
+                hasCitations: false,
+                executionTimeMs: 0,
+                evaluatedCondition: 'MODEL FAILED',
+                expectedCondition: testCase?.expectedCondition ?? '',
+                error: errorMessage,
+            });
         }
-    }
+    });
 
-    const totalCases = results.length;
+    // Include failed cases in the total so accuracy is not computed over successes only.
+    const totalCases = settledResults.length;
 
     const aggregateReport: AggregateEvalReport = {
         timestamp: new Date().toISOString(),

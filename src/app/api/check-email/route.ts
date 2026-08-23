@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { RateLimitMiddleware } from '@/lib/redis/middleware';
 
 /**
  * API Route: Check Email Existence
@@ -21,7 +22,8 @@ import { createClient } from '@/lib/supabase/server';
  * }
  */
 
-export async function POST(request: NextRequest) {
+// Strict rate limiting (IP-based) to prevent unauthenticated account enumeration.
+export const POST = RateLimitMiddleware.strict(async (request: NextRequest) => {
     try {
         const body = await request.json();
         const { email } = body;
@@ -91,7 +93,7 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         );
     }
-}
+});
 
 // Prevent caching of this endpoint
 export const dynamic = 'force-dynamic';

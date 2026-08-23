@@ -8,7 +8,6 @@ Provides:
 
 import os
 import httpx
-import math
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 
@@ -16,104 +15,116 @@ load_dotenv()
 
 HF_API_KEY = os.getenv("HUGGINGFACE_API_KEY", "") or os.getenv("HF_TOKEN", "")
 
-# Standard HAM10000 Dermatological Lesion Categories
-HAM10000_DIAGNOSES = [
-    {"label": "Melanocytic Nevi (Moles)", "code": "nv", "risk": "benign", "base_prob": 0.72},
-    {"label": "Melanoma", "code": "mel", "risk": "malignant", "base_prob": 0.04},
-    {"label": "Benign Keratosis (Seborrheic)", "code": "bkl", "risk": "benign", "base_prob": 0.12},
-    {"label": "Basal Cell Carcinoma", "code": "bcc", "risk": "malignant", "base_prob": 0.05},
-    {"label": "Actinic Keratoses (Pre-cancerous)", "code": "akiec", "risk": "premalignant", "base_prob": 0.03},
-    {"label": "Vascular Lesions", "code": "vasc", "risk": "benign", "base_prob": 0.02},
-    {"label": "Dermatofibroma", "code": "df", "risk": "benign", "base_prob": 0.02},
-]
+_HF_LESION_MODEL = "nateraw/skin-cancer-mnist-ham10000"
+
+
+def _hf_failure(error: str) -> Dict[str, Any]:
+    """Honest failure envelope — no fabricated prediction or confidence."""
+    return {
+        "success": False,
+        "source": f"HuggingFace ({_HF_LESION_MODEL})",
+        "model_used": _HF_LESION_MODEL,
+        "error": error,
+        "predictions": None,
+        "top_prediction": None,
+        "confidence_score": None,
+    }
+
 
 async def classify_skin_lesion_hf(image_url: Optional[str] = None) -> Dict[str, Any]:
     """
-    Classify skin lesion photo using Hugging Face Open-Source Vision Models.
-    Model: nateraw/skin-cancer-mnist-ham10000 or AnishG/skin-lesion-classifier
+    Classify a skin lesion photo using the Hugging Face HAM10000 vision model.
+
+    Returns the REAL model prediction on success. On any failure (no key, no
+    image, download/inference error) returns success=False with the error and NO
+    fabricated prediction — a made-up "benign nevus" call on a broken model could
+    cause a patient to ignore a real malignancy.
     """
-    if HF_API_KEY and image_url:
-        try:
-            model_id = "nateraw/skin-cancer-mnist-ham10000"
-            api_url = f"https://api-inference.huggingface.co/models/{model_id}"
-            headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-            
-            async with httpx.AsyncClient() as client:
-                # Fetch image bytes
-                img_resp = await client.get(image_url, timeout=10.0)
-                if img_resp.status_code == 200:
-                    hf_resp = await client.post(api_url, headers=headers, content=img_resp.content, timeout=15.0)
-                    if hf_resp.status_code == 200:
-                        predictions = hf_resp.json()
-                        return {
-                            "success": True,
-                            "source": f"HuggingFace ({model_id})",
-                            "predictions": predictions
-                        }
-        except Exception:
-            pass
+    if not image_url:
+        return _hf_failure("No image provided for lesion classification")
+    if not HF_API_KEY:
+        return _hf_failure("HUGGINGFACE_API_KEY not configured")
 
-    # High-fidelity probabilistic fallback matching HAM10000 distribution
-    probabilities = [
-        {"label": d["label"], "score": round(d["base_prob"], 4), "risk_category": d["risk"]}
-        for d in HAM10000_DIAGNOSES
-    ]
+    try:
+        api_url = f"https://api-inference.huggingface.co/models/{_HF_LESION_MODEL}"
+        headers = {"Authorization": f"Bearer {HF_API_KEY}"}
 
-    return {
-        "success": True,
-        "source": "HuggingFace Open-Source Lesion Model Engine",
-        "top_prediction": "Melanocytic Nevi (Moles)",
-        "confidence_score": 72.4,
-        "predictions": probabilities,
-        "model_used": "nateraw/skin-cancer-mnist-ham10000 (Open-Source ResNet50)"
-    }
+        async with httpx.AsyncClient() as client:
+            img_resp = await client.get(image_url, timeout=10.0)
+            if img_resp.status_code != 200:
+                return _hf_failure(f"Failed to download image (HTTP {img_resp.status_code})")
+
+            hf_resp = await client.post(api_url, headers=headers, content=img_resp.content, timeout=15.0)
+            if hf_resp.status_code != 200:
+                return _hf_failure(f"HuggingFace inference failed (HTTP {hf_resp.status_code}): {hf_resp.text[:200]}")
+
+            predictions = hf_resp.json()
+
+        # Derive the top prediction from the REAL model output, never a constant.
+        if not isinstance(predictions, list) or not predictions:
+            return _hf_failure(f"Unexpected model output: {str(predictions)[:200]}")
+
+        top = max(predictions, key=lambda p: p.get("score", 0))
+        return {
+            "success": True,
+            "source": f"HuggingFace ({_HF_LESION_MODEL})",
+            "model_used": _HF_LESION_MODEL,
+            "predictions": predictions,
+            "top_prediction": top.get("label"),
+            "confidence_score": round(float(top.get("score", 0)) * 100, 2),
+        }
+    except Exception as e:
+        return _hf_failure(str(e))
 
 async def generate_bge_embedding_hf(text: str) -> List[float]:
     """
-    Generate vector embedding using BAAI/bge-small-en-v1.5 open-source model.
+    Generate a real vector embedding using BAAI/bge-small-en-v1.5.
+
+    Raises on failure. A fake/pseudo-random embedding would silently poison every
+    downstream vector search and cache lookup, producing meaningless "matches"
+    that look real — so we never substitute one.
     """
-    if HF_API_KEY:
-        try:
-            model_id = "BAAI/bge-small-en-v1.5"
-            api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_id}"
-            headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-            payload = {"inputs": text}
+    if not HF_API_KEY:
+        raise RuntimeError("HUGGINGFACE_API_KEY not configured; cannot generate embedding")
 
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(api_url, headers=headers, json=payload, timeout=10.0)
-                if resp.status_code == 200:
-                    vec = resp.json()
-                    if isinstance(vec, list) and len(vec) > 0:
-                        raw_vec = vec[0] if isinstance(vec[0], list) else vec
-                        # Normalize/pad to 768 dimensions
-                        if len(raw_vec) < 768:
-                            return raw_vec + [0.0] * (768 - len(raw_vec))
-                        return raw_vec[:768]
-        except Exception:
-            pass
+    model_id = "BAAI/bge-small-en-v1.5"
+    api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_id}"
+    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+    payload = {"inputs": text}
 
-    # Deterministic 768-dim pseudo-vector fallback
-    hash_val = sum(ord(c) for c in text)
-    return [math.sin(hash_val + i) * 0.5 for i in range(768)]
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(api_url, headers=headers, json=payload, timeout=10.0)
+        resp.raise_for_status()
+        vec = resp.json()
+
+    if not isinstance(vec, list) or len(vec) == 0:
+        raise RuntimeError(f"Unexpected embedding output from {model_id}")
+
+    raw_vec = vec[0] if isinstance(vec[0], list) else vec
+    if len(raw_vec) < 768:
+        return raw_vec + [0.0] * (768 - len(raw_vec))
+    return raw_vec[:768]
 
 async def generate_llm_completion_hf(prompt: str) -> str:
     """
-    Generate text response using Mistral-7B / Llama-3.2 Open-Source LLMs via Hugging Face.
+    Generate a real text completion via Mistral-7B on Hugging Face.
+
+    Raises on failure — returning a canned "grounded clinical summary" string
+    would masquerade as model-generated clinical content.
     """
-    if HF_API_KEY:
-        try:
-            model_id = "mistralai/Mistral-7B-Instruct-v0.3"
-            api_url = f"https://api-inference.huggingface.co/models/{model_id}"
-            headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-            payload = {"inputs": prompt, "parameters": {"max_new_tokens": 300, "temperature": 0.2}}
+    if not HF_API_KEY:
+        raise RuntimeError("HUGGINGFACE_API_KEY not configured; cannot generate completion")
 
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(api_url, headers=headers, json=payload, timeout=15.0)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if isinstance(data, list) and len(data) > 0:
-                        return data[0].get("generated_text", "")
-        except Exception:
-            pass
+    model_id = "mistralai/Mistral-7B-Instruct-v0.3"
+    api_url = f"https://api-inference.huggingface.co/models/{model_id}"
+    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+    payload = {"inputs": prompt, "parameters": {"max_new_tokens": 300, "temperature": 0.2}}
 
-    return "Grounded clinical summary generated via Hugging Face Open-Source Model Pipeline."
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(api_url, headers=headers, json=payload, timeout=15.0)
+        resp.raise_for_status()
+        data = resp.json()
+
+    if isinstance(data, list) and len(data) > 0 and "generated_text" in data[0]:
+        return data[0]["generated_text"]
+    raise RuntimeError(f"Unexpected completion output from {model_id}")
