@@ -6,7 +6,7 @@ import { useParams, notFound, useRouter } from 'next/navigation';
 import { useAnalyses, type AnalysisReport, type Explanation } from '@/hooks/use-analyses';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from "@/components/ui/button";
-import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Languages, Mic, Send, Bot, User, Volume2, Stethoscope, Download, ShieldCheck, Database } from "lucide-react";
+import { CheckCircle, FileText, XCircle, ArrowLeft, Loader2, Upload, LineChart, Sparkles, Languages, Mic, Send, Bot, User, Volume2, Stethoscope, Download, ShieldCheck, Database, AlertTriangle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { downloadFhirJson } from "@/lib/fhir-exporter";
@@ -746,50 +746,52 @@ export default function AnalysisDetailPage() {
                                 </div>
                                 <div className="space-y-1">
                                     <h2 className="text-base md:text-lg font-bold text-foreground">
-                                        Clinical Triage in Progress (FDA SaMD 21 CFR 878.1830)
+                                        AI-Generated Preliminary Analysis
                                     </h2>
                                     <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
-                                        Your lesion photograph and diagnostic consultation data are safely recorded. Under clinical safety protocols, a credentialed board-certified dermatologist reviews all automated vision findings before releasing confirmed diagnostic conclusions and prescriptions.
+                                        This report has not yet been reviewed by a board-certified dermatologist. Attach it when requesting an appointment with a doctor to get a clinician-verified diagnosis and prescription.
                                     </p>
                                 </div>
                             </div>
 
-                            {/* 4-Stage Clinical Progress Timeline */}
-                            <div className="pt-2">
-                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-                                    <div className="p-3 rounded-xl bg-background/80 border border-border/80 space-y-1 shadow-2xs">
-                                        <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
-                                            <CheckCircle className="h-3.5 w-3.5" />
-                                            <span>Stage 1: Ingested</span>
-                                        </div>
-                                        <p className="text-muted-foreground text-[10px]">Photo & symptom log captured</p>
+                            {/* 3-Stage Automated Pipeline Summary */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                <div className="p-3 rounded-xl bg-background/80 border border-border/80 space-y-1 shadow-2xs">
+                                    <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                        <span>Stage 1: Disease Detected</span>
                                     </div>
+                                    <p className="text-muted-foreground text-[10px]">AI identified {analysis.conditionName || 'the condition'} from your photo</p>
+                                </div>
 
-                                    <div className="p-3 rounded-xl bg-background/80 border border-border/80 space-y-1 shadow-2xs">
-                                        <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
-                                            <CheckCircle className="h-3.5 w-3.5" />
-                                            <span>Stage 2: AI Calibrated</span>
-                                        </div>
-                                        <p className="text-muted-foreground text-[10px]">Multi-agent vision differential computed</p>
+                                <div className="p-3 rounded-xl bg-background/80 border border-border/80 space-y-1 shadow-2xs">
+                                    <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                        <span>Stage 2: Proforma Completed</span>
                                     </div>
+                                    <p className="text-muted-foreground text-[10px]">Follow-up symptom questions answered</p>
+                                </div>
 
-                                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 space-y-1 shadow-2xs">
-                                        <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-bold text-[11px]">
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                            <span>Stage 3: In Review</span>
-                                        </div>
-                                        <p className="text-foreground font-medium text-[10px]">Assigned to: Dr. Sarah Jenkins, MD</p>
+                                <div className="p-3 rounded-xl bg-background/80 border border-border/80 space-y-1 shadow-2xs">
+                                    <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                        <span>Stage 3: Report Generated</span>
                                     </div>
-
-                                    <div className="p-3 rounded-xl bg-muted/40 border border-border/40 space-y-1 opacity-70">
-                                        <div className="flex items-center gap-1.5 text-muted-foreground font-medium text-[11px]">
-                                            <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
-                                            <span>Stage 4: Release</span>
-                                        </div>
-                                        <p className="text-muted-foreground text-[10px]">Full diagnostic findings & prescription</p>
-                                    </div>
+                                    <p className="text-muted-foreground text-[10px]">Full AI diagnostic report compiled</p>
                                 </div>
                             </div>
+
+                            {/* AI-Generated Content Caution */}
+                            <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+                                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                <p className="text-[11px] md:text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                                    <strong>Caution:</strong> All three stages above are fully automated and generated by AI. No human clinician has reviewed this report — do not use it as a final diagnosis or to self-prescribe treatment.
+                                </p>
+                            </div>
+
+                            <Button asChild size="sm" className="rounded-full h-9 px-4 text-xs font-semibold">
+                                <Link href="/doctors">Book an Appointment</Link>
+                            </Button>
                         </section>
                     ) : (
                         /* OFFICIAL CLINICIAN RELEASE ATTESTATION */

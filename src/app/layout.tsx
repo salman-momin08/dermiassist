@@ -38,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${sourceCodePro.variable}`}>
-      <body className="font-body antialiased min-h-screen w-full overflow-x-hidden">
+      <body className="font-body antialiased min-h-screen w-full overflow-x-clip">
         <AuthProvider>
           <ThemeProvider
             attribute="class"

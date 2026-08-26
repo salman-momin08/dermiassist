@@ -201,6 +201,18 @@ export default function AdminRequestsPage() {
                 } catch (cacheError) {
                     // Don't throw - cache invalidation failure shouldn't block the role change
                 }
+
+                // Also bust the public doctor list cache, otherwise a newly
+                // verified doctor stays invisible on /doctors until the
+                // 5-minute cache TTL expires on its own.
+                if (request.data.requestedRole === 'doctor') {
+                    try {
+                        const { invalidateDoctorListCache } = await import('@/lib/redis/doctor-cache');
+                        await invalidateDoctorListCache();
+                    } catch (cacheError) {
+                        // Don't throw - cache invalidation failure shouldn't block the role change
+                    }
+                }
             }
 
             // Update request status to approved
