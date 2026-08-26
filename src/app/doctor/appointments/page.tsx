@@ -609,11 +609,20 @@ export default function DoctorAppointmentsPage() {
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
                                                             <div className="inline-block">
-                                                                <Button asChild size="sm" disabled={!isJoinButtonEnabled(app.appointment_date)}>
-                                                                    <Link href={`/video/${app.id}`}>
+                                                                {isJoinButtonEnabled(app.appointment_date) ? (
+                                                                    <Button asChild size="sm">
+                                                                        <Link href={`/video/${app.id}`}>
+                                                                            <Video className="mr-2 h-4 w-4" /> Join Call
+                                                                        </Link>
+                                                                    </Button>
+                                                                ) : (
+                                                                    // See patient-side appointments page: a disabled Button
+                                                                    // can't wrap a Link — anchors never match `:disabled`,
+                                                                    // so the button stayed visually and functionally active.
+                                                                    <Button size="sm" disabled>
                                                                         <Video className="mr-2 h-4 w-4" /> Join Call
-                                                                    </Link>
-                                                                </Button>
+                                                                    </Button>
+                                                                )}
                                                             </div>
                                                         </TooltipTrigger>
                                                         <TooltipContent>
