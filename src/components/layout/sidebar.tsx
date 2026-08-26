@@ -56,7 +56,7 @@ export function AppSidebar() {
   const links = role === 'doctor' ? doctorLinks : role === 'admin' ? adminLinks : patientLinks;
 
   return (
-    <aside className="hidden lg:flex w-64 flex-col justify-between border-r border-border/80 bg-card/50 backdrop-blur-xl p-4 min-h-[calc(100vh-4rem)] sticky top-16 select-none">
+    <aside className="hidden lg:flex w-64 flex-col justify-between border-r border-border/80 bg-card/50 backdrop-blur-xl p-4 h-[calc(100vh-4rem)] sticky top-16 self-start select-none">
       {/* Navigation Links */}
       <div className="space-y-1">
         {links.map((link) => {
