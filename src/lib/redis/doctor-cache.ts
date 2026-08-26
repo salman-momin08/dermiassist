@@ -30,32 +30,20 @@ export interface DoctorListFilters {
 }
 
 /**
- * Generate cache key for doctor list based on filters
+ * Fetch and cache the full unfiltered list of doctor profiles under a single
+ * stable cache key, regardless of which filters the caller wants applied.
+ *
+ * This intentionally does NOT key the cache by filter combination: Upstash
+ * doesn't support pattern/SCAN deletes (see deleteCachePattern in cache.ts),
+ * so a per-filter cache key can never be reliably invalidated when a doctor's
+ * `verified` status or profile changes — it would just sit stale until its
+ * TTL expired. Caching one base list and filtering in memory means a single
+ * invalidateDoctorListCache() call actually busts everything callers see.
  */
-function getDoctorListCacheKey(filters?: DoctorListFilters): string {
-    if (!filters || Object.keys(filters).length === 0) {
-        return CacheKeys.doctorList();
-    }
-
-    // Create a stable string from filters for cache key
-    const filterString = JSON.stringify(filters, Object.keys(filters).sort());
-    return CacheKeys.doctorList(filterString);
-}
-
-/**
- * Get cached doctor listings
- * 
- * @param filters - Optional filters for doctor search
- * @returns Array of doctor profiles
- */
-export async function getCachedDoctorList(
-    filters?: DoctorListFilters
-): Promise<DoctorProfile[]> {
-    const cacheKey = getDoctorListCacheKey(filters);
-
+async function getCachedAllDoctors(): Promise<DoctorProfile[]> {
     try {
-        const doctors = await getCacheOrSet<DoctorProfile[]>(
-            cacheKey,
+        return await getCacheOrSet<DoctorProfile[]>(
+            CacheKeys.doctorList(),
             async () => {
                 return await withRetry(async () => {
                     const supabase = await createClient();
@@ -63,29 +51,11 @@ export async function getCachedDoctorList(
                     // leftover patient-only PII (dob, gender, blood_group, city, state,
                     // address) on rows that changed role from patient to doctor, and
                     // this result set is served to the public doctor listing.
-                    let query = supabase
+                    const { data, error } = await supabase
                         .from('profiles')
                         .select('id, email, display_name, photo_url, verified, specialization, location, bio, phone, signature_url, education, certificates, years_of_experience, languages, consultation_fee, role, created_at, updated_at')
-                        .eq('role', 'doctor');
-
-                    // Apply filters
-                    if (filters?.specialization) {
-                        query = query.eq('specialization', filters.specialization);
-                    }
-                    if (filters?.verified !== undefined) {
-                        query = query.eq('verified', filters.verified);
-                    }
-                    if (filters?.minFee) {
-                        query = query.gte('consultation_fee', filters.minFee);
-                    }
-                    if (filters?.maxFee) {
-                        query = query.lte('consultation_fee', filters.maxFee);
-                    }
-                    if (filters?.search) {
-                        query = query.or(`display_name.ilike.%${filters.search}%,specialization.ilike.%${filters.search}%`);
-                    }
-
-                    const { data, error } = await query.order('created_at', { ascending: false });
+                        .eq('role', 'doctor')
+                        .order('created_at', { ascending: false });
 
                     if (error) {
                         if (isNetworkError(error)) {
@@ -103,12 +73,38 @@ export async function getCachedDoctorList(
             },
             { ttl: CacheTTL.DOCTOR_LIST } // 5 minutes
         );
-
-        return doctors;
     } catch (error) {
         logger.error('[Doctor Cache] Failed to get doctor list:', error);
         return [];
     }
+}
+
+/**
+ * Get cached doctor listings
+ *
+ * @param filters - Optional filters for doctor search
+ * @returns Array of doctor profiles
+ */
+export async function getCachedDoctorList(
+    filters?: DoctorListFilters
+): Promise<DoctorProfile[]> {
+    const all = await getCachedAllDoctors();
+
+    if (!filters) return all;
+
+    return all.filter((doctor) => {
+        if (filters.specialization && doctor.specialization !== filters.specialization) return false;
+        if (filters.verified !== undefined && !!doctor.verified !== filters.verified) return false;
+        const fee = doctor.consultation_fee !== undefined ? Number(doctor.consultation_fee) : undefined;
+        if (filters.minFee !== undefined && !(fee !== undefined && fee >= filters.minFee)) return false;
+        if (filters.maxFee !== undefined && !(fee !== undefined && fee <= filters.maxFee)) return false;
+        if (filters.search) {
+            const needle = filters.search.toLowerCase();
+            const haystack = `${doctor.display_name ?? ''} ${doctor.specialization ?? ''}`.toLowerCase();
+            if (!haystack.includes(needle)) return false;
+        }
+        return true;
+    });
 }
 
 /**
