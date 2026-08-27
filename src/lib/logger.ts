@@ -22,10 +22,23 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
 const configuredLevel = (process.env.LOG_LEVEL as LogLevel | undefined) ?? 'info';
 const isProduction = process.env.NODE_ENV === 'production';
 
+function serializePayload(data: unknown): Record<string, unknown> {
+    // Error instances store `message`/`stack`/`name` as non-enumerable own
+    // properties, so `{ ...error }` silently drops them — spreading an
+    // Error into a log entry produces {}. Extract them explicitly instead.
+    if (data instanceof Error) {
+        return { message: data.message, stack: data.stack, name: data.name };
+    }
+    if (typeof data === 'object' && data !== null) {
+        return data as Record<string, unknown>;
+    }
+    return { detail: data };
+}
+
 function emit(level: LogLevel, event: string, data?: unknown): void {
     if (LEVEL_ORDER[level] < LEVEL_ORDER[configuredLevel]) return;
 
-    const payload = typeof data === 'object' && data !== null ? data : { detail: data };
+    const payload = serializePayload(data);
 
     if (isProduction) {
         // NDJSON — one log entry per line; pipe-friendly for log aggregators
