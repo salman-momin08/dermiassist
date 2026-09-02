@@ -91,6 +91,21 @@ const nextConfig: NextConfig = {
             { message: /require\.extensions is not supported by webpack/ },
         ];
 
+        // Genkit pulls in @opentelemetry/sdk-node, which does a conditional
+        // require('@opentelemetry/exporter-jaeger') guarded by try/catch —
+        // OpenTelemetry deliberately excludes it from sdk-node's own
+        // dependencies because JaegerExporter doesn't support bundling, so
+        // it's never installed. We never set OTEL_TRACES_EXPORTER=jaeger, so
+        // that require never actually runs, but webpack still tries to resolve
+        // it statically at build time and fails the build. Alias it to false so
+        // webpack treats it as an empty module instead.
+        config.resolve = config.resolve || {};
+        const existingAlias = Array.isArray(config.resolve.alias) ? {} : config.resolve.alias;
+        config.resolve.alias = {
+            ...existingAlias,
+            '@opentelemetry/exporter-jaeger': false,
+        };
+
         return config;
     },
 };
