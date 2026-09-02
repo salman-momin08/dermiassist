@@ -8,14 +8,14 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
-export const GenerateSuggestionsInputSchema = z.object({
+const GenerateSuggestionsInputSchema = z.object({
   question: z.string().describe('The clinical question asked to the patient.'),
   conditionName: z.string().optional().describe('The detected skin condition name.'),
   conversationHistory: z.string().optional().describe('Prior consultation Q&A context.'),
 });
 export type GenerateSuggestionsInput = z.infer<typeof GenerateSuggestionsInputSchema>;
 
-export const GenerateSuggestionsOutputSchema = z.object({
+const GenerateSuggestionsOutputSchema = z.object({
   suggestions: z.array(z.string()).describe('An array of 3 to 4 short, realistic response options (2-6 words each) tailored specifically to the question.'),
 });
 export type GenerateSuggestionsOutput = z.infer<typeof GenerateSuggestionsOutputSchema>;
@@ -48,7 +48,7 @@ Rules:
 `,
 });
 
-export const generateSuggestionsFlow = ai.defineFlow(
+const generateSuggestionsFlow = ai.defineFlow(
   {
     name: 'generateSuggestionsFlow',
     inputSchema: GenerateSuggestionsInputSchema,
