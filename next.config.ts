@@ -99,8 +99,13 @@ const nextConfig: NextConfig = {
         // that require never actually runs, but webpack still tries to
         // resolve it statically at build time and fails the build. Alias it
         // to false so webpack treats it as an empty module instead.
+        // config.resolve.alias is typed as either a plain object or an
+        // AliasOption[] array; guard both that and a missing `resolve`
+        // so the merge below can't throw at build time.
+        config.resolve = config.resolve || {};
+        const existingAlias = Array.isArray(config.resolve.alias) ? {} : config.resolve.alias;
         config.resolve.alias = {
-            ...config.resolve.alias,
+            ...existingAlias,
             '@opentelemetry/exporter-jaeger': false,
         };
 
