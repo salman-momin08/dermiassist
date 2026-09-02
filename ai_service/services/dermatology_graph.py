@@ -38,7 +38,7 @@ class DermatologyState(TypedDict):
     final_evaluation: Optional[Dict[str, Any]]
     error: Optional[str]
 
-def _get_gemini_model(model_name: str = "gemini-3-flash"):
+def _get_gemini_model(model_name: str = "gemini-2.5-flash"):
     """Initialize Google Gemini client safely."""
     genai = _get_genai_module()
     if not genai:
@@ -56,6 +56,38 @@ def _get_openai_client():
         return AsyncOpenAI(api_key=OPENAI_API_KEY)
     except Exception:
         return None
+
+# Substrings that mark a transient, retryable model error (overload/rate/timeout)
+# rather than a permanent one (bad model name, auth, malformed request).
+_TRANSIENT_MARKERS = (
+    "503", "unavailable", "high demand", "overloaded", "try again later",
+    "429", "rate limit", "resource_exhausted", "quota", "timeout", "deadline",
+)
+
+def _is_transient_error(err: Exception) -> bool:
+    msg = str(err).lower()
+    return any(marker in msg for marker in _TRANSIENT_MARKERS)
+
+async def _gemini_generate_with_retry(model, contents, max_retries: int = 3, base_delay: float = 1.0):
+    """Call Gemini's blocking generate_content off the event loop, retrying with
+    exponential backoff on transient errors (e.g. 503 "high demand", 429).
+
+    Permanent errors (bad model id, auth, invalid request) are re-raised
+    immediately so the caller can fall back to another provider without waiting.
+    """
+    last_err: Optional[Exception] = None
+    for attempt in range(max_retries):
+        try:
+            return await asyncio.to_thread(model.generate_content, contents)
+        except Exception as e:  # noqa: BLE001 — classify by message, then re-raise
+            last_err = e
+            if not _is_transient_error(e) or attempt == max_retries - 1:
+                raise
+            delay = base_delay * (2 ** attempt)
+            print(f"[Gemini transient error — retry {attempt + 1}/{max_retries} in {delay}s]: {e}")
+            await asyncio.sleep(delay)
+    # Loop always returns or raises; this satisfies type-checkers.
+    raise last_err  # type: ignore[misc]
 
 # =====================================================================
 # Node 1: Vision Diagnostic Condition Detection
@@ -86,7 +118,7 @@ Do not provide any other information, summary, or recommendations. Return ONLY t
             elif "image/webp" in header:
                 mime_type = "image/webp"
 
-        model = _get_gemini_model("gemini-3-flash")
+        model = _get_gemini_model("gemini-2.5-flash")
         if not model:
             raise RuntimeError("Gemini model not initialized")
         
@@ -95,9 +127,9 @@ Do not provide any other information, summary, or recommendations. Return ONLY t
             "data": base64_data
         }
 
-        # generate_content is a blocking sync call — offload to a thread so it
-        # doesn't block the FastAPI event loop and serialize concurrent requests.
-        response = await asyncio.to_thread(model.generate_content, [prompt, image_part])
+        # generate_content is a blocking sync call — offload to a thread (so it
+        # doesn't block the FastAPI event loop) and retry transient overloads.
+        response = await _gemini_generate_with_retry(model, [prompt, image_part])
         condition_name = response.text.strip().replace("*", "").replace("\n", " ")
         # Clean up any quotes
         condition_name = re.sub(r'^["\']|["\']$', '', condition_name).strip()
@@ -169,12 +201,12 @@ Rules:
 Based on the above patient history and the suspected condition ({condition_name}), ask the single most important next clinical question:"""
 
     try:
-        model = _get_gemini_model("gemini-3-flash")
+        model = _get_gemini_model("gemini-2.5-flash")
         if not model:
             raise RuntimeError("Gemini model not initialized")
         
         full_prompt = f"{system_instruction}\n\n{user_prompt}"
-        response = await asyncio.to_thread(model.generate_content, full_prompt)
+        response = await _gemini_generate_with_retry(model, full_prompt)
         question = response.text.strip().replace('"', '').replace("'", "")
         
         return {
@@ -242,7 +274,7 @@ Return a valid JSON object matching this exact structure:
 Return ONLY valid JSON."""
 
     try:
-        model = _get_gemini_model("gemini-3-flash")
+        model = _get_gemini_model("gemini-2.5-flash")
         if not model:
             raise RuntimeError("Gemini model not initialized")
         
@@ -254,7 +286,7 @@ Return ONLY valid JSON."""
                 mime_type = "image/png"
             contents.append({"mime_type": mime_type, "data": base64_data})
 
-        response = await asyncio.to_thread(model.generate_content, contents)
+        response = await _gemini_generate_with_retry(model, contents)
         text = response.text.strip()
 
         # Clean JSON markdown if wrapped
@@ -267,10 +299,32 @@ Return ONLY valid JSON."""
         return {"final_evaluation": data}
     except Exception as e:
         print(f"[LangGraph Final Eval Error]: {e}")
-        # The final evaluation IS the clinical report shown to the patient. If the
-        # model failed, we must not fabricate dos/donts/recommendations — that
-        # would be inventing medical advice. Surface the failure instead.
-        raise RuntimeError(f"Final clinical evaluation failed: {e}") from e
+        # Real provider fallback: OpenAI GPT-4o (with the image when available).
+        # The final evaluation is the clinical report shown to the patient — we
+        # try a genuine second model before failing, but never fabricate a report.
+        openai_client = _get_openai_client()
+        if openai_client:
+            try:
+                content: List[Any] = [{"type": "text", "text": prompt}]
+                if photo_uri:
+                    content.append({"type": "image_url", "image_url": {"url": photo_uri}})
+                res = await openai_client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[{"role": "user", "content": content}],
+                    response_format={"type": "json_object"},
+                    max_tokens=1200,
+                )
+                text = (res.choices[0].message.content or "").strip()
+                data = json.loads(text)
+                return {"final_evaluation": data}
+            except Exception as oai_err:
+                print(f"[LangGraph OpenAI Final Eval Fallback Error]: {oai_err}")
+                raise RuntimeError(
+                    f"Final clinical evaluation failed on all providers. Gemini: {e}; OpenAI: {oai_err}"
+                ) from oai_err
+
+        # No real provider available — surface the failure, never invent medical advice.
+        raise RuntimeError(f"Final clinical evaluation failed and no fallback provider is configured: {e}") from e
 
 # =====================================================================
 # LangGraph State Machine Builder
@@ -368,9 +422,9 @@ Rules:
 2. Return ONLY a JSON list of 3-4 strings. Example: ["Option 1", "Option 2", "Option 3"]
 """
     try:
-        model = _get_gemini_model("gemini-3-flash")
+        model = _get_gemini_model("gemini-2.5-flash")
         if model:
-            res = await asyncio.to_thread(model.generate_content, prompt)
+            res = await _gemini_generate_with_retry(model, prompt)
             text = res.text.strip()
             # Extract JSON array
             match = re.search(r'\[.*\]', text, re.DOTALL)
