@@ -33,34 +33,44 @@ def _hf_failure(error: str) -> Dict[str, Any]:
     }
 
 
-async def classify_skin_lesion_hf(image_url: Optional[str] = None) -> Dict[str, Any]:
+async def classify_skin_lesion_hf(
+    image_url: Optional[str] = None,
+    image_bytes: Optional[bytes] = None,
+) -> Dict[str, Any]:
     """
     Classify a skin lesion photo using the Hugging Face HAM10000 vision model.
+
+    Accepts either a public `image_url` (downloaded first) or raw `image_bytes`
+    (e.g. decoded from a base64 data URI) posted directly to the inference API.
 
     Returns the REAL model prediction on success. On any failure (no key, no
     image, download/inference error) returns success=False with the error and NO
     fabricated prediction — a made-up "benign nevus" call on a broken model could
     cause a patient to ignore a real malignancy.
     """
-    if not image_url:
+    if not image_url and not image_bytes:
         return _hf_failure("No image provided for lesion classification")
     if not HF_API_KEY:
         return _hf_failure("HUGGINGFACE_API_KEY not configured")
-    try:
-        assert_public_http_url(image_url)
-    except UnsafeUrlError as e:
-        return _hf_failure(f"Image URL rejected: {e}")
 
     try:
         api_url = f"https://api-inference.huggingface.co/models/{_HF_LESION_MODEL}"
         headers = {"Authorization": f"Bearer {HF_API_KEY}"}
 
         async with httpx.AsyncClient() as client:
-            img_resp = await client.get(image_url, timeout=10.0)
-            if img_resp.status_code != 200:
-                return _hf_failure(f"Failed to download image (HTTP {img_resp.status_code})")
+            content = image_bytes
+            if content is None:
+                # URL path — validate against SSRF, then download the image.
+                try:
+                    assert_public_http_url(image_url)
+                except UnsafeUrlError as e:
+                    return _hf_failure(f"Image URL rejected: {e}")
+                img_resp = await client.get(image_url, timeout=10.0)
+                if img_resp.status_code != 200:
+                    return _hf_failure(f"Failed to download image (HTTP {img_resp.status_code})")
+                content = img_resp.content
 
-            hf_resp = await client.post(api_url, headers=headers, content=img_resp.content, timeout=15.0)
+            hf_resp = await client.post(api_url, headers=headers, content=content, timeout=30.0)
             if hf_resp.status_code != 200:
                 return _hf_failure(f"HuggingFace inference failed (HTTP {hf_resp.status_code}): {hf_resp.text[:200]}")
 
@@ -111,7 +121,7 @@ async def generate_bge_embedding_hf(text: str) -> List[float]:
         return raw_vec + [0.0] * (768 - len(raw_vec))
     return raw_vec[:768]
 
-async def generate_llm_completion_hf(prompt: str) -> str:
+async def generate_llm_completion_hf(prompt: str, max_new_tokens: int = 300) -> str:
     """
     Generate a real text completion via Mistral-7B on Hugging Face.
 
@@ -124,13 +134,23 @@ async def generate_llm_completion_hf(prompt: str) -> str:
     model_id = "mistralai/Mistral-7B-Instruct-v0.3"
     api_url = f"https://api-inference.huggingface.co/models/{model_id}"
     headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-    payload = {"inputs": prompt, "parameters": {"max_new_tokens": 300, "temperature": 0.2}}
+    # Mistral-Instruct is tuned on the [INST] chat template; wrap the prompt so
+    # we get an answer, not a continuation. return_full_text=False strips the
+    # echoed prompt from the response.
+    payload = {
+        "inputs": f"<s>[INST] {prompt} [/INST]",
+        "parameters": {
+            "max_new_tokens": max_new_tokens,
+            "temperature": 0.2,
+            "return_full_text": False,
+        },
+    }
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(api_url, headers=headers, json=payload, timeout=15.0)
+        resp = await client.post(api_url, headers=headers, json=payload, timeout=30.0)
         resp.raise_for_status()
         data = resp.json()
 
     if isinstance(data, list) and len(data) > 0 and "generated_text" in data[0]:
-        return data[0]["generated_text"]
+        return data[0]["generated_text"].strip()
     raise RuntimeError(f"Unexpected completion output from {model_id}")

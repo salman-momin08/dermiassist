@@ -825,7 +825,7 @@ export default function AnalyzeClient() {
                       {/* Message Content & Discreet Metadata */}
                       {isAi ? (
                         <div className="flex flex-col items-start max-w-[85%] sm:max-w-[75%]">
-                          <div className="w-fit rounded-2xl rounded-tl-xs px-4.5 py-3.5 bg-card text-foreground border border-border/80 shadow-xs text-[13.5px] leading-relaxed whitespace-pre-wrap font-normal">
+                          <div className="w-fit rounded-2xl rounded-tl-xs px-6 py-3.5 bg-card text-foreground border border-border/80 shadow-xs text-[13.5px] leading-relaxed whitespace-pre-wrap font-normal">
                             {msg.text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
                               if (part.startsWith('**') && part.endsWith('**')) {
                                 return <strong key={i} className="text-primary font-bold">{part.slice(2, -2)}</strong>;
@@ -858,7 +858,7 @@ export default function AnalyzeClient() {
                         </div>
                       ) : (
                         <div className="flex flex-col items-end max-w-[80%] sm:max-w-[70%] ml-auto">
-                          <div className="w-fit rounded-2xl rounded-tr-xs px-4.5 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-500/15 text-[13.5px] leading-relaxed whitespace-pre-wrap font-normal">
+                          <div className="w-fit rounded-2xl rounded-tr-xs px-6 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-500/15 text-[13.5px] leading-relaxed whitespace-pre-wrap font-normal">
                             {msg.text}
                           </div>
                           {/* Timestamp strictly beneath the message card */}

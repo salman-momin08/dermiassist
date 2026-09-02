@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import base64
 import asyncio
 import importlib
 from typing import TypedDict, List, Dict, Any, Optional
@@ -89,6 +90,33 @@ async def _gemini_generate_with_retry(model, contents, max_retries: int = 3, bas
     # Loop always returns or raises; this satisfies type-checkers.
     raise last_err  # type: ignore[misc]
 
+# HAM10000 class abbreviations → human-readable dermatology names. The HF model
+# returns the short class code; we expand it so the UI shows a real condition
+# name. Unknown codes fall through to the raw label (never fabricated).
+_HAM10000_LABELS = {
+    "akiec": "Actinic Keratosis / Bowen's Disease",
+    "bcc": "Basal Cell Carcinoma",
+    "bkl": "Benign Keratosis-like Lesion",
+    "df": "Dermatofibroma",
+    "mel": "Melanoma",
+    "nv": "Melanocytic Nevus",
+    "vasc": "Vascular Lesion",
+}
+
+def _humanize_ham10000_label(label: str) -> str:
+    key = (label or "").strip().lower()
+    return _HAM10000_LABELS.get(key, label.strip() if label else "Dermatological Condition")
+
+def _data_uri_to_bytes(photo_uri: str) -> Optional[bytes]:
+    """Decode a base64 data URI (or raw base64) into raw image bytes."""
+    if not photo_uri:
+        return None
+    try:
+        b64 = photo_uri.split(",", 1)[1] if "," in photo_uri else photo_uri
+        return base64.b64decode(b64)
+    except Exception:
+        return None
+
 # =====================================================================
 # Node 1: Vision Diagnostic Condition Detection
 # =====================================================================
@@ -140,8 +168,9 @@ Do not provide any other information, summary, or recommendations. Return ONLY t
         }
     except Exception as e:
         print(f"[LangGraph Vision Node Error]: {e}")
-        # Real provider fallback: OpenAI GPT-4o vision (a genuine second model,
-        # not a canned answer). If it also succeeds we return its real result.
+        errors = [f"Gemini: {e}"]
+
+        # Tier 2 — OpenAI GPT-4o vision (a genuine second model, not a canned answer).
         openai_client = _get_openai_client()
         if openai_client:
             try:
@@ -164,12 +193,28 @@ Do not provide any other information, summary, or recommendations. Return ONLY t
                 raise RuntimeError("OpenAI vision returned empty condition")
             except Exception as oai_err:
                 print(f"[LangGraph OpenAI Vision Fallback Error]: {oai_err}")
-                raise RuntimeError(
-                    f"Vision detection failed on all providers. Gemini: {e}; OpenAI: {oai_err}"
-                ) from oai_err
+                errors.append(f"OpenAI: {oai_err}")
 
-        # No real provider available — surface the failure, never guess a diagnosis.
-        raise RuntimeError(f"Vision detection failed and no fallback provider is configured: {e}") from e
+        # Tier 3 — Hugging Face open-source HAM10000 lesion classifier (free).
+        # Limited to 7 skin-cancer lesion classes, so it's a genuine last resort
+        # for lesion triage rather than general dermatology, but a real model.
+        try:
+            from ai_service.services.huggingface_service import classify_skin_lesion_hf
+            image_bytes = _data_uri_to_bytes(photo_uri)
+            hf_res = await classify_skin_lesion_hf(image_bytes=image_bytes)
+            if hf_res.get("success") and hf_res.get("top_prediction"):
+                return {
+                    "condition_name": _humanize_ham10000_label(hf_res["top_prediction"]),
+                    "confidence_score": hf_res.get("confidence_score"),
+                    "turn_count": 0,
+                }
+            errors.append(f"HuggingFace: {hf_res.get('error')}")
+        except Exception as hf_err:
+            print(f"[LangGraph HuggingFace Vision Fallback Error]: {hf_err}")
+            errors.append(f"HuggingFace: {hf_err}")
+
+        # Every real provider failed — surface it, never guess a diagnosis.
+        raise RuntimeError("Vision detection failed on all providers. " + "; ".join(errors)) from e
 
 # =====================================================================
 # Node 2: Dynamic Proforma Question Generation
@@ -215,7 +260,9 @@ Based on the above patient history and the suspected condition ({condition_name}
         }
     except Exception as e:
         print(f"[LangGraph Proforma Question Node Error]: {e}")
-        # Real provider fallback: OpenAI GPT-4o.
+        errors = [f"Gemini: {e}"]
+
+        # Tier 2 — OpenAI GPT-4o.
         openai_client = _get_openai_client()
         if openai_client:
             try:
@@ -236,13 +283,27 @@ Based on the above patient history and the suspected condition ({condition_name}
                 raise RuntimeError("OpenAI returned empty question")
             except Exception as oai_err:
                 print(f"[LangGraph OpenAI Question Fallback Error]: {oai_err}")
-                raise RuntimeError(
-                    f"Clinical question generation failed on all providers. Gemini: {e}; OpenAI: {oai_err}"
-                ) from oai_err
+                errors.append(f"OpenAI: {oai_err}")
+
+        # Tier 3 — Hugging Face Mistral-7B (free open-source).
+        try:
+            from ai_service.services.huggingface_service import generate_llm_completion_hf
+            question = (await generate_llm_completion_hf(
+                f"{system_instruction}\n\n{user_prompt}", max_new_tokens=120
+            )).strip().replace('"', '')
+            if question:
+                return {
+                    "current_question": question,
+                    "turn_count": state.get("turn_count", 0) + 1
+                }
+            errors.append("HuggingFace: empty question")
+        except Exception as hf_err:
+            print(f"[LangGraph HuggingFace Question Fallback Error]: {hf_err}")
+            errors.append(f"HuggingFace: {hf_err}")
 
         # The follow-up question is part of the clinical interview — do not fake
         # one. Surface the failure so the consultation can be retried/handled.
-        raise RuntimeError(f"Clinical question generation failed and no fallback provider is configured: {e}") from e
+        raise RuntimeError("Clinical question generation failed on all providers. " + "; ".join(errors)) from e
 
 # =====================================================================
 # Node 3: Multi-Agent Final Clinical Evaluation
@@ -299,9 +360,11 @@ Return ONLY valid JSON."""
         return {"final_evaluation": data}
     except Exception as e:
         print(f"[LangGraph Final Eval Error]: {e}")
-        # Real provider fallback: OpenAI GPT-4o (with the image when available).
-        # The final evaluation is the clinical report shown to the patient — we
-        # try a genuine second model before failing, but never fabricate a report.
+        errors = [f"Gemini: {e}"]
+
+        # Tier 2 — OpenAI GPT-4o (with the image when available). The final
+        # evaluation is the clinical report shown to the patient — we try a
+        # genuine second model before failing, but never fabricate a report.
         openai_client = _get_openai_client()
         if openai_client:
             try:
@@ -319,12 +382,24 @@ Return ONLY valid JSON."""
                 return {"final_evaluation": data}
             except Exception as oai_err:
                 print(f"[LangGraph OpenAI Final Eval Fallback Error]: {oai_err}")
-                raise RuntimeError(
-                    f"Final clinical evaluation failed on all providers. Gemini: {e}; OpenAI: {oai_err}"
-                ) from oai_err
+                errors.append(f"OpenAI: {oai_err}")
+
+        # Tier 3 — Hugging Face Mistral-7B (free, text-only; no image input).
+        try:
+            from ai_service.services.huggingface_service import generate_llm_completion_hf
+            text = await generate_llm_completion_hf(prompt, max_new_tokens=900)
+            # Extract the JSON object even if the model wraps it in prose/markdown.
+            match = re.search(r'\{.*\}', text, re.DOTALL)
+            if match:
+                data = json.loads(match.group(0))
+                return {"final_evaluation": data}
+            errors.append("HuggingFace: no JSON object in output")
+        except Exception as hf_err:
+            print(f"[LangGraph HuggingFace Final Eval Fallback Error]: {hf_err}")
+            errors.append(f"HuggingFace: {hf_err}")
 
         # No real provider available — surface the failure, never invent medical advice.
-        raise RuntimeError(f"Final clinical evaluation failed and no fallback provider is configured: {e}") from e
+        raise RuntimeError("Final clinical evaluation failed on all providers. " + "; ".join(errors)) from e
 
 # =====================================================================
 # LangGraph State Machine Builder
@@ -450,6 +525,18 @@ Rules:
                         return {"suggestions": [str(s) for s in suggestions[:4]]}
             except Exception as oai_err:
                 print(f"[LangGraph Suggestions OpenAI Fallback Error]: {oai_err}")
+
+        # Tier 3 — Hugging Face Mistral-7B (free open-source).
+        try:
+            from ai_service.services.huggingface_service import generate_llm_completion_hf
+            text = await generate_llm_completion_hf(prompt, max_new_tokens=120)
+            match = re.search(r'\[.*\]', text, re.DOTALL)
+            if match:
+                suggestions = json.loads(match.group(0))
+                if isinstance(suggestions, list) and len(suggestions) > 0:
+                    return {"suggestions": [str(s) for s in suggestions[:4]]}
+        except Exception as hf_err:
+            print(f"[LangGraph Suggestions HuggingFace Fallback Error]: {hf_err}")
 
     # Suggestions are non-diagnostic UI quick-replies. Rather than fake them
     # (which would hide that the model is down), return none with an explicit
