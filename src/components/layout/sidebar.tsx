@@ -83,9 +83,9 @@ export function AppSidebar() {
 
       {/* Need Help Card */}
       <div className="mt-auto pt-6">
-        <div className="relative overflow-hidden rounded-3xl p-4 bg-gradient-to-b from-indigo-950/40 via-slate-900/60 to-slate-950/80 border border-indigo-500/20 shadow-lg">
+        <div className="relative overflow-hidden rounded-3xl p-4 bg-gradient-to-b from-indigo-50 via-blue-50/60 to-card dark:from-indigo-950/40 dark:via-slate-900/60 dark:to-slate-950/80 border border-indigo-200 dark:border-indigo-500/20 shadow-lg">
           <div className="flex items-center gap-3 mb-2">
-            <div className="h-9 w-9 rounded-2xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 border border-indigo-500/30">
+            <div className="h-9 w-9 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 dark:border-indigo-500/30">
               <HelpCircle className="h-5 w-5" />
             </div>
             <div>

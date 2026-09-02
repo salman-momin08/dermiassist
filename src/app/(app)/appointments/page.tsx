@@ -275,11 +275,23 @@ export default function AppointmentsPage() {
                                                         <Tooltip>
                                                             <TooltipTrigger asChild>
                                                                 <div className="inline-block">
-                                                                    <Button asChild size="sm" disabled={!isJoinButtonEnabled(appointment.appointmentDate)}>
-                                                                        <Link href={`/video/${appointment.id}`}>
+                                                                    {isJoinButtonEnabled(appointment.appointmentDate) ? (
+                                                                        <Button asChild size="sm">
+                                                                            <Link href={`/video/${appointment.id}`}>
+                                                                                <Video className="mr-2 h-4 w-4" /> Join Call
+                                                                            </Link>
+                                                                        </Button>
+                                                                    ) : (
+                                                                        // A disabled shadcn Button can't wrap a Link (asChild
+                                                                        // renders an <a>, and the native `disabled` attribute
+                                                                        // — and the CSS `:disabled` pseudo-class the button's
+                                                                        // styles depend on — never apply to anchors, so the
+                                                                        // "disabled" link stayed fully clickable). Render a real
+                                                                        // <button disabled> instead when it's not joinable yet.
+                                                                        <Button size="sm" disabled>
                                                                             <Video className="mr-2 h-4 w-4" /> Join Call
-                                                                        </Link>
-                                                                    </Button>
+                                                                        </Button>
+                                                                    )}
                                                                 </div>
                                                             </TooltipTrigger>
                                                             <TooltipContent>
