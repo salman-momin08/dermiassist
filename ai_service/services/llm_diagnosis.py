@@ -50,7 +50,7 @@ GEMINI_API_KEY = (
 )
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
-GEMINI_MODEL = "gemini-3-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
 OPENAI_MODEL = "gpt-4o"
 
 # Required keys the model must return for a diagnosis to count as well-formed.
