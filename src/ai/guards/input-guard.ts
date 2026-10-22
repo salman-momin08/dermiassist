@@ -47,14 +47,12 @@ export function validateAndSanitizeInput(rawPrompt: string): GuardrailInputResul
     }
 
     // 2. Detect & Mask PII
-    if (PII_REGEX_PATTERNS.ssn.test(sanitized)) {
-        sanitized = sanitized.replace(PII_REGEX_PATTERNS.ssn, '[REDACTED SSN]');
-        piiDetected = true;
-    }
-
-    if (PII_REGEX_PATTERNS.creditCard.test(sanitized)) {
-        sanitized = sanitized.replace(PII_REGEX_PATTERNS.creditCard, '[REDACTED CARD]');
-        piiDetected = true;
+    for (const [kind, pattern] of Object.entries(PII_REGEX_PATTERNS)) {
+        // replace resets global-regex state between requests, unlike test().
+        sanitized = sanitized.replace(pattern, () => {
+            piiDetected = true;
+            return `[REDACTED ${kind.toUpperCase()}]`;
+        });
     }
 
     if (flaggedReasons.length > 0) {

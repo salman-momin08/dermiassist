@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { 
@@ -21,18 +21,18 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { mapAnalysisRow } from "@/lib/analysis-report";
 
 interface TriageCase {
   id: string;
   patient_id?: string;
   patient_name: string;
   condition_name: string;
-  confidence_score: number;
+  confidence_score: number | null;
   image: string;
   created_at: string;
   review_status: 'pending_review' | 'in_review' | 'released' | 'rejected';
-  severity: 'Urgent' | 'Moderate' | 'Mild';
-  discordance_risk: 'High' | 'Moderate' | 'Low';
+  severity: 'Urgent' | 'Moderate' | 'Mild' | 'Not assessed';
   icd10_code: string;
   wait_time_minutes: number;
 }
@@ -42,14 +42,16 @@ export default function DoctorReviewQueuePage() {
   const { toast } = useToast();
   const [cases, setCases] = useState<TriageCase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'wait_time' | 'confidence' | 'severity'>('wait_time');
   const supabase = useMemo(() => createClient(), []);
 
-  const fetchTriageQueue = async () => {
+  const fetchTriageQueue = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const { data, error } = await supabase
         .from('analyses')
@@ -62,96 +64,42 @@ export default function DoctorReviewQueuePage() {
       if (data && data.length > 0) {
         const now = Date.now();
         const mapped: TriageCase[] = data.map((item: any) => {
+          const report = mapAnalysisRow(item);
           const createdAtMs = new Date(item.created_at || Date.now()).getTime();
           const waitMins = Math.max(1, Math.round((now - createdAtMs) / 60000));
           
-          const isMalignancy = /melanoma|carcinoma|bcc|scc|dysplastic/i.test(item.condition_name || '');
-          const sev: 'Urgent' | 'Moderate' | 'Mild' = isMalignancy ? 'Urgent' : (item.severity === 'Severe' ? 'Urgent' : 'Moderate');
-          const discordance: 'High' | 'Moderate' | 'Low' = isMalignancy ? 'High' : (item.confidence_score < 75 ? 'Moderate' : 'Low');
+          const sev: TriageCase['severity'] = ['Severe', 'Critical', 'Urgent'].includes(report.severity)
+            ? 'Urgent' : report.severity === 'Mild' || report.severity === 'Moderate' ? report.severity : 'Not assessed';
 
           return {
             id: item.id,
             patient_id: item.user_id,
             patient_name: item.user_name || 'Anonymous Patient',
             condition_name: item.condition_name || 'Unclassified Lesion',
-            confidence_score: item.confidence_score || Math.floor(Math.random() * 15 + 80),
+            confidence_score: report.confidenceScore ?? null,
             image: item.image || 'https://placehold.co/200x200.png?text=Specimen',
             created_at: item.created_at,
             review_status: item.review_status || 'pending_review',
             severity: sev,
-            discordance_risk: discordance,
-            icd10_code: item.icd10_code || (isMalignancy ? 'C43.9' : 'L40.0'),
+            icd10_code: report.icd10Code || 'Not assigned',
             wait_time_minutes: waitMins,
           };
         });
         setCases(mapped);
       } else {
-        // Mock triage records for immediate testing if DB is empty
-        setCases([
-          {
-            id: 'mock-case-1',
-            patient_name: 'Marcus Vance',
-            condition_name: 'Nodular Melanoma (Suspicious)',
-            confidence_score: 94,
-            image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=400&auto=format&fit=crop&q=60',
-            created_at: new Date(Date.now() - 14 * 60000).toISOString(),
-            review_status: 'pending_review',
-            severity: 'Urgent',
-            discordance_risk: 'High',
-            icd10_code: 'C43.9',
-            wait_time_minutes: 14,
-          },
-          {
-            id: 'mock-case-2',
-            patient_name: 'Elena Rostova',
-            condition_name: 'Dysplastic Compound Nevus',
-            confidence_score: 82,
-            image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=400&auto=format&fit=crop&q=60',
-            created_at: new Date(Date.now() - 42 * 60000).toISOString(),
-            review_status: 'pending_review',
-            severity: 'Urgent',
-            discordance_risk: 'Moderate',
-            icd10_code: 'D22.9',
-            wait_time_minutes: 42,
-          },
-          {
-            id: 'mock-case-3',
-            patient_name: 'Salman Momin',
-            condition_name: 'Tinea Corporis (Annular)',
-            confidence_score: 88,
-            image: 'https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?w=400&auto=format&fit=crop&q=60',
-            created_at: new Date(Date.now() - 70 * 60000).toISOString(),
-            review_status: 'pending_review',
-            severity: 'Moderate',
-            discordance_risk: 'Low',
-            icd10_code: 'B35.4',
-            wait_time_minutes: 70,
-          },
-          {
-            id: 'mock-case-4',
-            patient_name: 'Chloe Tremblay',
-            condition_name: 'Plaque Psoriasis (Vulgaris)',
-            confidence_score: 91,
-            image: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=400&auto=format&fit=crop&q=60',
-            created_at: new Date(Date.now() - 135 * 60000).toISOString(),
-            review_status: 'released',
-            severity: 'Moderate',
-            discordance_risk: 'Low',
-            icd10_code: 'L40.0',
-            wait_time_minutes: 135,
-          },
-        ]);
+        setCases([]);
       }
     } catch (err: any) {
       console.warn("Triage fetch note:", err?.message || err);
+      setLoadError('Could not load triage cases. Please retry.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     fetchTriageQueue();
-  }, [supabase]);
+  }, [fetchTriageQueue]);
 
   // Filtering & Sorting
   const filteredCases = useMemo(() => {
@@ -173,9 +121,9 @@ export default function DoctorReviewQueuePage() {
           if (b.severity === 'Urgent' && a.severity !== 'Urgent') return 1;
           return b.wait_time_minutes - a.wait_time_minutes;
         }
-        if (sortBy === 'confidence') return b.confidence_score - a.confidence_score;
+        if (sortBy === 'confidence') return (b.confidence_score ?? -1) - (a.confidence_score ?? -1);
         if (sortBy === 'severity') {
-          const rank = { Urgent: 3, Moderate: 2, Mild: 1 };
+          const rank = { Urgent: 3, Moderate: 2, Mild: 1, 'Not assessed': 0 };
           return rank[b.severity] - rank[a.severity];
         }
         return 0;
@@ -193,7 +141,7 @@ export default function DoctorReviewQueuePage() {
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="font-clinical-mono text-xs font-bold text-primary uppercase tracking-wider">
-              FDA 21 CFR 878.1830 · CLINICIAN GATEWAY
+              CLINICAL DECISION SUPPORT · CLINICIAN GATEWAY
             </span>
           </div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground font-headline flex items-center gap-3">
@@ -308,12 +256,14 @@ export default function DoctorReviewQueuePage() {
                     <span>Loading verified clinical ledger...</span>
                   </td>
                 </tr>
+              ) : loadError ? (
+                <tr><td colSpan={8} role="alert" className="py-12 text-center text-destructive">{loadError}</td></tr>
               ) : filteredCases.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-muted-foreground">
                     <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-2 opacity-80" />
                     <p className="font-semibold text-foreground text-sm">No Pending Triage Cases</p>
-                    <p className="text-xs text-muted-foreground mt-1">All patient assessments have been verified and released.</p>
+                    <p className="text-xs text-muted-foreground mt-1">No cases match the current filters.</p>
                   </td>
                 </tr>
               ) : (
@@ -377,15 +327,15 @@ export default function DoctorReviewQueuePage() {
                       <td className="py-3.5 px-4 text-center">
                         <div className="inline-flex flex-col items-center">
                           <span className="font-clinical-mono font-bold text-xs text-foreground">
-                            {item.confidence_score}%
+                            {item.confidence_score == null ? 'Not assessed' : `${item.confidence_score}%`}
                           </span>
                           <div className="w-12 h-1 bg-muted rounded-full overflow-hidden mt-1">
                             <div
                               className={cn(
                                 "h-full rounded-full",
-                                item.confidence_score > 85 ? "bg-emerald-500" : "bg-amber-500"
+                                (item.confidence_score ?? 0) > 85 ? "bg-emerald-500" : "bg-amber-500"
                               )}
-                              style={{ width: `${item.confidence_score}%` }}
+                              style={{ width: `${item.confidence_score ?? 0}%` }}
                             />
                           </div>
                         </div>
@@ -405,19 +355,7 @@ export default function DoctorReviewQueuePage() {
 
                       {/* Discordance Risk */}
                       <td className="py-3.5 px-4">
-                        {item.discordance_risk === 'High' ? (
-                          <Badge variant="destructive" className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">
-                            High Discordance
-                          </Badge>
-                        ) : item.discordance_risk === 'Moderate' ? (
-                          <Badge variant="outline" className="text-[10px] font-semibold border-amber-500/40 text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                            Moderate Variance
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] font-semibold border-emerald-500/30 text-emerald-600 bg-emerald-500/5 px-2 py-0.5 rounded-full">
-                            Concordant Match
-                          </Badge>
-                        )}
+                        <span className="text-muted-foreground">Not assessed</span>
                       </td>
 
                       {/* Review Status */}

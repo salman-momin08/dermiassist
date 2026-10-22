@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { generateToken } from "@/ai/flows/generate-agora-token";
+import { uuidToAgoraUid } from "@/lib/agora-uid";
 
 type LocalTracks = [ILocalAudioTrack, ILocalVideoTrack];
 
@@ -64,7 +65,10 @@ function Conference() {
         const fetchedToken = await generateToken(roomId, user.id);
         if (!isMounted) return;
 
-        await agoraClient.join(process.env.NEXT_PUBLIC_AGORA_APP_ID!, roomId, fetchedToken, user.id);
+        // Join with the same deterministic numeric UID the server minted the
+        // token for (see generate-agora-token.ts) — Agora rejects/soft-fails
+        // when the join UID doesn't match the token's UID.
+        await agoraClient.join(process.env.NEXT_PUBLIC_AGORA_APP_ID!, roomId, fetchedToken, uuidToAgoraUid(user.id));
         await agoraClient.publish(tracks);
 
         setIsJoining(false);

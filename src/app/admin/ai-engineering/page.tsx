@@ -451,7 +451,7 @@ export default function AIEngineeringDashboard() {
                                 <strong>Semantic Cache:</strong> Cosine similarity matching threshold ($&gt;0.92$) bypassing LLM calls for recurring queries, achieving sub-50ms execution speed.
                             </p>
                             <p>
-                                <strong>Hugging Face Integration:</strong> Open-Source HAM10000 skin lesion classifier (`nateraw/skin-cancer-mnist-ham10000`) and BGE embeddings (`BAAI/bge-small-en-v1.5`).
+                                <strong>Hugging Face Integration:</strong> Open-Source HAM10000 skin lesion classifier (`Anwarkh1/Skin_Cancer-Image_Classification`) via Inference Providers, plus a standalone BGE embedding demo (`BAAI/bge-small-en-v1.5`).
                             </p>
                             <p>
                                 <strong>Model Context Protocol (MCP):</strong> Native JSON-RPC 2.0 server interface allowing any MCP-compliant client to consume DermiAssist tools over standard endpoints (`/api/mcp`).

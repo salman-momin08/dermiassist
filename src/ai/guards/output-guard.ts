@@ -33,6 +33,8 @@ export function validateOutputSafety<T extends { reportData?: Record<string, unk
     // A missing confidence score must NOT be treated as a passing default (previously 75).
     // Absence of a confidence signal is itself a red flag, so treat it as unknown => high risk.
     const confidenceScore: number | null = typeof rawOutput.confidenceScore === 'number'
+        && Number.isFinite(rawOutput.confidenceScore)
+        && rawOutput.confidenceScore >= 0 && rawOutput.confidenceScore <= 100
         ? rawOutput.confidenceScore
         : null;
 

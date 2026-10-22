@@ -174,7 +174,7 @@ const CustomChannelHeader = () => {
                         <h2 className="text-sm font-bold text-foreground leading-none">{channelName}</h2>
                         <Badge variant="outline" className="text-[10px] font-semibold border-emerald-500/30 text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1">
                             <ShieldCheck className="h-3 w-3" />
-                            <span>HIPAA Encrypted</span>
+                            <span>Encrypted in Transit</span>
                         </Badge>
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-0.5">

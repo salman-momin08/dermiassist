@@ -20,6 +20,21 @@
 
 > ⚠️ **Medical & Regulatory Disclaimer**: DermiAssist-AI is an AI Engineering portfolio showcase and clinical decision-support prototype. It provides preliminary informational skin assessments using artificial intelligence and does **NOT** provide definitive medical diagnoses or replace clinical evaluation by a licensed dermatologist.
 
+## Production release gates
+
+This repository is **not clinically validated or certified production-ready**. Passing unit tests or an LLM judge is not clinical validation. Before serving real patients:
+
+- Run `npm ci`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, and `python -m unittest discover -s ai_service/tests -v`. Public Supabase configuration is required at build time. Test-only placeholders can check compilation, but cannot verify integrations.
+- The deployment interpreter is Python **3.14**, a [supported Vercel runtime](https://vercel.com/docs/functions/runtimes/python#python-version). Dependency installation, service import and regression tests have been checked locally on Python 3.14.7. Python 3.11 was not available for local revalidation; no newer-only application syntax was introduced. [CI](.github/workflows/ci.yml) tests Python 3.11/3.14 and the frontend on Node 22; those remote jobs must pass before release.
+- Rehearse migrations 33-37 on a backed-up Supabase staging branch. Migration 34 takes exclusive locks and swaps a live table; verify row counts, RLS, foreign keys, realtime subscriptions, account deletion and restore procedures. If earlier versions of these migrations were already applied, reconcile the deployed schema with a forward migration rather than blindly replaying table renames. The revised verification RPC must be deployed with the application.
+- Configure every required service using [.env.example](.env.example), including `REPORT_SIGNING_SECRET`, `PYTHON_AI_SERVICE_API_KEY`, `OPENAI_API_KEY`, `NOVU_API_SECRET` and Redis. API rate limiting now fails closed if Redis is missing or unavailable.
+- On Vercel, async job submission returns **503** and the in-process worker is disabled. Use synchronous analysis until a durable request-driven job runner is integrated. The local Redis polling worker is not an exactly-once or crash-recovering queue.
+- Point `PYTHON_AI_SERVICE_URL` at the actual deployed Python service, not `localhost`. Verify routing, deployment protection, function durations, cold starts, request-size limits and Python bundle contents in a Vercel preview deployment.
+- Exercise patient/doctor/admin authorization, complete analysis-to-review-to-verification workflows, printing, video/audio, notifications and failure recovery against staging. Complete authorization coverage for all exported Server Actions and assess the clinical, privacy and retention requirements before releasing.
+- Expand the four-case benchmark with clinician-reviewed emergency, ambiguous, non-skin, adversarial, multilingual and skin-tone-diverse cases. Judge scores and model-reported confidence are not calibrated clinical accuracy or source verification.
+
+Behavioral safeguards: full diagnostic reports are not reused based on semantic symptom similarity; missing medical metadata remains unknown; mock patients are not inserted into empty review queues. PDFs use a direct verification link instead of sending verification tokens to a third-party QR service. The HMAC authenticates the release identifier/status/timestamp, **not the PDF contents or a clinician's personal digital signature**.
+
 ---
 
 ## 📋 Table of Contents
@@ -41,12 +56,12 @@
   - [5.4. Hugging Face Open-Source Model Suite](#54-hugging-face-open-source-model-suite)
   - [5.5. Real-Time Token Streaming Engine (SSE)](#55-real-time-token-streaming-engine-sse)
   - [5.6. Longitudinal Lesion Healing Analytics & Progress Tracker](#56-longitudinal-lesion-healing-analytics--progress-tracker)
-  - [5.7. Enterprise Clinical PDF Generator with QR Verification](#57-enterprise-clinical-pdf-generator-with-qr-verification)
+  - [5.7. Clinical PDF Print View with Online Verification](#57-clinical-pdf-print-view-with-online-verification)
   - [5.8. Dynamic Token Budget Allocator](#58-dynamic-token-budget-allocator)
   - [5.9. Hybrid RAG Search (BM25 + Vector RRF)](#59-hybrid-rag-search-bm25--vector-rrf)
   - [5.10. Circuit Breaker Resilience & Async Task Workers](#510-circuit-breaker-resilience--async-task-workers)
   - [5.11. Model Context Protocol (MCP) Server](#511-model-context-protocol-mcp-server)
-  - [5.12. Sub-50ms Semantic Vector Caching Layer](#512-sub-50ms-semantic-vector-caching-layer)
+  - [5.12. Clinical Caching Tradeoff](#512-clinical-caching-tradeoff)
   - [5.13. Dual-Layer AI Guardrails & PII Redaction](#513-dual-layer-ai-guardrails--pii-redaction)
   - [5.14. LLM-as-a-Judge Evaluation & Benchmarking](#514-llm-as-a-judge-evaluation--benchmarking)
 - [6. Full-Stack Product Capabilities & Role Workflows](#6-full-stack-product-capabilities--role-workflows)
@@ -96,7 +111,7 @@ graph TB
     
     subgraph AI Engine & Multi-Agent Orchestration
         GENKIT[Genkit AI Engine - src/ai/genkit.ts]
-        HF_SERVICE[Hugging Face Open-Source Lesion Classifier - HAM10000]
+        HF_SERVICE[Hugging Face Open-Source Lesion Classifier - HAM10000 - Anwarkh1]
         AI_ORCHESTRATOR[Master Multi-Agent Orchestrator - src/ai/orchestrator.ts]
         SEM_CACHE[Semantic Vector Cache - src/ai/cache/semantic-cache.ts]
         GUARDRAILS_IN[Input Guardrail & PII Redactor]
@@ -166,7 +181,7 @@ graph LR
     HybridRAG --> Synthesis[6. Differential Report Synthesis Agent]
     Synthesis --> OutputGuard[7. Output Safety & Disclaimer Enforcer]
     OutputGuard --> StreamResponse[8. SSE Real-Time Token Streaming / PDF Export]
-    StreamResponse --> UI[9. Render Grounded Differential Report & Verification QR Code]
+    StreamResponse --> UI[9. Render Differential Report & Verification Link]
 ```
 
 ### 2.3. Production Infrastructure & Deployment Topology
@@ -217,7 +232,7 @@ Architectural design decisions in DermiAssist-AI prioritize **accuracy, sub-seco
 | **Fault Resilience** | Circuit Breaker Pattern | Naive API Retries | Tracks external API failures (Gemini / Hugging Face); trips from `CLOSED` $\rightarrow$ `OPEN` after 3 errors with 30s reset timeout, preventing cascading thread exhaustion during outages. |
 | **Task Concurrency** | Async Task Worker Queue | Synchronous Blocking HTTP | Offloads heavy multi-agent synthesis to background Redis workers (`POST /api/v1/jobs/submit`), returning immediate `job_id` for polling. |
 | **Database Scalability**| PostgreSQL Range Partitioning | Monolithic Unpartitioned Table | Range partitions `analyses` logs by `date` (`supabase_migrations/30_partitioning_sharding.sql`), maintaining sub-10ms B-Tree index scans at scale (>1,000,000 records). |
-| **Open-Source ML** | Hugging Face HAM10000 Models | Proprietary Vision API Only | Integrates `nateraw/skin-cancer-mnist-ham10000` for open-source lesion classification and `BAAI/bge-small-en-v1.5` for vector embeddings. |
+| **Open-Source ML** | Hugging Face HAM10000 Classifier | Proprietary Vision API Only | Integrates `Anwarkh1/Skin_Cancer-Image_Classification` (HAM10000 7-class) for open-source lesion classification via Hugging Face Inference Providers, with `BAAI/bge-small-en-v1.5` available as a standalone BGE embedding demo. |
 | **Agent Architecture** | 4-Agent Modular Decomposition | Monolithic Single Prompt | Decomposing into parallel Triage & Vision agents via `Promise.all` yields $+35\%$ higher diagnostic precision and prevents prompt distraction. |
 | **Interoperability** | Model Context Protocol (MCP) | Custom Proprietary REST API | Implements Anthropic open MCP specification (JSON-RPC 2.0), enabling seamless tool integration with external AI clients (Claude, Cursor). |
 | **Caching Strategy** | Vector Cosine Similarity ($>0.92$) | Exact-String Key-Value Cache | Handles natural language query variations ("red rash on arm" vs "itchy red bumps on my arm"), serving hits in $<50\text{ms}$ with $100\%$ LLM token cost elimination. |
@@ -426,9 +441,9 @@ uvicorn main:app --reload --port 8000
 
 ### 5.4. Hugging Face Open-Source Model Suite (`ai_service/services/huggingface_service.py`)
 Integrated into the Python FastAPI microservice:
-- **Dermatological Vision Lesion Classifier (`nateraw/skin-cancer-mnist-ham10000`)**: Evaluates uploaded skin lesion photos against the gold-standard HAM10000 open-source dataset, returning exact probabilistic diagnostic distributions.
-- **Open-Source Vector Embedding Engine (`BAAI/bge-small-en-v1.5`)**: High-performance BGE open-source vector embeddings alternative for Supabase `pgvector`.
-- **Open-Source LLM Fallback Router (`mistralai/Mistral-7B-Instruct-v0.3` / `meta-llama/Llama-3.2`)**: Automated failover to Hugging Face Open-Source models if primary Gemini API quotas are reached.
+- **Dermatological Vision Lesion Classifier (`Anwarkh1/Skin_Cancer-Image_Classification`)**: A HAM10000-based 7-class open-source classifier (melanoma, basal cell carcinoma, actinic keratoses, melanocytic nevi, benign keratosis-like lesions, vascular lesions, dermatofibroma) scoring uploaded lesion photos. Served via Hugging Face Inference Providers (`hf-inference`); fails closed when the model is not warm, never fabricating a prediction.
+- **Open-Source Vector Embedding Engine (`BAAI/bge-small-en-v1.5`)**: A standalone 384-dimensional BGE embedding demo exposed at `POST /api/v1/huggingface/embed`. Note: the production pgvector store is populated with Google `text-embedding-004` (768-dim), so this BGE route is a separate showcase and is **not** used for live retrieval.
+- **Open-Source LLM Completion Fallback (`mistralai/Mistral-7B-Instruct-v0.3`)**: Used by the LangGraph suggestion/evaluation paths as an open-source completion fallback when Gemini/OpenAI are unavailable. Reachability depends on the model being served by Hugging Face Inference Providers.
 
 ---
 
@@ -441,14 +456,15 @@ Implemented at [`src/app/api/ai/stream-analysis/route.ts`](src/app/api/ai/stream
 
 ### 5.6. Longitudinal Lesion Healing Analytics & Progress Tracker
 Implemented at [`ai_service/services/healing_tracker.py`](ai_service/services/healing_tracker.py) and exposed via `POST /api/v1/analytics/track-healing`:
-- Compares sequential skin photos over time (e.g. Day 1 vs. Day 14 vs. Day 30) using Gemini 2.5 Vision and Hugging Face ResNet feature extraction.
-- Computes **Surface Area Reduction %**, **Erythema (Redness) Fading Index**, and **Healing Velocity Score**.
+- Compares sequential skin photos over time (e.g. Day 1 vs. Day 14 vs. Day 30) using the HAM10000 lesion classifier plus direct pixel-level measurements (reddened-area fraction and an erythema index) computed from the two images.
+- Surfaces image-derived erythema and lesion-area change between baseline and follow-up. These are raw image measurements, explicitly flagged `validated: false` — they are **not** clinically validated healing metrics (lighting, angle, zoom and skin tone all affect them).
 
 ---
 
-### 5.7. Enterprise Clinical PDF Generator with QR Verification
+### 5.7. Clinical PDF Print View with Online Verification
 Implemented at [`src/lib/pdf-generator.ts`](src/lib/pdf-generator.ts):
-- Generates high-resolution multi-page medical PDF reports with ICD-10 medical codes, grounded literature citations, doctor digital signatures, and an embedded cryptographic QR code linking to digital report verification.
+- Generates an escaped HTML print view for browser printing/PDF export. Only recorded findings, clinician overrides and available medical metadata are shown; missing codes/confidence remain unknown and citations are not fabricated.
+- Released reports can carry a server-generated HMAC verification link. No external QR-code service receives the report URL or its verification token. This verifies a release record, not the content integrity of a downloaded PDF.
 
 ---
 
@@ -466,7 +482,7 @@ Implemented at [`ai_service/services/hybrid_search.py`](ai_service/services/hybr
 
 ### 5.10. Circuit Breaker Resilience & Async Task Workers
 - **Circuit Breaker** ([`ai_service/utils/circuit_breaker.py`](ai_service/utils/circuit_breaker.py)): Manages state transitions (`CLOSED` $\rightarrow$ `OPEN` $\rightarrow$ `HALF_OPEN`) with 30s reset timeout to prevent cascading thread exhaustion during API outages.
-- **Async Task Worker Pool** ([`ai_service/queue/task_worker.py`](ai_service/queue/task_worker.py)): Decouples heavy multi-agent synthesis from HTTP threads via background task queuing (`POST /api/v1/jobs/submit`).
+- **Redis Queue** ([`ai_service/queue/redis_queue.py`](ai_service/queue/redis_queue.py)): A local/persistent-process polling implementation. It is disabled on Vercel; `POST /api/v1/jobs/submit` returns 503 there until a durable runner is implemented. Redis persistence alone does not guarantee processing after a worker crash.
 
 ---
 
@@ -490,18 +506,13 @@ graph TD
 
 ---
 
-### 5.12. Sub-50ms Semantic Vector Caching Layer
+### 5.12. Clinical Caching Tradeoff
 
-```mermaid
-graph TD
-    Query[Incoming Patient Symptom Query] --> Embedder[Generate Query Embedding via text-embedding-004]
-    Embedder --> CosineCalc[Compute Cosine Similarity against Cache Vectors]
-    CosineCalc --> Threshold{Max Cosine Similarity > 0.92?}
-    Threshold -- Yes (Cache Hit) --> ServeCache[Serve Cached Report Payload in <50ms]
-    Threshold -- No (Cache Miss) --> TriggerAgents[Invoke Multi-Agent Diagnostic Engine]
-    TriggerAgents --> StoreCache[Store Query Vector & Generated Report in Cache]
-    StoreCache --> RenderUI[Render Report to Patient UI]
-```
+The multi-agent diagnostic orchestrator deliberately bypasses semantic report caching.
+Similar symptoms do not make images, body location, duration or patient context interchangeable.
+This spends additional inference time/cost to avoid serving another case's report.
+The separate image/answer cache uses exact hashes, and final-evaluation keys also include
+the initial condition. The in-memory semantic-cache utility is not wired into diagnostic reporting.
 
 ---
 
@@ -749,21 +760,26 @@ Vercel natively supports deploying Python FastAPI microservices alongside Next.j
    - `HUGGINGFACE_API_KEY`: Hugging Face user access token.
    - `UPSTASH_REDIS_REST_URL` & `UPSTASH_REDIS_REST_TOKEN`: Upstash Redis credentials.
 
-4. **Zero-Downtime Resilience Guarantee**:
-   - If the FastAPI microservice is starting up or unreachable, our Next.js API route (`/api/ai/analyze`) automatically and seamlessly falls back to the TypeScript Genkit engine, guaranteeing $100\%$ uptime!
+4. **Verify resilience and configuration**:
+   - The analysis route attempts the TypeScript Genkit engine when the Python request or pipeline fails. Both engines can fail; there is no uptime guarantee.
+   - Set `PYTHON_AI_SERVICE_URL` to the deployed service origin and configure matching internal API keys. Confirm preview/production deployment protection allows the server-to-server request.
+   - Check the release gates above before pushing production traffic. In-process queue workers cannot reliably survive a Vercel function lifecycle.
 
 ---
 
 ## 11. Performance, Latency & Rate Limits
 
-| Execution Path | Average Latency | Description |
+The following are measurement requirements, not production performance claims.
+Collect p50/p95/p99 latency and failure rates in the target deployment under representative load.
+
+| Execution Path | Latency Status | Description |
 |----------------|-----------------|-------------|
-| **Semantic Cache Hit** | **$< 50\text{ ms}$** | Vector similarity match ($>0.92$) returning cached report |
-| **SSE First-Token Render** | **$< 100\text{ ms}$** | Server-Sent Events stream chunk delivery |
-| **Input Guardrail** | **$< 5\text{ ms}$** | Regex PII redaction & prompt injection check |
-| **pgvector RAG Search** | **$\approx 45\text{ ms}$** | Vector cosine distance matching + reranking |
-| **Hybrid RRF Search** | **$\approx 60\text{ ms}$** | BM25 Keyword + Vector Reciprocal Rank Fusion |
-| **Full Pipeline Execution** | **$\approx 1400 - 2200\text{ ms}$** | Total multi-agent pipeline execution time |
+| **Semantic Report Cache** | Disabled | Clinical reports are not interchangeable by symptom similarity |
+| **SSE Report Delivery** | Not benchmarked | Connection status followed by completed, safety-checked output; not provider token streaming |
+| **Input Guardrail** | Not benchmarked | Regex PII redaction and limited pattern checks, not comprehensive injection prevention |
+| **pgvector RAG Search** | Not benchmarked | Vector cosine distance matching |
+| **Hybrid RRF Search** | Not benchmarked | Full-text keyword + vector reciprocal-rank fusion |
+| **Full Pipeline Execution** | Not benchmarked | Includes provider latency, retries and cold starts |
 
 ---
 

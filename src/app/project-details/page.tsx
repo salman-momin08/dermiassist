@@ -16,8 +16,8 @@ const features = [
     {
         icon: <Cpu className="h-8 w-8 text-primary" />,
         title: "Hugging Face Open-Source Model Suite",
-        description: "Integrates Hugging Face Inference API with gold-standard medical models (nateraw/skin-cancer-mnist-ham10000) for open-source lesion classification and BAAI/bge-small-en-v1.5 for open-source vector embeddings.",
-        tech: ["Hugging Face", "HAM10000", "BGE Embeddings", "Llama-3.2"],
+        description: "Integrates the Hugging Face Inference Providers API with an open-source HAM10000 7-class lesion classifier (Anwarkh1/Skin_Cancer-Image_Classification). BAAI/bge-small-en-v1.5 is available as a standalone open-source embedding demo; production retrieval uses Google text-embedding-004 in pgvector.",
+        tech: ["Hugging Face", "HAM10000", "BGE Embeddings", "Mistral-7B"],
     },
     {
         icon: <Database className="h-8 w-8 text-primary" />,

@@ -1,7 +1,6 @@
 /**
- * @fileOverview Enterprise Clinical PDF Generator with AI Governance & QR Verification.
- * Generates multi-page clinical reports with ICD-10 medical coding, grounded RAG citations,
- * AI Model Claims & Intended Use Disclaimers, doctor digital signatures, and encrypted QR verification.
+ * @fileOverview Clinical report HTML print view with online release verification.
+ * Verification authenticates a release record, not the printed document's contents.
  */
 
 export interface ReportPDFPayload {
@@ -11,7 +10,7 @@ export interface ReportPDFPayload {
     conditionName: string;
     icdCode: string;
     severity: string;
-    confidenceScore: number;
+    confidenceScore?: number;
     summary: string;
     keyFindings: string[];
     recommendedTreatments: string[];
@@ -22,6 +21,14 @@ export interface ReportPDFPayload {
     modelArchitecture?: string;
     generationLatencyMs?: number;
     patientImage?: string;
+    /**
+     * HMAC verification signature (see `src/lib/case-review-actions.ts` and
+     * `src/app/verify-report/[id]/page.tsx`). Only present once a doctor has
+     * released the report — undocumented/unsigned reports still render a QR
+     * code, but it will resolve to "Invalid or Not Found" on the
+     * verification page since there is nothing to check the signature against.
+     */
+    verificationSignature?: string;
 }
 
 /**
@@ -40,19 +47,24 @@ function escapeHtml(value: unknown): string {
 }
 
 /**
- * Generate cryptographic verification URL for QR code embedding.
+ * Generate cryptographic verification URL for QR code embedding. The
+ * signature (computed server-side at release time, see
+ * `src/lib/case-review-actions.ts`) is included as a query param so the
+ * public `/verify-report/[id]` page has something to check the stored
+ * signature against — without it, the page has no way to distinguish a real
+ * released report from an arbitrary/forged id typed into the URL.
  */
-export function getReportVerificationUrl(analysisId: string): string {
+export function getReportVerificationUrl(analysisId: string, verificationSignature?: string): string {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://dermiassist.live';
-    return `${origin}/verify-report/${analysisId}`;
+    const base = `${origin}/verify-report/${encodeURIComponent(analysisId)}`;
+    return verificationSignature ? `${base}?sig=${encodeURIComponent(verificationSignature)}` : base;
 }
 
 /**
  * Generate formatted HTML template ready for high-fidelity PDF rendering and printing.
  */
 export function generateReportHTML(data: ReportPDFPayload): string {
-    const verificationUrl = getReportVerificationUrl(data.analysisId);
-    const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(verificationUrl)}`;
+    const verificationUrl = getReportVerificationUrl(data.analysisId, data.verificationSignature);
     const modelArch = data.modelArchitecture;
     // Only surface a latency figure when a real measured value is provided.
     const metaParts: string[] = [];
@@ -81,9 +93,9 @@ export function generateReportHTML(data: ReportPDFPayload): string {
             </div>
             <div style="text-align: right;">
                 <span style="background: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 4px; border: 1px solid #bfdbfe;">
-                    ID: ${data.analysisId.substring(0, 8).toUpperCase()}
+                    ID: ${escapeHtml(data.analysisId.substring(0, 8).toUpperCase())}
                 </span>
-                <p style="margin: 6px 0 0 0; color: #64748b; font-size: 11px;">Issued: ${data.date}</p>
+                <p style="margin: 6px 0 0 0; color: #64748b; font-size: 11px;">Issued: ${escapeHtml(data.date)}</p>
             </div>
         </div>
 
@@ -94,7 +106,7 @@ export function generateReportHTML(data: ReportPDFPayload): string {
                     🤖 Notice of AI-Generated Clinical Synthesis
                 </span>
                 ${generationMeta ? `<span style="font-size: 10px; color: #64748b; font-family: monospace;">
-                    ${generationMeta}
+                    ${escapeHtml(generationMeta)}
                 </span>` : ''}
             </div>
             <p style="font-size: 11px; color: #334155; margin: 0; line-height: 1.45;">
@@ -119,7 +131,7 @@ export function generateReportHTML(data: ReportPDFPayload): string {
                     </tr>
                     <tr>
                         <td style="padding: 4px 0;"><strong>Severity Grade:</strong> <span style="color: ${data.severity === 'Severe' || data.severity === 'Critical' ? '#dc2626' : data.severity === 'Moderate' ? '#d97706' : '#16a34a'}; font-weight: 700;">${escapeHtml(data.severity)}</span></td>
-                        <td style="padding: 4px 0;"><strong>AI Calibration Score:</strong> <span style="font-weight: 700; color: #2563eb;">${data.confidenceScore}%</span></td>
+                        <td style="padding: 4px 0;"><strong>Model-Reported Confidence:</strong> <span style="font-weight: 700; color: #2563eb;">${typeof data.confidenceScore === 'number' && Number.isFinite(data.confidenceScore) && data.confidenceScore >= 0 && data.confidenceScore <= 100 ? `${data.confidenceScore}%` : 'Not assessed'}</span></td>
                         <td style="padding: 4px 0;"><strong>Verification Status:</strong> ${hasCitations ? `<span style="color: #16a34a; font-weight: 600;">✓ Grounded with Citations</span>` : `<span style="color: #64748b; font-weight: 600;">No citations</span>`}</td>
                     </tr>
                 </table>
@@ -188,12 +200,11 @@ export function generateReportHTML(data: ReportPDFPayload): string {
                     <strong>Legal & Regulatory Disclaimer:</strong> ${escapeHtml(data.disclaimer) || 'DermiAssist-AI generates algorithmic insights solely for research and physician-assisted decision support. All clinical actions, prescription decisions, and definitive diagnoses must be executed by a board-certified dermatologist.'}
                 </p>
                 <p style="font-size: 9px; color: #94a3b8; margin: 4px 0 0 0;">
-                    Timestamp: ${new Date().toISOString()} • Scan the QR code to open this report's online verification page
+                    Timestamp: ${new Date().toISOString()} • Use the link to open this report's online verification page
                 </p>
             </div>
             <div style="text-align: center; flex-shrink: 0;">
-                <img src="${qrCodeApiUrl}" width="76" height="76" alt="Scan to Verify Report" style="border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; background: #fff;" />
-                <p style="font-size: 8.5px; color: #475569; margin: 2px 0 0 0; font-weight: 600;">Scan to Verify Online</p>
+                <a href="${escapeHtml(verificationUrl)}" style="font-size: 11px; color: #2563eb;">Verify Report Online</a>
             </div>
         </div>
     </div>
