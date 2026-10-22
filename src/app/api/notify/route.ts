@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { novu } from '@/lib/novu/client';
+import { getNovu } from '@/lib/novu/client';
 import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        await novu.trigger(workflowId, {
+        await getNovu().trigger(workflowId, {
             to: {
                 subscriberId,
                 ...(email && { email }),

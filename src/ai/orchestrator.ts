@@ -6,7 +6,6 @@
 
 import { validateAndSanitizeInput } from '@/ai/guards/input-guard';
 import { validateOutputSafety } from '@/ai/guards/output-guard';
-import { getSemanticCache, setSemanticCache } from '@/ai/cache/semantic-cache';
 import { runTriageAgent } from '@/ai/agents/triage-agent';
 import { runVisionAgent, VisionOutput } from '@/ai/agents/vision-agent';
 import { runRAGSpecialistAgent } from '@/ai/agents/rag-specialist-agent';
@@ -57,6 +56,9 @@ export async function executeMultiAgentPipeline(
     // ── STEP 1: Input Guardrail & PII Sanitization ────────────────
     const guardrailStepStart = Date.now();
     const inputGuard = validateAndSanitizeInput(input.symptoms);
+    if (!inputGuard.safe) {
+        throw new Error('Input rejected by clinical safety checks.');
+    }
     traceLog.push({
         agent: 'InputGuardrailAgent',
         status: inputGuard.safe ? 'success' : 'fallback',
@@ -65,30 +67,8 @@ export async function executeMultiAgentPipeline(
 
     const cleanSymptoms = inputGuard.sanitizedPrompt;
 
-    // ── STEP 2: Semantic Cache Lookup ──────────────────────────────
-    const cacheStepStart = Date.now();
-    const cachedReport = await getSemanticCache<FinalReport>(cleanSymptoms);
-    traceLog.push({
-        agent: 'SemanticCacheAgent',
-        status: cachedReport ? 'success' : 'skipped',
-        durationMs: Date.now() - cacheStepStart,
-    });
-
-    if (cachedReport) {
-        logger.info('ai.orchestrator.cache.hit');
-        return {
-            success: true,
-            cached: true,
-            report: cachedReport,
-            executionTimeMs: Date.now() - startTime,
-            agentTrace: traceLog,
-            safety: {
-                inputSanitized: inputGuard.piiDetected,
-                hallucinationRisk: 'low',
-                disclaimerAppended: true,
-            },
-        };
-    }
+    // Similar symptom text is not an interchangeable clinical case. In particular,
+    // images, duration, location and patient context must never be lost to caching.
 
     // Honest "not analyzed" vision block. Used when no image is provided OR when the
     // vision model fails — we never fabricate a lesion type, suspected conditions, or a
@@ -175,7 +155,6 @@ export async function executeMultiAgentPipeline(
 
     // ── STEP 5: Output Safety Guardrail & Disclaimer Injection ──────
     const outputGuard = validateOutputSafety({
-        reportData: rawReport as unknown as Record<string, unknown>,
         confidenceScore: rawReport.confidenceScore,
         response: rawReport.summary,
     });
@@ -184,9 +163,6 @@ export async function executeMultiAgentPipeline(
         ...rawReport,
         summary: outputGuard.data.response || rawReport.summary,
     };
-
-    // ── STEP 6: Save Result to Semantic Cache ──────────────────────
-    await setSemanticCache(cleanSymptoms, finalReport);
 
     const totalExecutionTimeMs = Date.now() - startTime;
 

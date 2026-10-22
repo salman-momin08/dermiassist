@@ -12,6 +12,11 @@ from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 
 from ai_service.utils.url_safety import assert_public_http_url, UnsafeUrlError
+from ai_service.utils.circuit_breaker import (
+    huggingface_circuit_breaker,
+    with_circuit_breaker,
+    CircuitBreakerOpenException,
+)
 
 load_dotenv()
 
@@ -52,19 +57,14 @@ async def classify_skin_lesion_hf(image_url: Optional[str] = None) -> Dict[str, 
         return _hf_failure(f"Image URL rejected: {e}")
 
     try:
-        api_url = f"https://api-inference.huggingface.co/models/{_HF_LESION_MODEL}"
-        headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-
         async with httpx.AsyncClient() as client:
             img_resp = await client.get(image_url, timeout=10.0)
             if img_resp.status_code != 200:
                 return _hf_failure(f"Failed to download image (HTTP {img_resp.status_code})")
 
-            hf_resp = await client.post(api_url, headers=headers, content=img_resp.content, timeout=15.0)
-            if hf_resp.status_code != 200:
-                return _hf_failure(f"HuggingFace inference failed (HTTP {hf_resp.status_code}): {hf_resp.text[:200]}")
-
-            predictions = hf_resp.json()
+            predictions = await with_circuit_breaker(
+                huggingface_circuit_breaker, _call_hf_lesion_classifier, client, img_resp.content
+            )
 
         # Derive the top prediction from the REAL model output, never a constant.
         if not isinstance(predictions, list) or not predictions:
@@ -79,8 +79,20 @@ async def classify_skin_lesion_hf(image_url: Optional[str] = None) -> Dict[str, 
             "top_prediction": top.get("label"),
             "confidence_score": round(float(top.get("score", 0)) * 100, 2),
         }
+    except CircuitBreakerOpenException as e:
+        return _hf_failure(str(e))
     except Exception as e:
         return _hf_failure(str(e))
+
+
+async def _call_hf_lesion_classifier(client: httpx.AsyncClient, image_bytes: bytes) -> Any:
+    """Raw HuggingFace lesion-classifier inference call. Raises on failure."""
+    api_url = f"https://api-inference.huggingface.co/models/{_HF_LESION_MODEL}"
+    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+    hf_resp = await client.post(api_url, headers=headers, content=image_bytes, timeout=15.0)
+    if hf_resp.status_code != 200:
+        raise RuntimeError(f"HuggingFace inference failed (HTTP {hf_resp.status_code}): {hf_resp.text[:200]}")
+    return hf_resp.json()
 
 async def generate_bge_embedding_hf(text: str) -> List[float]:
     """
@@ -94,14 +106,17 @@ async def generate_bge_embedding_hf(text: str) -> List[float]:
         raise RuntimeError("HUGGINGFACE_API_KEY not configured; cannot generate embedding")
 
     model_id = "BAAI/bge-small-en-v1.5"
-    api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_id}"
-    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-    payload = {"inputs": text}
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(api_url, headers=headers, json=payload, timeout=10.0)
-        resp.raise_for_status()
-        vec = resp.json()
+    async def _call() -> Any:
+        api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_id}"
+        headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+        payload = {"inputs": text}
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(api_url, headers=headers, json=payload, timeout=10.0)
+            resp.raise_for_status()
+            return resp.json()
+
+    vec = await with_circuit_breaker(huggingface_circuit_breaker, _call)
 
     if not isinstance(vec, list) or len(vec) == 0:
         raise RuntimeError(f"Unexpected embedding output from {model_id}")
@@ -122,14 +137,17 @@ async def generate_llm_completion_hf(prompt: str) -> str:
         raise RuntimeError("HUGGINGFACE_API_KEY not configured; cannot generate completion")
 
     model_id = "mistralai/Mistral-7B-Instruct-v0.3"
-    api_url = f"https://api-inference.huggingface.co/models/{model_id}"
-    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-    payload = {"inputs": prompt, "parameters": {"max_new_tokens": 300, "temperature": 0.2}}
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(api_url, headers=headers, json=payload, timeout=15.0)
-        resp.raise_for_status()
-        data = resp.json()
+    async def _call() -> Any:
+        api_url = f"https://api-inference.huggingface.co/models/{model_id}"
+        headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+        payload = {"inputs": prompt, "parameters": {"max_new_tokens": 300, "temperature": 0.2}}
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(api_url, headers=headers, json=payload, timeout=15.0)
+            resp.raise_for_status()
+            return resp.json()
+
+    data = await with_circuit_breaker(huggingface_circuit_breaker, _call)
 
     if isinstance(data, list) and len(data) > 0 and "generated_text" in data[0]:
         return data[0]["generated_text"]

@@ -14,6 +14,7 @@ import { calculateUVProtection, FitzpatrickSkinType } from "@/lib/uv-tracker";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
+import { generateReportHTML } from '@/lib/pdf-generator';
 import { visualProgressAnalysis } from '@/ai/flows/visual-progress-analysis';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -459,39 +460,31 @@ export default function AnalysisDetailPage() {
         setIsDownloading(true);
 
         try {
-            const { generateReportHTML } = await import('@/lib/pdf-generator');
-            
             const htmlContent = generateReportHTML({
                 analysisId: analysis.id,
-                patientName: userData.displayName || 'Khwajamainuddin Momin',
+                patientName: userData.displayName || 'Not provided',
                 date: new Date(analysis.date).toLocaleDateString(),
                 conditionName: analysis.conditionName,
-                icdCode: (analysis as any).icdCode || 'L40.0',
-                severity: (analysis as any).severity || 'Moderate',
-                confidenceScore: (analysis as any).confidenceScore || 94,
-                summary: analysis.recommendations || 'Clinical analysis indicates characteristic cutaneous lesions. Grounded guidelines recommend targeted topical therapy.',
+                icdCode: analysis.icd10Code || 'Not assigned',
+                severity: analysis.severity,
+                confidenceScore: analysis.confidenceScore,
+                summary: analysis.condition,
                 keyFindings: [
-                    analysis.conditionName ? `Primary differential: ${analysis.conditionName}` : 'Cutaneous plaque with erythema',
-                    analysis.submittedInfo?.otherConsiderations ? cleanText(analysis.submittedInfo.otherConsiderations).substring(0, 150) + '...' : 'Erythematous scaly plaque with clear demarcation'
+                    `Primary differential: ${analysis.conditionName}`,
+                    ...(analysis.submittedInfo?.otherConsiderations ? [cleanText(analysis.submittedInfo.otherConsiderations)] : [])
                 ],
-                recommendedTreatments: analysis.dos?.slice(0, 3) || [
-                    'Apply prescribed topical corticosteroid / emollient twice daily',
-                    'Maintain skin hydration and avoid known flare triggers',
-                    'Schedule follow-up evaluation with a board-certified dermatologist'
-                ],
-                citationsUsed: [
-                    'American Academy of Dermatology (AAD) Practice Guidelines 2024',
-                    'Journal of the European Academy of Dermatology and Venereology (JEADV)',
-                    'National Psoriasis Foundation Clinical Practice Framework'
-                ],
+                recommendedTreatments: [analysis.recommendations, ...analysis.dos].filter(Boolean),
+                citationsUsed: [],
+                doctorNotes: analysis.reviewerNotes,
                 disclaimer: 'DermiAssist-AI provides preliminary informational analysis using artificial intelligence and does NOT provide definitive medical diagnoses or replace evaluation by a licensed dermatologist. Always consult a qualified healthcare professional for medical advice.',
-                modelArchitecture: 'Gemini 2.5 Flash + HAM10000 ResNet + Supabase pgvector RAG (HNSW)',
-                generationLatencyMs: 1840,
                 patientImage: analysis.image,
+                verificationSignature: analysis.verificationSignature,
             });
 
             // Open print window with formatted HTML for pixel-perfect PDF export
-            const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) throw new Error('Allow popups to print this report.');
+            printWindow.opener = null;
             if (printWindow) {
                 printWindow.document.write(`
                     <!DOCTYPE html>
@@ -521,7 +514,7 @@ export default function AnalysisDetailPage() {
 
             toast({
                 title: "Report Generated",
-                description: "PDF export ready with QR code verification.",
+                description: "Print view ready with an online verification link.",
             });
         } catch (error) {
             console.error("Failed to generate PDF:", error);
@@ -812,7 +805,7 @@ export default function AnalysisDetailPage() {
                                 </div>
                                 <div className="text-right">
                                     <span className="font-clinical-mono text-xs font-bold text-muted-foreground">
-                                        LIC: {analysis.reviewerBadgeNumber || 'NY-MED-88219'}
+                                        LIC: {analysis.reviewerBadgeNumber || 'Not provided'}
                                     </span>
                                 </div>
                             </div>
@@ -889,10 +882,10 @@ export default function AnalysisDetailPage() {
                                     </h3>
                                     <div className="flex items-center gap-2">
                                         <Badge variant="outline" className="font-clinical-mono text-xs font-bold border-primary/40 text-primary">
-                                            ICD-10: {analysis.icd10Code || 'L40.0'}
+                                            ICD-10: {analysis.icd10Code || 'Not assigned'}
                                         </Badge>
                                         <Badge variant="secondary" className="text-xs font-semibold">
-                                            Certainty: {analysis.confidenceScore || 88}%
+                                            Model confidence: {analysis.confidenceScore == null ? 'Not assessed' : `${analysis.confidenceScore}%`}
                                         </Badge>
                                     </div>
                                 </div>

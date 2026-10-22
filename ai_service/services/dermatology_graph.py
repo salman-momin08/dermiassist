@@ -6,6 +6,10 @@ import importlib
 from typing import TypedDict, List, Dict, Any, Optional
 from dotenv import load_dotenv
 
+from langgraph.graph import StateGraph, END
+
+from ai_service.services.huggingface_service import generate_llm_completion_hf
+
 load_dotenv()
 
 # Setup API Keys
@@ -19,24 +23,31 @@ def _get_genai_module():
     except ImportError:
         return None
 
-def _get_langgraph_module():
-    """Safely import langgraph.graph if installed."""
-    try:
-        return importlib.import_module("langgraph.graph")
-    except ImportError:
-        return None
-
-# State Definition
-class DermatologyState(TypedDict):
+# State Definition — shared across all three compiled graphs below. Every node
+# reads/writes a subset of these keys; LangGraph merges a node's returned dict
+# into the running state (partial updates), so nodes only need to return the
+# keys they actually touch.
+class DermatologyState(TypedDict, total=False):
+    # Inputs, populated by the execute_langgraph_* callers before invoking a graph.
     photo_data_uri: Optional[str]
     condition_name: Optional[str]
     conversation_history: Optional[str]
     user_answers: Optional[str]
-    current_question: Optional[str]
     turn_count: int
-    confidence_score: Optional[float]
+
+    # Outputs, written by whichever node in the chain succeeds.
+    current_question: Optional[str]
     final_evaluation: Optional[Dict[str, Any]]
+    confidence_score: Optional[float]
     error: Optional[str]
+
+    # Graph control-flow bookkeeping (internal to this module — not part of any
+    # public API response). `success` drives the conditional edges below;
+    # `attempts` accumulates "Provider: error message" strings across tiers so
+    # the terminal node's raised error mirrors the original code's combined
+    # "failed on all providers. Gemini: ...; OpenAI: ..." message.
+    success: bool
+    attempts: List[str]
 
 def _get_gemini_model(model_name: str = "gemini-2.5-flash"):
     """Initialize Google Gemini client safely."""
@@ -90,96 +101,117 @@ async def _gemini_generate_with_retry(model, contents, max_retries: int = 3, bas
     raise last_err  # type: ignore[misc]
 
 # =====================================================================
-# Node 1: Vision Diagnostic Condition Detection
+# Graph 1: Vision Diagnostic Condition Detection
+#   try_gemini --(success)--> END
+#   try_gemini --(failure)--> try_openai --(success)--> END
+#   try_openai --(failure)--> raises (terminal, no fabricated condition)
+#
+# No third (HuggingFace) tier here: this is an image-understanding task and
+# the only HF model wired into this codebase (classify_skin_lesion_hf, the
+# HAM10000 lesion classifier in huggingface_service.py) returns a different
+# label taxonomy — bolting it on here would silently change what "condition
+# detected" means rather than genuinely retrying the same task on a third
+# real provider. Judgment call: kept honest 2-tier fallback instead.
 # =====================================================================
-async def detect_condition_node(state: DermatologyState) -> Dict[str, Any]:
-    """Analyze image using multimodal vision reasoning to detect primary skin condition.
 
-    Raises on failure — we never fabricate a condition name. A wrong or invented
-    diagnosis in a medical app is worse than an explicit failure the caller can
-    handle (retry, fall back to another real provider, or surface to the user).
-    """
+_DETECT_PROMPT = """You are an expert dermatologist AI. Analyze the provided image of a skin condition.
+Your ONLY task is to identify the most likely skin condition and return its common medical name (e.g. Psoriasis, Eczema, Acne Vulgaris, Rosacea, Seborrheic Dermatitis, Contact Dermatitis, Melanocytic Nevus).
+Do not provide any other information, summary, or recommendations. Return ONLY the condition name."""
+
+def _parse_photo_data_uri(photo_uri: str) -> tuple:
+    mime_type = "image/jpeg"
+    base64_data = photo_uri
+    if "," in photo_uri:
+        header, base64_data = photo_uri.split(",", 1)
+        if "image/png" in header:
+            mime_type = "image/png"
+        elif "image/webp" in header:
+            mime_type = "image/webp"
+    return mime_type, base64_data
+
+async def _detect_try_gemini(state: DermatologyState) -> Dict[str, Any]:
+    """Node 1a: Gemini multimodal vision call — the primary condition detector."""
     photo_uri = state.get("photo_data_uri")
     if not photo_uri:
         raise ValueError("No image provided for condition detection")
 
-    prompt = """You are an expert dermatologist AI. Analyze the provided image of a skin condition.
-Your ONLY task is to identify the most likely skin condition and return its common medical name (e.g. Psoriasis, Eczema, Acne Vulgaris, Rosacea, Seborrheic Dermatitis, Contact Dermatitis, Melanocytic Nevus).
-Do not provide any other information, summary, or recommendations. Return ONLY the condition name."""
-
     try:
-        # Extract base64 and mime type
-        mime_type = "image/jpeg"
-        base64_data = photo_uri
-        if "," in photo_uri:
-            header, base64_data = photo_uri.split(",", 1)
-            if "image/png" in header:
-                mime_type = "image/png"
-            elif "image/webp" in header:
-                mime_type = "image/webp"
-
+        mime_type, base64_data = _parse_photo_data_uri(photo_uri)
         model = _get_gemini_model("gemini-2.5-flash")
         if not model:
             raise RuntimeError("Gemini model not initialized")
-        
-        image_part = {
-            "mime_type": mime_type,
-            "data": base64_data
-        }
 
+        image_part = {"mime_type": mime_type, "data": base64_data}
         # generate_content is a blocking sync call — offload to a thread (so it
         # doesn't block the FastAPI event loop) and retry transient overloads.
-        response = await _gemini_generate_with_retry(model, [prompt, image_part])
+        response = await _gemini_generate_with_retry(model, [_DETECT_PROMPT, image_part])
         condition_name = response.text.strip().replace("*", "").replace("\n", " ")
-        # Clean up any quotes
         condition_name = re.sub(r'^["\']|["\']$', '', condition_name).strip()
-        
-        return {
-            "condition_name": condition_name or "Dermatological Condition",
-            "turn_count": 0
-        }
+
+        return {"condition_name": condition_name or "Dermatological Condition", "turn_count": 0, "success": True}
     except Exception as e:
-        print(f"[LangGraph Vision Node Error]: {e}")
-        # Real provider fallback: OpenAI GPT-4o vision (a genuine second model,
-        # not a canned answer). If it also succeeds we return its real result.
-        openai_client = _get_openai_client()
-        if openai_client:
-            try:
-                res = await openai_client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": prompt},
-                                {"type": "image_url", "image_url": {"url": photo_uri}}
-                            ]
-                        }
-                    ],
-                    max_tokens=50
-                )
-                detected = (res.choices[0].message.content or "").strip()
-                if detected:
-                    return {"condition_name": detected, "turn_count": 0}
-                raise RuntimeError("OpenAI vision returned empty condition")
-            except Exception as oai_err:
-                print(f"[LangGraph OpenAI Vision Fallback Error]: {oai_err}")
-                raise RuntimeError(
-                    f"Vision detection failed on all providers. Gemini: {e}; OpenAI: {oai_err}"
-                ) from oai_err
+        print(f"[LangGraph Vision Node Error — Gemini]: {e}")
+        return {"success": False, "attempts": state.get("attempts", []) + [f"Gemini: {e}"]}
 
-        # No real provider available — surface the failure, never guess a diagnosis.
-        raise RuntimeError(f"Vision detection failed and no fallback provider is configured: {e}") from e
+async def _detect_try_openai(state: DermatologyState) -> Dict[str, Any]:
+    """Node 1b: OpenAI GPT-4o vision fallback — a genuine second model, not a canned answer.
+
+    Terminal node in this chain: on failure here, raise so the graph's ainvoke
+    propagates a real error to the caller instead of ending in a silently
+    "successful" state with no condition name.
+    """
+    photo_uri = state.get("photo_data_uri")
+    attempts = state.get("attempts", [])
+    openai_client = _get_openai_client()
+    if not openai_client:
+        raise RuntimeError(
+            f"Vision detection failed and no fallback provider is configured: {attempts[-1] if attempts else 'Gemini unavailable'}"
+        )
+    try:
+        res = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": _DETECT_PROMPT},
+                        {"type": "image_url", "image_url": {"url": photo_uri}}
+                    ]
+                }
+            ],
+            max_tokens=50
+        )
+        detected = (res.choices[0].message.content or "").strip()
+        if detected:
+            return {"condition_name": detected, "turn_count": 0, "success": True}
+        raise RuntimeError("OpenAI vision returned empty condition")
+    except Exception as oai_err:
+        print(f"[LangGraph OpenAI Vision Fallback Error]: {oai_err}")
+        combined = "; ".join(attempts + [f"OpenAI: {oai_err}"])
+        raise RuntimeError(f"Vision detection failed on all providers. {combined}") from oai_err
+
+def _build_detect_graph():
+    workflow = StateGraph(DermatologyState)
+    workflow.add_node("try_gemini", _detect_try_gemini)
+    workflow.add_node("try_openai", _detect_try_openai)
+    workflow.set_entry_point("try_gemini")
+    workflow.add_conditional_edges(
+        "try_gemini",
+        lambda s: "done" if s.get("success") else "fallback",
+        {"done": END, "fallback": "try_openai"},
+    )
+    workflow.add_edge("try_openai", END)
+    return workflow.compile()
+
+detect_graph = _build_detect_graph()
 
 # =====================================================================
-# Node 2: Dynamic Proforma Question Generation
+# Graph 2: Dynamic Proforma Question Generation
+#   try_gemini -> try_openai -> try_hf -> END (or raise on total failure)
 # =====================================================================
-async def proforma_question_node(state: DermatologyState) -> Dict[str, Any]:
-    """Generate the single next most relevant clinical question based on condition and history."""
-    condition_name = state.get("condition_name") or "Dermatological Condition"
-    history = state.get("conversation_history") or ""
 
-    system_instruction = f"""You are an expert board-certified dermatologist AI conducting a real-time clinical diagnostic consultation.
+def _question_system_instruction(condition_name: str) -> str:
+    return f"""You are an expert board-certified dermatologist AI conducting a real-time clinical diagnostic consultation.
 The primary differential identified from visual analysis is **{condition_name}**.
 
 Your objective is to ask ONE thoughtful, highly relevant clinical follow-up question to investigate:
@@ -195,65 +227,108 @@ Rules:
 3. Tailor the medical inquiry specifically to the nuances of {condition_name}.
 4. Ask only ONE clear, compassionate question without extra conversational preamble."""
 
-    user_prompt = f"""Conversation History so far:
+def _question_user_prompt(history: str, condition_name: str) -> str:
+    return f"""Conversation History so far:
 {history}
 
 Based on the above patient history and the suspected condition ({condition_name}), ask the single most important next clinical question:"""
+
+async def _question_try_gemini(state: DermatologyState) -> Dict[str, Any]:
+    condition_name = state.get("condition_name") or "Dermatological Condition"
+    history = state.get("conversation_history") or ""
+    system_instruction = _question_system_instruction(condition_name)
+    user_prompt = _question_user_prompt(history, condition_name)
 
     try:
         model = _get_gemini_model("gemini-2.5-flash")
         if not model:
             raise RuntimeError("Gemini model not initialized")
-        
+
         full_prompt = f"{system_instruction}\n\n{user_prompt}"
         response = await _gemini_generate_with_retry(model, full_prompt)
         question = response.text.strip().replace('"', '').replace("'", "")
-        
-        return {
-            "current_question": question,
-            "turn_count": state.get("turn_count", 0) + 1
-        }
+
+        return {"current_question": question, "turn_count": state.get("turn_count", 0) + 1, "success": True}
     except Exception as e:
-        print(f"[LangGraph Proforma Question Node Error]: {e}")
-        # Real provider fallback: OpenAI GPT-4o.
-        openai_client = _get_openai_client()
-        if openai_client:
-            try:
-                res = await openai_client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": system_instruction},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    max_tokens=150
-                )
-                question = (res.choices[0].message.content or "").strip().replace('"', '')
-                if question:
-                    return {
-                        "current_question": question,
-                        "turn_count": state.get("turn_count", 0) + 1
-                    }
-                raise RuntimeError("OpenAI returned empty question")
-            except Exception as oai_err:
-                print(f"[LangGraph OpenAI Question Fallback Error]: {oai_err}")
-                raise RuntimeError(
-                    f"Clinical question generation failed on all providers. Gemini: {e}; OpenAI: {oai_err}"
-                ) from oai_err
+        print(f"[LangGraph Proforma Question Node Error — Gemini]: {e}")
+        return {"success": False, "attempts": state.get("attempts", []) + [f"Gemini: {e}"]}
 
-        # The follow-up question is part of the clinical interview — do not fake
-        # one. Surface the failure so the consultation can be retried/handled.
-        raise RuntimeError(f"Clinical question generation failed and no fallback provider is configured: {e}") from e
-
-# =====================================================================
-# Node 3: Multi-Agent Final Clinical Evaluation
-# =====================================================================
-async def final_evaluation_node(state: DermatologyState) -> Dict[str, Any]:
-    """Synthesize complete clinical assessment report with ICD-10 coding and medical guidelines."""
+async def _question_try_openai(state: DermatologyState) -> Dict[str, Any]:
     condition_name = state.get("condition_name") or "Dermatological Condition"
-    user_answers = state.get("user_answers") or state.get("conversation_history") or ""
-    photo_uri = state.get("photo_data_uri")
+    history = state.get("conversation_history") or ""
+    system_instruction = _question_system_instruction(condition_name)
+    user_prompt = _question_user_prompt(history, condition_name)
+    attempts = state.get("attempts", [])
 
-    prompt = f"""You are a world-class dermatologist AI. Your task is to perform a final, comprehensive evaluation of a skin condition.
+    openai_client = _get_openai_client()
+    if not openai_client:
+        return {"success": False, "attempts": attempts + ["OpenAI: OPENAI_API_KEY not configured"]}
+    try:
+        res = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_prompt}
+            ],
+            max_tokens=150
+        )
+        question = (res.choices[0].message.content or "").strip().replace('"', '')
+        if question:
+            return {"current_question": question, "turn_count": state.get("turn_count", 0) + 1, "success": True}
+        return {"success": False, "attempts": attempts + ["OpenAI: returned empty question"]}
+    except Exception as oai_err:
+        print(f"[LangGraph OpenAI Question Fallback Error]: {oai_err}")
+        return {"success": False, "attempts": attempts + [f"OpenAI: {oai_err}"]}
+
+async def _question_try_hf(state: DermatologyState) -> Dict[str, Any]:
+    """Real third-tier fallback: HuggingFace Mistral-7B-Instruct text completion
+    (generate_llm_completion_hf, huggingface_service.py). Terminal node — on any
+    failure here, raise so the combined error surfaces exactly like the other
+    two tiers' failures, never a fabricated question."""
+    condition_name = state.get("condition_name") or "Dermatological Condition"
+    history = state.get("conversation_history") or ""
+    attempts = state.get("attempts", [])
+    combined_prompt = f"{_question_system_instruction(condition_name)}\n\n{_question_user_prompt(history, condition_name)}"
+
+    try:
+        completion = await generate_llm_completion_hf(combined_prompt)
+        # Mistral is a raw completion model (no dedicated system/user roles), so
+        # take the first non-empty line as the question rather than the whole
+        # continuation, which may trail into unrelated text.
+        question = next((line.strip() for line in (completion or "").splitlines() if line.strip()), "")
+        question = question.replace('"', '')
+        if not question:
+            raise RuntimeError("HuggingFace returned an empty completion")
+        return {"current_question": question, "turn_count": state.get("turn_count", 0) + 1, "success": True}
+    except Exception as e:
+        print(f"[LangGraph HF Question Fallback Error]: {e}")
+        combined = "; ".join(attempts + [f"HuggingFace: {e}"])
+        raise RuntimeError(f"Clinical question generation failed on all providers. {combined}") from e
+
+def _build_question_graph():
+    workflow = StateGraph(DermatologyState)
+    workflow.add_node("try_gemini", _question_try_gemini)
+    workflow.add_node("try_openai", _question_try_openai)
+    workflow.add_node("try_hf", _question_try_hf)
+    workflow.set_entry_point("try_gemini")
+    workflow.add_conditional_edges(
+        "try_gemini", lambda s: "done" if s.get("success") else "fallback", {"done": END, "fallback": "try_openai"}
+    )
+    workflow.add_conditional_edges(
+        "try_openai", lambda s: "done" if s.get("success") else "fallback", {"done": END, "fallback": "try_hf"}
+    )
+    workflow.add_edge("try_hf", END)
+    return workflow.compile()
+
+question_graph = _build_question_graph()
+
+# =====================================================================
+# Graph 3: Multi-Agent Final Clinical Evaluation
+#   try_gemini -> try_openai -> try_hf -> END (or raise on total failure)
+# =====================================================================
+
+def _eval_prompt(condition_name: str, user_answers: str) -> str:
+    return f"""You are a world-class dermatologist AI. Your task is to perform a final, comprehensive evaluation of a skin condition.
 You have already performed an initial analysis and determined the condition is likely {condition_name}.
 You then conducted a proforma inquiry which the patient has answered.
 
@@ -273,143 +348,150 @@ Return a valid JSON object matching this exact structure:
 }}
 Return ONLY valid JSON."""
 
+def _extract_json_block(text: str) -> Dict[str, Any]:
+    text = text.strip()
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0].strip()
+    elif "```" in text:
+        text = text.split("```")[1].split("```")[0].strip()
+    return json.loads(text)
+
+async def _eval_try_gemini(state: DermatologyState) -> Dict[str, Any]:
+    condition_name = state.get("condition_name") or "Dermatological Condition"
+    user_answers = state.get("user_answers") or state.get("conversation_history") or ""
+    photo_uri = state.get("photo_data_uri")
+    prompt = _eval_prompt(condition_name, user_answers)
+
     try:
         model = _get_gemini_model("gemini-2.5-flash")
         if not model:
             raise RuntimeError("Gemini model not initialized")
-        
+
         contents: List[Any] = [prompt]
         if photo_uri and "," in photo_uri:
-            mime_type = "image/jpeg"
-            header, base64_data = photo_uri.split(",", 1)
-            if "image/png" in header:
-                mime_type = "image/png"
+            mime_type, base64_data = _parse_photo_data_uri(photo_uri)
             contents.append({"mime_type": mime_type, "data": base64_data})
 
         response = await _gemini_generate_with_retry(model, contents)
-        text = response.text.strip()
-
-        # Clean JSON markdown if wrapped
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
-
-        data = json.loads(text)
-        return {"final_evaluation": data}
+        data = _extract_json_block(response.text)
+        return {"final_evaluation": data, "success": True}
     except Exception as e:
-        print(f"[LangGraph Final Eval Error]: {e}")
-        # Real provider fallback: OpenAI GPT-4o (with the image when available).
-        # The final evaluation is the clinical report shown to the patient — we
-        # try a genuine second model before failing, but never fabricate a report.
-        openai_client = _get_openai_client()
-        if openai_client:
-            try:
-                content: List[Any] = [{"type": "text", "text": prompt}]
-                if photo_uri:
-                    content.append({"type": "image_url", "image_url": {"url": photo_uri}})
-                res = await openai_client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[{"role": "user", "content": content}],
-                    response_format={"type": "json_object"},
-                    max_tokens=1200,
-                )
-                text = (res.choices[0].message.content or "").strip()
-                data = json.loads(text)
-                return {"final_evaluation": data}
-            except Exception as oai_err:
-                print(f"[LangGraph OpenAI Final Eval Fallback Error]: {oai_err}")
-                raise RuntimeError(
-                    f"Final clinical evaluation failed on all providers. Gemini: {e}; OpenAI: {oai_err}"
-                ) from oai_err
+        print(f"[LangGraph Final Eval Error — Gemini]: {e}")
+        return {"success": False, "attempts": state.get("attempts", []) + [f"Gemini: {e}"]}
 
-        # No real provider available — surface the failure, never invent medical advice.
-        raise RuntimeError(f"Final clinical evaluation failed and no fallback provider is configured: {e}") from e
+async def _eval_try_openai(state: DermatologyState) -> Dict[str, Any]:
+    condition_name = state.get("condition_name") or "Dermatological Condition"
+    user_answers = state.get("user_answers") or state.get("conversation_history") or ""
+    photo_uri = state.get("photo_data_uri")
+    prompt = _eval_prompt(condition_name, user_answers)
+    attempts = state.get("attempts", [])
 
-# =====================================================================
-# LangGraph State Machine Builder
-# =====================================================================
-def build_dermatology_graph():
-    """Compile the LangGraph StateGraph machine."""
+    openai_client = _get_openai_client()
+    if not openai_client:
+        return {"success": False, "attempts": attempts + ["OpenAI: OPENAI_API_KEY not configured"]}
     try:
-        langgraph = _get_langgraph_module()
-        if not langgraph:
-            return None
-        
-        StateGraph = getattr(langgraph, "StateGraph")
-        END = getattr(langgraph, "END")
-        
-        workflow = StateGraph(DermatologyState)
-        
-        # Add nodes
-        workflow.add_node("detect_condition", detect_condition_node)
-        workflow.add_node("proforma_question", proforma_question_node)
-        workflow.add_node("final_evaluation", final_evaluation_node)
-        
-        # Set entry point and edges
-        workflow.set_entry_point("detect_condition")
-        workflow.add_edge("detect_condition", "proforma_question")
-        workflow.add_edge("proforma_question", END)
-        workflow.add_edge("final_evaluation", END)
-        
-        return workflow.compile()
-    except Exception as e:
-        print(f"[LangGraph Compilation Warning]: {e}. Running standalone dispatchers.")
-        return None
+        content: List[Any] = [{"type": "text", "text": prompt}]
+        if photo_uri:
+            content.append({"type": "image_url", "image_url": {"url": photo_uri}})
+        res = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": content}],
+            response_format={"type": "json_object"},
+            max_tokens=1200,
+        )
+        data = json.loads((res.choices[0].message.content or "").strip())
+        return {"final_evaluation": data, "success": True}
+    except Exception as oai_err:
+        print(f"[LangGraph OpenAI Final Eval Fallback Error]: {oai_err}")
+        return {"success": False, "attempts": attempts + [f"OpenAI: {oai_err}"]}
 
-# Singleton graph instance
-dermatology_graph = build_dermatology_graph()
+async def _eval_try_hf(state: DermatologyState) -> Dict[str, Any]:
+    """Real third-tier fallback: HuggingFace Mistral-7B text completion, text-only
+    (no image — Mistral-7B-Instruct is not multimodal, so the visual context
+    that Gemini/OpenAI had is simply unavailable on this tier; the synthesis is
+    still based on real patient-answer text, never fabricated). Terminal node —
+    raises on any failure, including unparseable JSON, so a malformed HF
+    completion never becomes a fabricated clinical report."""
+    condition_name = state.get("condition_name") or "Dermatological Condition"
+    user_answers = state.get("user_answers") or state.get("conversation_history") or ""
+    attempts = state.get("attempts", [])
+    prompt = _eval_prompt(condition_name, user_answers)
+
+    try:
+        completion = await generate_llm_completion_hf(prompt)
+        data = _extract_json_block(completion)
+        return {"final_evaluation": data, "success": True}
+    except Exception as e:
+        print(f"[LangGraph HF Final Eval Fallback Error]: {e}")
+        combined = "; ".join(attempts + [f"HuggingFace: {e}"])
+        raise RuntimeError(f"Final clinical evaluation failed on all providers. {combined}") from e
+
+def _build_eval_graph():
+    workflow = StateGraph(DermatologyState)
+    workflow.add_node("try_gemini", _eval_try_gemini)
+    workflow.add_node("try_openai", _eval_try_openai)
+    workflow.add_node("try_hf", _eval_try_hf)
+    workflow.set_entry_point("try_gemini")
+    workflow.add_conditional_edges(
+        "try_gemini", lambda s: "done" if s.get("success") else "fallback", {"done": END, "fallback": "try_openai"}
+    )
+    workflow.add_conditional_edges(
+        "try_openai", lambda s: "done" if s.get("success") else "fallback", {"done": END, "fallback": "try_hf"}
+    )
+    workflow.add_edge("try_hf", END)
+    return workflow.compile()
+
+eval_graph = _build_eval_graph()
 
 # =====================================================================
 # Exported Execution Helpers for FastAPI
 # =====================================================================
 async def execute_langgraph_detect(photo_data_uri: str) -> Dict[str, Any]:
-    """Execute LangGraph vision condition detection."""
-    state: DermatologyState = {
+    """Execute the compiled LangGraph vision condition-detection graph."""
+    initial_state: DermatologyState = {
         "photo_data_uri": photo_data_uri,
-        "condition_name": None,
-        "conversation_history": None,
-        "user_answers": None,
-        "current_question": None,
         "turn_count": 0,
-        "confidence_score": None,
-        "final_evaluation": None,
-        "error": None
+        "attempts": [],
     }
-    return await detect_condition_node(state)
+    final_state = await detect_graph.ainvoke(initial_state)
+    return {
+        "condition_name": final_state.get("condition_name", "Dermatological Condition"),
+        "turn_count": final_state.get("turn_count", 0),
+    }
 
 async def execute_langgraph_question(condition_name: str, conversation_history: str) -> Dict[str, Any]:
-    """Execute LangGraph dynamic question generation."""
-    state: DermatologyState = {
-        "photo_data_uri": None,
+    """Execute the compiled LangGraph dynamic-question-generation graph."""
+    initial_state: DermatologyState = {
         "condition_name": condition_name,
         "conversation_history": conversation_history,
-        "user_answers": None,
-        "current_question": None,
         "turn_count": 0,
-        "confidence_score": None,
-        "final_evaluation": None,
-        "error": None
+        "attempts": [],
     }
-    return await proforma_question_node(state)
+    final_state = await question_graph.ainvoke(initial_state)
+    return {
+        "current_question": final_state.get("current_question", ""),
+        "turn_count": final_state.get("turn_count", 1),
+    }
 
 async def execute_langgraph_evaluation(initial_condition: str, user_answers: str, photo_data_uri: Optional[str] = None) -> Dict[str, Any]:
-    """Execute LangGraph final evaluation synthesis."""
-    state: DermatologyState = {
+    """Execute the compiled LangGraph final-evaluation-synthesis graph."""
+    initial_state: DermatologyState = {
         "photo_data_uri": photo_data_uri,
         "condition_name": initial_condition,
-        "conversation_history": None,
         "user_answers": user_answers,
-        "current_question": None,
         "turn_count": 0,
-        "confidence_score": None,
-        "final_evaluation": None,
-        "error": None
+        "attempts": [],
     }
-    return await final_evaluation_node(state)
+    final_state = await eval_graph.ainvoke(initial_state)
+    return {"final_evaluation": final_state.get("final_evaluation", {})}
 
 async def execute_langgraph_suggestions(question: str, condition_name: Optional[str] = None, conversation_history: Optional[str] = None) -> Dict[str, Any]:
-    """Execute Python AI suggestions agent to generate 3-4 tailored response options."""
+    """Execute Python AI suggestions agent to generate 3-4 tailored response options.
+
+    Low-stakes UI quick-replies, not a diagnostic step — no graph needed here
+    (per the original design), just a direct Gemini-then-OpenAI attempt with an
+    honest empty-list fallback (never fabricated chips) if both are unavailable.
+    """
     prompt = f"""You are a specialized clinical assistant AI agent for DermiAssist-AI.
 Your role is to generate 3 to 4 realistic, distinct, concise patient response options (2 to 6 words each) for a patient answering the following clinical question.
 
@@ -455,4 +537,3 @@ Rules:
     # (which would hide that the model is down), return none with an explicit
     # error so the UI degrades to free-text entry instead of canned chips.
     return {"suggestions": [], "error": "Suggestion model unavailable"}
-

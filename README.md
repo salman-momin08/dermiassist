@@ -20,6 +20,21 @@
 
 > ⚠️ **Medical & Regulatory Disclaimer**: DermiAssist-AI is an AI Engineering portfolio showcase and clinical decision-support prototype. It provides preliminary informational skin assessments using artificial intelligence and does **NOT** provide definitive medical diagnoses or replace clinical evaluation by a licensed dermatologist.
 
+## Production release gates
+
+This repository is **not clinically validated or certified production-ready**. Passing unit tests or an LLM judge is not clinical validation. Before serving real patients:
+
+- Run `npm ci`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, and `python -m unittest discover -s ai_service/tests -v`. Public Supabase configuration is required at build time. Test-only placeholders can check compilation, but cannot verify integrations.
+- The deployment interpreter is Python **3.14**, a [supported Vercel runtime](https://vercel.com/docs/functions/runtimes/python#python-version). Dependency installation, service import and regression tests have been checked locally on Python 3.14.7. Python 3.11 was not available for local revalidation; no newer-only application syntax was introduced. [CI](.github/workflows/ci.yml) tests Python 3.11/3.14 and the frontend on Node 22; those remote jobs must pass before release.
+- Rehearse migrations 33-37 on a backed-up Supabase staging branch. Migration 34 takes exclusive locks and swaps a live table; verify row counts, RLS, foreign keys, realtime subscriptions, account deletion and restore procedures. If earlier versions of these migrations were already applied, reconcile the deployed schema with a forward migration rather than blindly replaying table renames. The revised verification RPC must be deployed with the application.
+- Configure every required service using [.env.example](.env.example), including `REPORT_SIGNING_SECRET`, `PYTHON_AI_SERVICE_API_KEY`, `OPENAI_API_KEY`, `NOVU_API_SECRET` and Redis. API rate limiting now fails closed if Redis is missing or unavailable.
+- On Vercel, async job submission returns **503** and the in-process worker is disabled. Use synchronous analysis until a durable request-driven job runner is integrated. The local Redis polling worker is not an exactly-once or crash-recovering queue.
+- Point `PYTHON_AI_SERVICE_URL` at the actual deployed Python service, not `localhost`. Verify routing, deployment protection, function durations, cold starts, request-size limits and Python bundle contents in a Vercel preview deployment.
+- Exercise patient/doctor/admin authorization, complete analysis-to-review-to-verification workflows, printing, video/audio, notifications and failure recovery against staging. Complete authorization coverage for all exported Server Actions and assess the clinical, privacy and retention requirements before releasing.
+- Expand the four-case benchmark with clinician-reviewed emergency, ambiguous, non-skin, adversarial, multilingual and skin-tone-diverse cases. Judge scores and model-reported confidence are not calibrated clinical accuracy or source verification.
+
+Behavioral safeguards: full diagnostic reports are not reused based on semantic symptom similarity; missing medical metadata remains unknown; mock patients are not inserted into empty review queues. PDFs use a direct verification link instead of sending verification tokens to a third-party QR service. The HMAC authenticates the release identifier/status/timestamp, **not the PDF contents or a clinician's personal digital signature**.
+
 ---
 
 ## 📋 Table of Contents
@@ -41,12 +56,12 @@
   - [5.4. Hugging Face Open-Source Model Suite](#54-hugging-face-open-source-model-suite)
   - [5.5. Real-Time Token Streaming Engine (SSE)](#55-real-time-token-streaming-engine-sse)
   - [5.6. Longitudinal Lesion Healing Analytics & Progress Tracker](#56-longitudinal-lesion-healing-analytics--progress-tracker)
-  - [5.7. Enterprise Clinical PDF Generator with QR Verification](#57-enterprise-clinical-pdf-generator-with-qr-verification)
+  - [5.7. Clinical PDF Print View with Online Verification](#57-clinical-pdf-print-view-with-online-verification)
   - [5.8. Dynamic Token Budget Allocator](#58-dynamic-token-budget-allocator)
   - [5.9. Hybrid RAG Search (BM25 + Vector RRF)](#59-hybrid-rag-search-bm25--vector-rrf)
   - [5.10. Circuit Breaker Resilience & Async Task Workers](#510-circuit-breaker-resilience--async-task-workers)
   - [5.11. Model Context Protocol (MCP) Server](#511-model-context-protocol-mcp-server)
-  - [5.12. Sub-50ms Semantic Vector Caching Layer](#512-sub-50ms-semantic-vector-caching-layer)
+  - [5.12. Clinical Caching Tradeoff](#512-clinical-caching-tradeoff)
   - [5.13. Dual-Layer AI Guardrails & PII Redaction](#513-dual-layer-ai-guardrails--pii-redaction)
   - [5.14. LLM-as-a-Judge Evaluation & Benchmarking](#514-llm-as-a-judge-evaluation--benchmarking)
 - [6. Full-Stack Product Capabilities & Role Workflows](#6-full-stack-product-capabilities--role-workflows)
@@ -166,7 +181,7 @@ graph LR
     HybridRAG --> Synthesis[6. Differential Report Synthesis Agent]
     Synthesis --> OutputGuard[7. Output Safety & Disclaimer Enforcer]
     OutputGuard --> StreamResponse[8. SSE Real-Time Token Streaming / PDF Export]
-    StreamResponse --> UI[9. Render Grounded Differential Report & Verification QR Code]
+    StreamResponse --> UI[9. Render Differential Report & Verification Link]
 ```
 
 ### 2.3. Production Infrastructure & Deployment Topology
@@ -446,9 +461,10 @@ Implemented at [`ai_service/services/healing_tracker.py`](ai_service/services/he
 
 ---
 
-### 5.7. Enterprise Clinical PDF Generator with QR Verification
+### 5.7. Clinical PDF Print View with Online Verification
 Implemented at [`src/lib/pdf-generator.ts`](src/lib/pdf-generator.ts):
-- Generates high-resolution multi-page medical PDF reports with ICD-10 medical codes, grounded literature citations, doctor digital signatures, and an embedded cryptographic QR code linking to digital report verification.
+- Generates an escaped HTML print view for browser printing/PDF export. Only recorded findings, clinician overrides and available medical metadata are shown; missing codes/confidence remain unknown and citations are not fabricated.
+- Released reports can carry a server-generated HMAC verification link. No external QR-code service receives the report URL or its verification token. This verifies a release record, not the content integrity of a downloaded PDF.
 
 ---
 
@@ -466,7 +482,7 @@ Implemented at [`ai_service/services/hybrid_search.py`](ai_service/services/hybr
 
 ### 5.10. Circuit Breaker Resilience & Async Task Workers
 - **Circuit Breaker** ([`ai_service/utils/circuit_breaker.py`](ai_service/utils/circuit_breaker.py)): Manages state transitions (`CLOSED` $\rightarrow$ `OPEN` $\rightarrow$ `HALF_OPEN`) with 30s reset timeout to prevent cascading thread exhaustion during API outages.
-- **Async Task Worker Pool** ([`ai_service/queue/task_worker.py`](ai_service/queue/task_worker.py)): Decouples heavy multi-agent synthesis from HTTP threads via background task queuing (`POST /api/v1/jobs/submit`).
+- **Redis Queue** ([`ai_service/queue/redis_queue.py`](ai_service/queue/redis_queue.py)): A local/persistent-process polling implementation. It is disabled on Vercel; `POST /api/v1/jobs/submit` returns 503 there until a durable runner is implemented. Redis persistence alone does not guarantee processing after a worker crash.
 
 ---
 
@@ -490,18 +506,13 @@ graph TD
 
 ---
 
-### 5.12. Sub-50ms Semantic Vector Caching Layer
+### 5.12. Clinical Caching Tradeoff
 
-```mermaid
-graph TD
-    Query[Incoming Patient Symptom Query] --> Embedder[Generate Query Embedding via text-embedding-004]
-    Embedder --> CosineCalc[Compute Cosine Similarity against Cache Vectors]
-    CosineCalc --> Threshold{Max Cosine Similarity > 0.92?}
-    Threshold -- Yes (Cache Hit) --> ServeCache[Serve Cached Report Payload in <50ms]
-    Threshold -- No (Cache Miss) --> TriggerAgents[Invoke Multi-Agent Diagnostic Engine]
-    TriggerAgents --> StoreCache[Store Query Vector & Generated Report in Cache]
-    StoreCache --> RenderUI[Render Report to Patient UI]
-```
+The multi-agent diagnostic orchestrator deliberately bypasses semantic report caching.
+Similar symptoms do not make images, body location, duration or patient context interchangeable.
+This spends additional inference time/cost to avoid serving another case's report.
+The separate image/answer cache uses exact hashes, and final-evaluation keys also include
+the initial condition. The in-memory semantic-cache utility is not wired into diagnostic reporting.
 
 ---
 
@@ -749,21 +760,26 @@ Vercel natively supports deploying Python FastAPI microservices alongside Next.j
    - `HUGGINGFACE_API_KEY`: Hugging Face user access token.
    - `UPSTASH_REDIS_REST_URL` & `UPSTASH_REDIS_REST_TOKEN`: Upstash Redis credentials.
 
-4. **Zero-Downtime Resilience Guarantee**:
-   - If the FastAPI microservice is starting up or unreachable, our Next.js API route (`/api/ai/analyze`) automatically and seamlessly falls back to the TypeScript Genkit engine, guaranteeing $100\%$ uptime!
+4. **Verify resilience and configuration**:
+   - The analysis route attempts the TypeScript Genkit engine when the Python request or pipeline fails. Both engines can fail; there is no uptime guarantee.
+   - Set `PYTHON_AI_SERVICE_URL` to the deployed service origin and configure matching internal API keys. Confirm preview/production deployment protection allows the server-to-server request.
+   - Check the release gates above before pushing production traffic. In-process queue workers cannot reliably survive a Vercel function lifecycle.
 
 ---
 
 ## 11. Performance, Latency & Rate Limits
 
-| Execution Path | Average Latency | Description |
+The following are measurement requirements, not production performance claims.
+Collect p50/p95/p99 latency and failure rates in the target deployment under representative load.
+
+| Execution Path | Latency Status | Description |
 |----------------|-----------------|-------------|
-| **Semantic Cache Hit** | **$< 50\text{ ms}$** | Vector similarity match ($>0.92$) returning cached report |
-| **SSE First-Token Render** | **$< 100\text{ ms}$** | Server-Sent Events stream chunk delivery |
-| **Input Guardrail** | **$< 5\text{ ms}$** | Regex PII redaction & prompt injection check |
-| **pgvector RAG Search** | **$\approx 45\text{ ms}$** | Vector cosine distance matching + reranking |
-| **Hybrid RRF Search** | **$\approx 60\text{ ms}$** | BM25 Keyword + Vector Reciprocal Rank Fusion |
-| **Full Pipeline Execution** | **$\approx 1400 - 2200\text{ ms}$** | Total multi-agent pipeline execution time |
+| **Semantic Report Cache** | Disabled | Clinical reports are not interchangeable by symptom similarity |
+| **SSE Report Delivery** | Not benchmarked | Connection status followed by completed, safety-checked output; not provider token streaming |
+| **Input Guardrail** | Not benchmarked | Regex PII redaction and limited pattern checks, not comprehensive injection prevention |
+| **pgvector RAG Search** | Not benchmarked | Vector cosine distance matching |
+| **Hybrid RRF Search** | Not benchmarked | Full-text keyword + vector reciprocal-rank fusion |
+| **Full Pipeline Execution** | Not benchmarked | Includes provider latency, retries and cold starts |
 
 ---
 

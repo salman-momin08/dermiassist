@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, RateLimitPresets } from '@/lib/redis/rate-limit';
+import { createClient } from '@/lib/supabase/server';
+
+export const maxDuration = 300;
 
 /**
  * Benchmark eval endpoint.
@@ -14,9 +17,12 @@ import { checkRateLimit, RateLimitPresets } from '@/lib/redis/rate-limit';
  */
 export async function GET(request: NextRequest) {
     try {
-        // Most expensive endpoint in the app; rate-limit strictly by IP.
-        const forwardedFor = request.headers.get('x-forwarded-for');
-        const identifier = forwardedFor?.split(',')[0].trim() || 'unknown';
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        if (profileError || profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const identifier = user.id;
         const rateLimitResult = await checkRateLimit({
             limit: RateLimitPresets.STRICT.limit,
             window: RateLimitPresets.STRICT.window,
@@ -25,12 +31,15 @@ export async function GET(request: NextRequest) {
         });
         if (!rateLimitResult.success) {
             return NextResponse.json(
-                { error: 'Rate limit exceeded. Please try again later.' },
-                { status: 429, headers: { 'Retry-After': String(rateLimitResult.retryAfter ?? 60) } }
+                { error: rateLimitResult.unavailable ? 'Request protection is temporarily unavailable.' : 'Rate limit exceeded. Please try again later.' },
+                { status: rateLimitResult.unavailable ? 503 : 429, headers: { 'Retry-After': String(rateLimitResult.retryAfter ?? 60) } }
             );
         }
 
         const provider = request.nextUrl.searchParams.get('provider') || 'openai';
+        if (provider !== 'openai' && provider !== 'gemini') {
+            return NextResponse.json({ error: 'Invalid model provider.' }, { status: 400 });
+        }
         const fastApiUrl =
             process.env.PYTHON_AI_SERVICE_URL ||
             process.env.FASTAPI_SERVICE_URL ||

@@ -18,6 +18,8 @@ from typing import Dict, Any, Optional
 from ai_service.services.rag_service import search_vector_rag
 from ai_service.services.huggingface_service import classify_skin_lesion_hf
 from ai_service.services.llm_diagnosis import generate_differential_diagnosis
+from ai_service.utils.token_budget import ROLE_TOKEN_BUDGETS, truncate_to_token_budget
+from ai_service.utils.input_guard import sanitize_clinical_input
 
 
 async def run_multi_agent_pipeline(
@@ -30,7 +32,15 @@ async def run_multi_agent_pipeline(
     trace = []
 
     # 1. Input Guardrail — lightweight PII redaction (not a diagnosis).
-    sanitized_symptoms = symptoms.replace("SSN", "[REDACTED]").replace("credit card", "[REDACTED]")
+    sanitized_symptoms = sanitize_clinical_input(symptoms)
+
+    # Enforce the triage agent's token budget on the raw symptoms text up front —
+    # this is the one piece of patient-supplied free text that flows into every
+    # downstream agent (triage check, RAG query, synthesis prompt), so capping it
+    # here protects the whole pipeline from a single oversized input.
+    sanitized_symptoms = truncate_to_token_budget(
+        sanitized_symptoms, ROLE_TOKEN_BUDGETS["triage_agent"]
+    )["text"]
 
     # 2. Triage Agent — deterministic red-flag risk stratification.
     t1 = time.time()
@@ -68,10 +78,20 @@ async def run_multi_agent_pipeline(
     if hf_vision_result.get("success"):
         vision_findings["top_prediction"] = hf_vision_result.get("top_prediction")
         vision_findings["vision_confidence"] = hf_vision_result.get("confidence_score")
+
+    # Truncate the RAG-retrieved literature context to the rag_specialist budget
+    # before it's injected into the synthesis prompt — this text comes straight
+    # from retrieved chunks and can be arbitrarily long across several matches.
+    rag_grounding_text = rag_result.get("grounding_prompt_text") or ""
+    if rag_grounding_text:
+        rag_grounding_text = truncate_to_token_budget(
+            rag_grounding_text, ROLE_TOKEN_BUDGETS["rag_specialist"]
+        )["text"]
+
     diagnosis = await generate_differential_diagnosis(
         symptoms=sanitized_symptoms,
         vision_findings=vision_findings,
-        rag_grounding=rag_result.get("grounding_prompt_text"),
+        rag_grounding=rag_grounding_text,
         body_location=body_location,
         preferred_provider=provider,
     )

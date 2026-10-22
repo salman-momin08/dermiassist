@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './use-auth';
 import { createClient } from '@/lib/supabase/client';
+import { mapAnalysisRow } from '@/lib/analysis-report';
+import { useToast } from './use-toast';
 
 
 import { ReviewStatus, ClinicianOverrides } from '@/types/review-types';
@@ -43,10 +45,13 @@ export interface AnalysisReport {
     reviewedAt?: string;
     confidenceScore?: number;
     icd10Code?: string;
+    /** HMAC signature computed at release time; see src/lib/case-review-actions.ts. */
+    verificationSignature?: string;
 }
 
 export function useAnalyses() {
     const { user } = useAuth();
+    const { toast } = useToast();
     const [analyses, setAnalyses] = useState<AnalysisReport[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     // Stable reference — prevents a new Supabase client on every render
@@ -70,38 +75,9 @@ export function useAnalyses() {
                 .order('created_at', { ascending: false });
 
             if (error) {
-                // Ignore silent fetch errors on load
+                toast({ title: 'Could not load analyses', description: error.message, variant: 'destructive' });
             } else if (data) {
-                // Map snake_case DB to camelCase Interface
-                const mappedAnalyses: AnalysisReport[] = data.map((item: any) => ({
-                    id: item.id,
-                    userId: item.user_id,
-                    userName: item.user_name,
-                    conditionName: item.condition_name,
-                    condition: item.condition_description || item.condition_name, // fallback
-                    date: item.created_at,
-                    severity: item.severity,
-                    image: item.image,
-                    recommendations: item.recommendations,
-                    dos: item.dos,
-                    donts: item.donts,
-                    submittedInfo: {
-                        initialCondition: item.submitted_info?.initialCondition,
-                        otherConsiderations: item.submitted_info?.otherConsiderations,
-                        proformaAnswers: item.submitted_info?.proformaAnswers,
-                    },
-                    explanations: item.explanations,
-                    reviewStatus: item.review_status || 'pending_review',
-                    reviewerId: item.reviewer_id,
-                    reviewerName: item.reviewer_name || (item.review_status === 'released' ? 'Dr. Sarah Jenkins, MD' : undefined),
-                    reviewerBadgeNumber: item.reviewer_badge_number || (item.review_status === 'released' ? 'NY-MED-88219' : undefined),
-                    reviewerNotes: item.reviewer_notes,
-                    clinicianOverrides: item.clinician_overrides,
-                    reviewedAt: item.reviewed_at,
-                    confidenceScore: item.confidence_score || 88,
-                    icd10Code: item.icd10_code || 'L40.0',
-                }));
-                setAnalyses(mappedAnalyses);
+                setAnalyses(data.map(mapAnalysisRow));
             }
             setIsLoading(false);
         }
@@ -110,35 +86,6 @@ export function useAnalyses() {
 
         // Supabase Realtime Subscription
         // Use optimistic updates from the payload to avoid a full refetch on every change.
-        const mapRow = (item: any): AnalysisReport => ({
-            id: item.id,
-            userId: item.user_id,
-            userName: item.user_name,
-            conditionName: item.condition_name,
-            condition: item.condition_description || item.condition_name,
-            date: item.created_at,
-            severity: item.severity,
-            image: item.image,
-            recommendations: item.recommendations,
-            dos: item.dos,
-            donts: item.donts,
-            submittedInfo: {
-                initialCondition: item.submitted_info?.initialCondition,
-                otherConsiderations: item.submitted_info?.otherConsiderations,
-                proformaAnswers: item.submitted_info?.proformaAnswers,
-            },
-            explanations: item.explanations,
-            reviewStatus: item.review_status || 'pending_review',
-            reviewerId: item.reviewer_id,
-            reviewerName: item.reviewer_name,
-            reviewerBadgeNumber: item.reviewer_badge_number,
-            reviewerNotes: item.reviewer_notes,
-            clinicianOverrides: item.clinician_overrides,
-            reviewedAt: item.reviewed_at,
-            confidenceScore: item.confidence_score,
-            icd10Code: item.icd10_code,
-        });
-
         const channel = supabase
             .channel(`analyses-changes-${user.id}`)
             .on('postgres_changes', {
@@ -148,12 +95,12 @@ export function useAnalyses() {
                 filter: `user_id=eq.${user.id}`,
             }, (payload: any) => {
                 if (payload.eventType === 'INSERT') {
-                    setAnalyses(prev => [mapRow(payload.new), ...prev]);
+                    setAnalyses(prev => [mapAnalysisRow(payload.new), ...prev.filter(a => a.id !== payload.new.id)]);
                 } else if (payload.eventType === 'DELETE') {
                     setAnalyses(prev => prev.filter(a => a.id !== payload.old.id));
                 } else if (payload.eventType === 'UPDATE') {
                     setAnalyses(prev =>
-                        prev.map(a => a.id === payload.new.id ? mapRow(payload.new) : a)
+                        prev.map(a => a.id === payload.new.id ? mapAnalysisRow(payload.new) : a)
                     );
                 }
             })
@@ -162,7 +109,7 @@ export function useAnalyses() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user, supabase]);
+    }, [user, supabase, toast]);
 
     const addAnalysis = useCallback(async (userId: string, userName: string, newAnalysis: Omit<AnalysisReport, 'id' | 'date' | 'severity' | 'userId' | 'userName'>) => {
         // Map camelCase to snake_case
@@ -171,8 +118,9 @@ export function useAnalyses() {
             user_name: userName,
             condition_name: newAnalysis.conditionName,
             condition_description: newAnalysis.condition,
-            severity: 'Mild',
+            severity: 'Not assessed',
             image: newAnalysis.image,
+            image_url: newAnalysis.image,
             recommendations: newAnalysis.recommendations,
             dos: newAnalysis.dos,
             donts: newAnalysis.donts,
@@ -188,61 +136,27 @@ export function useAnalyses() {
 
         if (error) throw new Error(error.message);
 
-        const item = data;
-        return {
-            id: item.id,
-            userId: item.user_id,
-            userName: item.user_name,
-            conditionName: item.condition_name,
-            condition: item.condition_description,
-            date: item.created_at,
-            severity: item.severity,
-            image: item.image,
-            recommendations: item.recommendations,
-            dos: item.dos,
-            donts: item.donts,
-            submittedInfo: item.submitted_info,
-            explanations: item.explanations
-        } as AnalysisReport;
+        return mapAnalysisRow(data);
     }, [supabase]);
 
     const getAnalysisById = useCallback(async (userId: string, analysisId: string): Promise<AnalysisReport | undefined> => {
         if (!userId || !analysisId) return undefined;
 
-        try {
-            const { data: item, error } = await supabase
+        const { data: item, error } = await supabase
                 .from('analyses')
                 .select('*')
                 .eq('id', analysisId)
-                .single();
-
-            if (error || !item) return undefined;
-
-            return {
-                id: item.id,
-                userId: item.user_id,
-                userName: item.user_name,
-                conditionName: item.condition_name,
-                condition: item.condition_description,
-                date: item.created_at,
-                severity: item.severity,
-                image: item.image,
-                recommendations: item.recommendations,
-                dos: item.dos,
-                donts: item.donts,
-                submittedInfo: item.submitted_info,
-                explanations: item.explanations
-            } as AnalysisReport;
-        } catch (error) {
-            return undefined;
-        }
+                .eq('user_id', userId)
+                .maybeSingle();
+        if (error) throw new Error(error.message);
+        return item ? mapAnalysisRow(item) : undefined;
     }, [supabase]);
 
     const updateAnalysis = useCallback(async (userId: string, analysisId: string, data: Partial<AnalysisReport>) => {
         if (!userId || !analysisId) return;
 
         // Map specific fields if needed, or rely on partial updates being careful
-        const updates: any = {};
+        const updates: { explanations?: AnalysisReport['explanations'] } = {};
         if (data.explanations) updates.explanations = data.explanations;
 
         // For now only likely to update explanations, but can add more mapping if needed
@@ -250,12 +164,17 @@ export function useAnalyses() {
         const { error } = await supabase
             .from('analyses')
             .update(updates)
-            .eq('id', analysisId);
+            .eq('id', analysisId)
+            .eq('user_id', userId)
+            .select('id')
+            .single();
+        if (error) throw new Error(error.message);
     }, [supabase]);
 
     const deleteAnalysis = useCallback(async (userId: string, id: string) => {
         if (!userId) throw new Error("User not authenticated.");
-        await supabase.from('analyses').delete().eq('id', id);
+        const { error } = await supabase.from('analyses').delete().eq('id', id).eq('user_id', userId).select('id').single();
+        if (error) throw new Error(error.message);
     }, [supabase]);
 
     return { analyses, addAnalysis, getAnalysisById, updateAnalysis, deleteAnalysis, isLoading };

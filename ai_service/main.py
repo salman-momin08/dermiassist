@@ -26,8 +26,14 @@ from ai_service.services.openai_service import analyze_disease_with_openai
 from ai_service.services.eval_harness import run_eval_harness
 from ai_service.services.drug_interaction_service import check_drug_interaction
 from ai_service.utils.token_budget import estimate_token_count, truncate_to_token_budget, calculate_llm_cost
-from ai_service.utils.circuit_breaker import gemini_circuit_breaker, huggingface_circuit_breaker
-from ai_service.queue.task_worker import submit_async_job, get_job_status
+from ai_service.utils.circuit_breaker import gemini_circuit_breaker, huggingface_circuit_breaker, openai_circuit_breaker
+from ai_service.queue.redis_queue import (
+    submit_async_job,
+    get_job_status,
+    start_worker as start_job_queue_worker,
+    is_redis_configured as is_job_queue_configured,
+    RedisNotConfiguredError,
+)
 
 app = FastAPI(
     title="DermiAssist-AI Polyglot Python Microservice",
@@ -96,6 +102,21 @@ async def _knowledge_base_startup_check():
     except Exception as e:
         logger.warning(f"Knowledge-base startup check failed (non-fatal): {e}")
 
+    # Start the durable Upstash-Redis-backed background job worker (polling
+    # dequeue loop). No-op (with a warning) if Redis env vars aren't set — job
+    # submission will then fail closed with a clear 503 rather than silently
+    # falling back to an in-memory queue.
+    if os.getenv("VERCEL"):
+        logger.info("In-process async job worker disabled on Vercel; a durable runner is required.")
+    elif is_job_queue_configured():
+        start_job_queue_worker()
+        logger.info("Redis-backed async job queue worker started.")
+    else:
+        logger.warning(
+            "UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN not configured — "
+            "async job queue endpoints will reject submissions until configured."
+        )
+
 
 @app.get("/health", tags=["Health Check"])
 async def health_check():
@@ -106,6 +127,7 @@ async def health_check():
         "architecture": "Polyglot Microservice (FastAPI + Next.js 15)",
         "circuit_breakers": {
             "gemini": gemini_circuit_breaker.get_status(),
+            "openai": openai_circuit_breaker.get_status(),
             "huggingface": huggingface_circuit_breaker.get_status()
         },
         "docs": "/docs"
@@ -174,21 +196,33 @@ async def run_benchmark_evals(provider: str = "openai"):
 
 @app.post("/api/v1/jobs/submit", tags=["Async Background Worker Queue"], dependencies=_auth)
 async def submit_job(request: AnalysisRequest):
-    """Submit heavy diagnostic task to Redis Async Task Worker Queue."""
+    """Submit heavy diagnostic task to the Upstash-Redis-backed async job queue."""
+    if os.getenv("VERCEL"):
+        raise HTTPException(
+            status_code=503,
+            detail="Async analysis requires a durable job runner; in-process workers are disabled on Vercel. Use synchronous analysis.",
+        )
     try:
         res = await submit_async_job(
-            symptoms=request.symptoms,
-            image_url=request.image_url,
-            body_location=request.body_location
+            job_type="diagnostic_analysis",
+            payload={
+                "symptoms": request.symptoms,
+                "image_url": request.image_url,
+                "body_location": request.body_location,
+                "provider": request.provider or "openai",
+            },
         )
         return res
+    except RedisNotConfiguredError as e:
+        # Fail closed: never silently accept a job we can't durably queue.
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/jobs/{job_id}", tags=["Async Background Worker Queue"], dependencies=_auth)
 async def poll_job(job_id: str, owner_token: str = ""):
     """Poll execution status of an async background job. Requires the owner_token issued at submit time."""
-    return get_job_status(job_id, owner_token)
+    return await get_job_status(job_id, owner_token)
 
 @app.post("/api/v1/rag/hybrid-search", tags=["Vector RAG Engine"], dependencies=_auth)
 async def hybrid_search_rrf(request: RAGQueryRequest):
@@ -221,9 +255,10 @@ async def analyze_token_budget(text: str, max_budget: int = 1024):
 
 @app.get("/api/v1/system/circuit-breakers", tags=["System Design & AI Budgeting"], dependencies=_auth)
 async def get_circuit_breakers():
-    """Retrieve status of API Circuit Breakers (Gemini & Hugging Face)."""
+    """Retrieve status of API Circuit Breakers (Gemini, OpenAI & Hugging Face)."""
     return {
         "gemini": gemini_circuit_breaker.get_status(),
+        "openai": openai_circuit_breaker.get_status(),
         "huggingface": huggingface_circuit_breaker.get_status()
     }
 
@@ -388,5 +423,3 @@ async def langgraph_generate_suggestions(request: LangGraphSuggestionsRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-

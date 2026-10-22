@@ -9,6 +9,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
+import { geminiCircuitBreaker } from '@/ai/utils/circuit-breaker';
 
 export const VisionInputSchema = z.object({
     imageUrl: z.string().describe('URL or Base64 data URI of the skin lesion photo.'),
@@ -47,11 +48,23 @@ Image URL: {{{imageUrl}}}
 export async function runVisionAgent(input: VisionInput): Promise<VisionOutput> {
     logger.info('agent.vision.started', { bodyLocation: input.bodyLocation });
 
+    if (!geminiCircuitBreaker.canExecute()) {
+        // Honest failure: the breaker is OPEN because Gemini has been failing
+        // repeatedly. Do not fabricate a lesion type / conditions / confidence —
+        // surface the same kind of failure the model itself would produce so the
+        // orchestrator falls back to the "not analyzed" block as usual.
+        const message = 'Vision agent unavailable: Gemini circuit breaker is OPEN (repeated recent failures).';
+        logger.error('agent.vision.circuit_open', { status: geminiCircuitBreaker.getStatus() });
+        throw new Error(message);
+    }
+
     try {
         const result = await visionPrompt(input);
         if (!result.output) {
             throw new Error('Vision agent failed to analyze image features.');
         }
+
+        geminiCircuitBreaker.recordSuccess();
 
         logger.info('agent.vision.completed', {
             lesionType: result.output.lesionType,
@@ -60,6 +73,7 @@ export async function runVisionAgent(input: VisionInput): Promise<VisionOutput> 
 
         return result.output;
     } catch (err) {
+        geminiCircuitBreaker.recordFailure();
         // Honest failure: fabricating a lesion type / suspected conditions / confidence
         // would mask a broken vision model behind confident-looking output. Surface the
         // failure so the caller can decide how to degrade (e.g. fall back to a

@@ -28,7 +28,7 @@ const securityHeaders = [
     // Restrict access to browser APIs (camera/mic should only be used client-side)
     {
         key: 'Permissions-Policy',
-        value: 'camera=(), geolocation=(), payment=()',
+        value: 'camera=(self), microphone=(self), geolocation=(), payment=()',
     },
     // Enable XSS protection in older browsers (belt-and-suspenders)
     {
@@ -114,4 +114,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-

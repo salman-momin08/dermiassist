@@ -98,7 +98,7 @@ export async function finalEvaluationCached(
     }
 
     const imageHash = hashImageDataUri(input.photoDataUri);
-    const cacheKey = getFinalEvaluationCacheKey(imageHash, input.userAnswers);
+    const cacheKey = getFinalEvaluationCacheKey(imageHash, input.userAnswers, input.initialCondition);
 
     logger.debug('ai_cache.final_eval.start', { imageHashPrefix: imageHash.substring(0, 16), userId });
 
