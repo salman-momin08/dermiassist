@@ -126,6 +126,56 @@ test('evaluation cache keys include every diagnosis-context input', () => {
     );
 });
 
+test('final evaluation action returns safe failures instead of throwing production-redacted errors', async () => {
+    const errors = load('src\\lib\\errors.ts');
+    const report = { conditionName: 'Assessment', recommendations: 'Clinician review' };
+    const input = { photoDataUri: 'data:image/jpeg;base64,AA==', initialCondition: 'Uncertain', userAnswers: 'Itchy' };
+    let modelCalls = 0;
+    let modelError;
+    let rateLimit = { success: true };
+    const mocks = {
+        '@/lib/errors': errors,
+        '@/lib/logger': { logger: { ...logger, debug() {} } },
+        '@/lib/redis': { getCacheOrSet: async (key, generate) => generate(), CacheTTL: { AI_ANALYSIS: 60 } },
+        '@/lib/redis/rate-limit': {
+            RateLimitPresets: { AI_ANALYSIS: { limit: 10, window: 3600 } },
+            checkRateLimit: async () => rateLimit,
+        },
+        '@/lib/redis/ai-cache': {
+            hashImageDataUri: () => 'image-hash',
+            getDetectDiseaseNameCacheKey: () => 'detection',
+            getFinalEvaluationCacheKey: () => 'evaluation',
+        },
+        '@/lib/redis/cache': { trackCacheMiss() {}, trackCacheHit() {} },
+        '@/ai/flows/detect-disease-name': {},
+        '@/ai/flows/final-evaluation': { finalEvaluation: async () => {
+            modelCalls++;
+            if (modelError) throw modelError;
+            return report;
+        } },
+    };
+    const { finalEvaluationAction } = load('src\\ai\\flows\\cached.ts', mocks);
+    assert.deepEqual(await finalEvaluationAction(input, 'patient'), { success: true, data: report });
+
+    for (const error of [new Error('private upstream credentials'), new errors.AIOutputError('private provider response')]) {
+        modelError = error;
+        const result = await finalEvaluationAction(input, 'patient');
+        assert.equal(result.success, false);
+        assert.equal(result.code, error.code || 'AI_EVALUATION_FAILED');
+        assert.match(result.error, /No report was generated/);
+        assert.equal(JSON.stringify(result).includes('private'), false);
+        assert.equal(Object.hasOwn(result, 'data'), false);
+    }
+
+    const callsBeforeRateLimit = modelCalls;
+    rateLimit = { success: false, limit: 10, reset: Date.now() + 60000, retryAfter: 60 };
+    const limited = await finalEvaluationAction(input, 'patient');
+    assert.equal(limited.success, false);
+    assert.equal(limited.code, 'RATE_LIMIT_EXCEEDED');
+    assert.equal(limited.retryAfter, 60);
+    assert.equal(modelCalls, callsBeforeRateLimit);
+});
+
 test('input guard redacts all configured PII consistently across repeated requests', () => {
     const { validateAndSanitizeInput } = load('src\\ai\\guards\\input-guard.ts');
     for (let i = 0; i < 3; i++) {

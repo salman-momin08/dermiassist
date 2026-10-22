@@ -18,7 +18,42 @@ import { detectDiseaseName as originalDetectDiseaseName, type DetectDiseaseNameI
 import { finalEvaluation as originalFinalEvaluation, type FinalEvaluationInput, type FinalEvaluationOutput } from '@/ai/flows/final-evaluation';
 import { logger } from '@/lib/logger';
 import { trackCacheHit, trackCacheMiss } from '@/lib/redis/cache';
-import { RateLimitError } from '@/lib/errors';
+import { AppError, RateLimitError } from '@/lib/errors';
+
+export type FinalEvaluationResult =
+    | { success: true; data: FinalEvaluationOutput }
+    | { success: false; error: string; code: string; retryAfter?: number };
+
+export async function finalEvaluationAction(
+    input: FinalEvaluationInput,
+    userId?: string
+): Promise<FinalEvaluationResult> {
+    try {
+        return { success: true, data: await finalEvaluationCached(input, userId) };
+    } catch (error) {
+        logger.error('ai_cache.final_eval.action_failed', {
+            userId,
+            name: error instanceof Error ? error.name : typeof error,
+            message: error instanceof Error ? error.message : String(error),
+            code: error instanceof AppError ? error.code : 'AI_EVALUATION_FAILED',
+        });
+
+        if (error instanceof RateLimitError) {
+            return {
+                success: false,
+                error: 'The analysis request limit has been reached. Please try again later.',
+                code: error.code,
+                retryAfter: error.retryAfter,
+            };
+        }
+
+        return {
+            success: false,
+            error: 'The AI service could not complete your evaluation. No report was generated. Please try again later.',
+            code: error instanceof AppError ? error.code : 'AI_EVALUATION_FAILED',
+        };
+    }
+}
 
 /**
  * Cached version of detectDiseaseName with rate limiting

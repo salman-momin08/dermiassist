@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { detectDiseaseNameCached as detectDiseaseName } from "@/ai/flows/cached";
-import { finalEvaluationCached as finalEvaluation } from "@/ai/flows/cached";
+import { finalEvaluationAction as finalEvaluation } from "@/ai/flows/cached";
 import { proformaChat } from "@/ai/flows/proforma-chat";
 import { useToast } from "@/hooks/use-toast";
 import { getSafeErrorMessage } from "@/lib/errors";
@@ -216,12 +216,19 @@ export default function AnalyzeClient() {
         }
       }
 
-      const result = await finalEvaluation({
+      const evaluation = await finalEvaluation({
         photoDataUri: preview,
         initialCondition: detectedCondition,
         userAnswers: answersString,
       }, user?.id);
 
+      if (!evaluation.success) {
+        setError(evaluation.error);
+        setStep('error');
+        return;
+      }
+
+      const result = evaluation.data;
       const newReport = await addAnalysis(user.id, userData.displayName || "Patient", {
         condition: result.condition,
         conditionName: result.conditionName,
