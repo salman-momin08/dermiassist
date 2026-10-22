@@ -261,6 +261,7 @@ export default function AnalyzeClient() {
     currentHistory: ChatMessage[]
   ) => {
     setIsLoading(true);
+    setDynamicSuggestions([]);
     try {
       const { nextQuestion, suggestedAnswers, isComplete, confidenceScore: modelConfidence } = await proformaChat({
         conditionName: conditionName,
@@ -360,14 +361,6 @@ export default function AnalyzeClient() {
     setChatHistory([welcomeMsg]);
     setQuestionCount(0);
     setConfidenceScore(45);
-    generateQuestionSuggestions({
-      question: `Initial consultation for ${conditionName}`,
-      conditionName,
-    }).then((res) => {
-      if (res?.suggestions && res.suggestions.length > 0) {
-        setDynamicSuggestions(res.suggestions);
-      }
-    }).catch((err) => console.warn("Suggestions agent initial error:", err));
     getNextQuestion(conditionName, `AI: Initial detection is ${conditionName}.`, [welcomeMsg]);
   };
 

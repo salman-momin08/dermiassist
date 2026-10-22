@@ -57,6 +57,28 @@ export function getFinalEvaluationCacheKey(
     return `ai:final-eval:v2:${imageHash}:${answersHash}`;
 }
 
+export function getProformaQuestionCacheKey(conditionName: string, conversationHistory: string): string {
+    const contextHash = crypto
+        .createHash('sha256')
+        .update(JSON.stringify([conditionName.trim().replace(/\s+/g, ' ').toLowerCase(), conversationHistory]))
+        .digest('hex');
+
+    return `ai:proforma-question:v1:${contextHash}`;
+}
+
+export function getQuestionSuggestionsCacheKey(
+    question: string,
+    conditionName = '',
+    conversationHistory = ''
+): string {
+    const contextHash = crypto
+        .createHash('sha256')
+        .update(JSON.stringify([conditionName.trim().replace(/\s+/g, ' ').toLowerCase(), question, conversationHistory]))
+        .digest('hex');
+
+    return `ai:question-suggestions:v1:${contextHash}`;
+}
+
 /**
  * Truncate image data URI for logging (to avoid huge console logs)
  * @param dataUri - Full data URI

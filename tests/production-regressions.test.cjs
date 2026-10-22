@@ -126,6 +126,136 @@ test('evaluation cache keys include every diagnosis-context input', () => {
     );
 });
 
+test('proforma cache keys normalize disease names without merging different patient histories', () => {
+    const { getProformaQuestionCacheKey } = load('src\\lib\\redis\\ai-cache.ts');
+    const history = 'User: Itching started yesterday';
+    const key = getProformaQuestionCacheKey(' Atopic   Dermatitis ', history);
+    assert.equal(key, getProformaQuestionCacheKey('atopic dermatitis', history));
+    assert.notEqual(key, getProformaQuestionCacheKey('Psoriasis', history));
+    assert.notEqual(key, getProformaQuestionCacheKey('atopic dermatitis', 'User: Pain started yesterday'));
+    assert.notEqual(key, getProformaQuestionCacheKey('atopic dermatitis', history + '\nAI: Any bleeding?'));
+    assert.match(key, /^ai:proforma-question:v1:[a-f0-9]{64}$/);
+    assert.equal(key.includes(history), false);
+});
+
+test('proforma KV cache reuses successful questions, preserves context and bypasses cache outages', async () => {
+    const { CacheTTL } = load('src\\lib\\redis\\keys.ts');
+    const values = new Map();
+    const writes = [];
+    let cacheAvailable = true;
+    let pythonCalls = 0;
+    let modelAvailable = true;
+    const cache = load('src\\lib\\redis\\cache.ts', {
+        './keys': { CacheTTL },
+        './client': {
+            safeRedisOperation: async (operation, fallback) => cacheAvailable ? operation() : fallback,
+            redis: {
+                get: async key => values.get(key) ?? null,
+                setex: async (key, ttl, value) => { writes.push({ key, ttl }); values.set(key, value); },
+            },
+        },
+    });
+    const { proformaChat } = load('src\\ai\\flows\\proforma-chat.ts', {
+        '@/lib/redis/cache': cache,
+        '@/ai/genkit': { ai: { defineFlow: (config, generate) => generate, generate: async () => ({ output: null, text: '' }) } },
+        '@/lib/python-ai-client': { callPythonLangGraphNextQuestion: async () => {
+            pythonCalls++;
+            return modelAvailable ? { next_question: `How long have you had these symptoms? (${pythonCalls})` } : null;
+        } },
+    });
+    const input = { conditionName: 'Eczema', conversationHistory: 'AI: Initial detection is Eczema.' };
+    const first = await proformaChat(input);
+    assert.deepEqual(await proformaChat(input), first);
+    assert.equal(pythonCalls, 1);
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].ttl, 86400);
+
+    await proformaChat({ ...input, conversationHistory: input.conversationHistory + '\nUser: Itchy for two days' });
+    await proformaChat({ ...input, conditionName: 'Psoriasis' });
+    assert.equal(pythonCalls, 3);
+
+    const failedInput = { ...input, conversationHistory: 'User: New symptoms' };
+    const writesBeforeFailure = writes.length;
+    modelAvailable = false;
+    await assert.rejects(proformaChat(failedInput), /Failed to generate dynamic proforma question/);
+    assert.equal(writes.length, writesBeforeFailure);
+    modelAvailable = true;
+    await proformaChat(failedInput);
+    assert.equal(pythonCalls, 5);
+
+    cacheAvailable = false;
+    const callsBeforeOutage = pythonCalls;
+    await proformaChat(input);
+    await proformaChat(input);
+    assert.equal(pythonCalls, callsBeforeOutage + 2);
+});
+
+test('proforma cache retains model-generated suggestions and completion metadata', async () => {
+    const report = { nextQuestion: 'Any bleeding?', suggestedAnswers: ['Yes', 'No'], isComplete: false, confidenceScore: 63 };
+    let generated = 0;
+    const values = new Map();
+    const { proformaChat } = load('src\\ai\\flows\\proforma-chat.ts', {
+        '@/lib/redis/cache': { getCacheOrSet: async (key, generate) => {
+            if (!values.has(key)) values.set(key, await generate());
+            return values.get(key);
+        } },
+        '@/lib/python-ai-client': { callPythonLangGraphNextQuestion: async () => null },
+        '@/ai/genkit': { ai: {
+            defineFlow: (config, generate) => generate,
+            generate: async () => { generated++; return { output: report }; },
+        } },
+    });
+    const input = { conditionName: 'Eczema', conversationHistory: 'User: Itchy' };
+    assert.deepEqual(await proformaChat(input), report);
+    assert.deepEqual(await proformaChat(input), report);
+    assert.equal(generated, 1);
+});
+
+test('suggestions KV cache includes the actual question and history and never stores model failures', async () => {
+    const { getQuestionSuggestionsCacheKey } = load('src\\lib\\redis\\ai-cache.ts');
+    const key = getQuestionSuggestionsCacheKey('Any itching?', 'Eczema', 'User: Two days');
+    assert.equal(key, getQuestionSuggestionsCacheKey('Any itching?', ' eczema ', 'User: Two days'));
+    assert.notEqual(key, getQuestionSuggestionsCacheKey('Any pain?', 'Eczema', 'User: Two days'));
+    assert.notEqual(key, getQuestionSuggestionsCacheKey('Any itching?', 'Psoriasis', 'User: Two days'));
+    assert.notEqual(key, getQuestionSuggestionsCacheKey('Any itching?', 'Eczema', 'User: Two months'));
+    assert.match(key, /^ai:question-suggestions:v1:[a-f0-9]{64}$/);
+
+    let modelAvailable = true;
+    let pythonCalls = 0;
+    const values = new Map();
+    const { generateQuestionSuggestions } = load('src\\ai\\flows\\generate-suggestions.ts', {
+        '@/lib/redis/cache': {
+            getCache: async key => values.get(key) ?? null,
+            setCache: async (key, value, options) => {
+                assert.equal(options.ttl, 86400);
+                values.set(key, value);
+                return true;
+            },
+        },
+        '@/lib/python-ai-client': { callPythonLangGraphSuggestions: async () => {
+            pythonCalls++;
+            return modelAvailable ? { suggestions: ['Mild itching', 'No itching'] } : null;
+        } },
+        '@/ai/genkit': { ai: {
+            defineFlow: (config, generate) => generate,
+            definePrompt: () => async () => ({ output: null }),
+        } },
+    });
+    const input = { question: 'Any itching?', conditionName: 'Eczema', conversationHistory: 'User: Two days' };
+    const first = await generateQuestionSuggestions(input);
+    assert.deepEqual(await generateQuestionSuggestions(input), first);
+    assert.equal(pythonCalls, 1);
+
+    modelAvailable = false;
+    const failedInput = { ...input, question: 'Any bleeding?' };
+    const writesBeforeFailure = values.size;
+    assert.deepEqual(await generateQuestionSuggestions(failedInput), { suggestions: [] });
+    assert.equal(values.size, writesBeforeFailure);
+    modelAvailable = true;
+    assert.deepEqual(await generateQuestionSuggestions(failedInput), first);
+    assert.equal(pythonCalls, 3);
+});
+
 test('final evaluation action returns safe failures instead of throwing production-redacted errors', async () => {
     const errors = load('src\\lib\\errors.ts');
     const report = { conditionName: 'Assessment', recommendations: 'Clinician review' };

@@ -7,6 +7,9 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { getCache, setCache } from '@/lib/redis/cache';
+import { CacheTTL } from '@/lib/redis/keys';
+import { getQuestionSuggestionsCacheKey } from '@/lib/redis/ai-cache';
 
 const GenerateSuggestionsInputSchema = z.object({
   question: z.string().describe('The clinical question asked to the patient.'),
@@ -67,12 +70,7 @@ const generateSuggestionsFlow = ai.defineFlow(
     }
 
     return {
-      suggestions: [
-        "Yes, experiencing this symptom",
-        "No, not present",
-        "Mild discomfort only",
-        "Started a few days ago",
-      ],
+      suggestions: [],
     };
   }
 );
@@ -82,6 +80,25 @@ import { callPythonLangGraphSuggestions } from '@/lib/python-ai-client';
 export async function generateQuestionSuggestions(
   input: GenerateSuggestionsInput
 ): Promise<GenerateSuggestionsOutput> {
+  const validatedInput = GenerateSuggestionsInputSchema.parse(input);
+  const cacheKey = getQuestionSuggestionsCacheKey(
+    validatedInput.question,
+    validatedInput.conditionName,
+    validatedInput.conversationHistory
+  );
+  const cached = GenerateSuggestionsOutputSchema.safeParse(await getCache<GenerateSuggestionsOutput>(cacheKey));
+  if (cached.success && cached.data.suggestions.length > 0) {
+    return cached.data;
+  }
+
+  const result = GenerateSuggestionsOutputSchema.parse(await generateUncachedSuggestions(validatedInput));
+  if (result.suggestions.length > 0) {
+    await setCache(cacheKey, result, { ttl: CacheTTL.DAY });
+  }
+  return result;
+}
+
+async function generateUncachedSuggestions(input: GenerateSuggestionsInput): Promise<GenerateSuggestionsOutput> {
   // 1. Primary: Python LangGraph AI Microservice
   const pythonRes = await callPythonLangGraphSuggestions(
     input.question,

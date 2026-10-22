@@ -514,6 +514,14 @@ This spends additional inference time/cost to avoid serving another case's repor
 The separate image/answer cache uses exact hashes, and final-evaluation keys also include
 the initial condition. The in-memory semantic-cache utility is not wired into diagnostic reporting.
 
+Consultation questions and quick-answer suggestions use the existing Upstash Redis KV cache
+with a 24-hour TTL. Versioned SHA-256 keys include the normalized condition name and exact
+conversation history; suggestion keys also include the actual question. Repeated opening
+questions can be reused, but different patient answers and different diseases do not share
+follow-up responses. Only successful generated content is stored; empty suggestions and
+failed calls are not cached. Redis outages bypass this question cache and use real inference.
+Configure `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` to enable persistence.
+
 ---
 
 ### 5.13. Dual-Layer AI Guardrails & PII Redaction
