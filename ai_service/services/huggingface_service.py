@@ -14,6 +14,8 @@ fabricated prediction/embedding/text) when it is not.
 """
 
 import os
+import base64
+import binascii
 import httpx
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
@@ -83,6 +85,50 @@ async def classify_skin_lesion_hf(image_url: Optional[str] = None) -> Dict[str, 
             )
 
         # Derive the top prediction from the REAL model output, never a constant.
+        if not isinstance(predictions, list) or not predictions:
+            return _hf_failure(f"Unexpected model output: {str(predictions)[:200]}")
+
+        top = max(predictions, key=lambda p: p.get("score", 0))
+        return {
+            "success": True,
+            "source": f"HuggingFace ({_HF_LESION_MODEL})",
+            "model_used": _HF_LESION_MODEL,
+            "predictions": predictions,
+            "top_prediction": top.get("label"),
+            "confidence_score": round(float(top.get("score", 0)) * 100, 2),
+        }
+    except CircuitBreakerOpenException as e:
+        return _hf_failure(str(e))
+    except Exception as e:
+        return _hf_failure(str(e))
+
+
+async def classify_skin_lesion_bytes_hf(photo_data_uri: Optional[str]) -> Dict[str, Any]:
+    """Classify a lesion directly from a base64 data URI (no public URL needed).
+
+    Used as the last-resort vision fallback inside the LangGraph detection graph
+    when Gemini and OpenAI are both unavailable (e.g. free-tier quota exhausted).
+    Returns the REAL HAM10000 model prediction, or an honest failure envelope —
+    never a fabricated condition.
+    """
+    if not photo_data_uri:
+        return _hf_failure("No image provided for lesion classification")
+    if not HF_API_KEY:
+        return _hf_failure("HUGGINGFACE_API_KEY not configured")
+    try:
+        b64 = photo_data_uri.split(",", 1)[1] if "," in photo_data_uri else photo_data_uri
+        image_bytes = base64.b64decode(b64, validate=True)
+    except (binascii.Error, ValueError) as e:
+        return _hf_failure(f"Invalid base64 image data: {e}")
+    if not image_bytes:
+        return _hf_failure("Decoded image is empty")
+
+    try:
+        async with httpx.AsyncClient() as client:
+            predictions = await with_circuit_breaker(
+                huggingface_circuit_breaker, _call_hf_lesion_classifier, client, image_bytes
+            )
+
         if not isinstance(predictions, list) or not predictions:
             return _hf_failure(f"Unexpected model output: {str(predictions)[:200]}")
 

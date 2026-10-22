@@ -9,6 +9,7 @@ from ai_service.services.llm_diagnosis import _validate_diagnosis
 from ai_service.utils.token_budget import estimate_token_count, truncate_to_token_budget
 from ai_service.utils.circuit_breaker import CircuitBreaker, with_circuit_breaker
 from ai_service.services import eval_harness
+from ai_service.services import dermatology_graph
 from ai_service.queue import redis_queue
 from ai_service import main
 from ai_service.utils.input_guard import sanitize_clinical_input
@@ -137,6 +138,40 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
                     )
                 self.assertEqual(response.status_code, 503)
                 self.assertIn("durable job runner", response.json()["detail"])
+
+
+class ProviderFallbackTests(unittest.IsolatedAsyncioTestCase):
+    def test_quota_errors_fall_through_instead_of_retrying(self):
+        for message in ("429 Too Many Requests", "RESOURCE_EXHAUSTED quota", "insufficient_quota"):
+            with self.subTest(message=message):
+                self.assertTrue(dermatology_graph._is_quota_error(RuntimeError(message)))
+        # Quota exhaustion must NOT be treated as a retryable transient error.
+        self.assertFalse(dermatology_graph._is_transient_error(RuntimeError("429 quota exhausted")))
+        self.assertTrue(dermatology_graph._is_transient_error(RuntimeError("503 overloaded, try again later")))
+
+    def test_ham10000_labels_map_to_readable_condition_names(self):
+        self.assertEqual(dermatology_graph._humanize_ham10000_label("melanoma"), "Melanoma")
+        self.assertEqual(dermatology_graph._humanize_ham10000_label("basal_cell_carcinoma"), "Basal Cell Carcinoma")
+        self.assertEqual(dermatology_graph._humanize_ham10000_label("some_new_label"), "Some New Label")
+        self.assertEqual(dermatology_graph._humanize_ham10000_label(None), "Dermatological Condition")
+
+    async def test_detection_falls_back_to_huggingface_when_gemini_and_openai_are_down(self):
+        hf = AsyncMock(return_value={"success": True, "top_prediction": "melanoma", "confidence_score": 91.2})
+        with patch.object(dermatology_graph, "_get_gemini_model", return_value=None), \
+             patch.object(dermatology_graph, "_get_openai_client", return_value=None), \
+             patch.object(dermatology_graph, "classify_skin_lesion_bytes_hf", hf):
+            result = await dermatology_graph.execute_langgraph_detect("data:image/jpeg;base64,QUJD")
+        self.assertEqual(result["condition_name"], "Melanoma")
+        hf.assert_awaited_once()
+
+    async def test_detection_raises_when_every_provider_including_huggingface_fails(self):
+        hf = AsyncMock(return_value={"success": False, "error": "HF serverless cold"})
+        with patch.object(dermatology_graph, "_get_gemini_model", return_value=None), \
+             patch.object(dermatology_graph, "_get_openai_client", return_value=None), \
+             patch.object(dermatology_graph, "classify_skin_lesion_bytes_hf", hf):
+            with self.assertRaises(Exception) as ctx:
+                await dermatology_graph.execute_langgraph_detect("data:image/jpeg;base64,QUJD")
+        self.assertIn("all providers", str(ctx.exception))
 
 
 if __name__ == "__main__":

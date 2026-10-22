@@ -8,7 +8,10 @@ from dotenv import load_dotenv
 
 from langgraph.graph import StateGraph, END
 
-from ai_service.services.huggingface_service import generate_llm_completion_hf
+from ai_service.services.huggingface_service import (
+    generate_llm_completion_hf,
+    classify_skin_lesion_bytes_hf,
+)
 
 load_dotenv()
 
@@ -68,12 +71,24 @@ def _get_openai_client():
     except Exception:
         return None
 
-# Substrings that mark a transient, retryable model error (overload/rate/timeout)
-# rather than a permanent one (bad model name, auth, malformed request).
+# Quota / limit-exhaustion markers. On the free tier these won't recover within
+# our short retry window, so retrying with backoff just wastes seconds — we fall
+# straight through to the next provider (OpenAI, then HuggingFace) instead.
+_QUOTA_MARKERS = (
+    "429", "rate limit", "resource_exhausted", "quota", "exhausted",
+    "insufficient_quota", "billing",
+)
+
+# Genuinely transient markers (server overloaded / network blip) worth a brief
+# retry before falling through to the next provider.
 _TRANSIENT_MARKERS = (
     "503", "unavailable", "high demand", "overloaded", "try again later",
-    "429", "rate limit", "resource_exhausted", "quota", "timeout", "deadline",
+    "timeout", "deadline",
 )
+
+def _is_quota_error(err: Exception) -> bool:
+    msg = str(err).lower()
+    return any(marker in msg for marker in _QUOTA_MARKERS)
 
 def _is_transient_error(err: Exception) -> bool:
     msg = str(err).lower()
@@ -92,7 +107,9 @@ async def _gemini_generate_with_retry(model, contents, max_retries: int = 3, bas
             return await asyncio.to_thread(model.generate_content, contents)
         except Exception as e:  # noqa: BLE001 — classify by message, then re-raise
             last_err = e
-            if not _is_transient_error(e) or attempt == max_retries - 1:
+            # Quota exhaustion or a permanent error: don't burn the retry window —
+            # raise now so the caller falls through to OpenAI/HuggingFace fast.
+            if _is_quota_error(e) or not _is_transient_error(e) or attempt == max_retries - 1:
                 raise
             delay = base_delay * (2 ** attempt)
             print(f"[Gemini transient error — retry {attempt + 1}/{max_retries} in {delay}s]: {e}")
@@ -104,15 +121,31 @@ async def _gemini_generate_with_retry(model, contents, max_retries: int = 3, bas
 # Graph 1: Vision Diagnostic Condition Detection
 #   try_gemini --(success)--> END
 #   try_gemini --(failure)--> try_openai --(success)--> END
-#   try_openai --(failure)--> raises (terminal, no fabricated condition)
+#   try_openai --(failure)--> try_hf --(success)--> END
+#   try_hf     --(failure)--> raises (terminal, no fabricated condition)
 #
-# No third (HuggingFace) tier here: this is an image-understanding task and
-# the only HF model wired into this codebase (classify_skin_lesion_hf, the
-# HAM10000 lesion classifier in huggingface_service.py) returns a different
-# label taxonomy — bolting it on here would silently change what "condition
-# detected" means rather than genuinely retrying the same task on a third
-# real provider. Judgment call: kept honest 2-tier fallback instead.
+# The HuggingFace tier (HAM10000 lesion classifier) is a genuine last-resort
+# fallback for when both Gemini and OpenAI are unavailable (e.g. the free-tier
+# quota is exhausted during testing). Its 7-class lesion taxonomy differs from
+# the open-vocabulary names Gemini/OpenAI return, so the label is mapped to a
+# readable condition name — it is still a REAL model prediction, never a guess.
 # =====================================================================
+
+# HAM10000 raw class labels → human-readable dermatological condition names.
+_HAM10000_LABEL_MAP = {
+    "benign_keratosis-like_lesions": "Benign Keratosis",
+    "basal_cell_carcinoma": "Basal Cell Carcinoma",
+    "actinic_keratoses": "Actinic Keratosis",
+    "vascular_lesions": "Vascular Lesion",
+    "melanocytic_Nevi": "Melanocytic Nevus",
+    "melanoma": "Melanoma",
+    "dermatofibroma": "Dermatofibroma",
+}
+
+def _humanize_ham10000_label(label: Optional[str]) -> str:
+    if not label:
+        return "Dermatological Condition"
+    return _HAM10000_LABEL_MAP.get(label, label.replace("_", " ").strip().title())
 
 _DETECT_PROMPT = """You are an expert dermatologist AI. Analyze the provided image of a skin condition.
 Your ONLY task is to identify the most likely skin condition and return its common medical name (e.g. Psoriasis, Eczema, Acne Vulgaris, Rosacea, Seborrheic Dermatitis, Contact Dermatitis, Melanocytic Nevus).
@@ -156,17 +189,14 @@ async def _detect_try_gemini(state: DermatologyState) -> Dict[str, Any]:
 async def _detect_try_openai(state: DermatologyState) -> Dict[str, Any]:
     """Node 1b: OpenAI GPT-4o vision fallback — a genuine second model, not a canned answer.
 
-    Terminal node in this chain: on failure here, raise so the graph's ainvoke
-    propagates a real error to the caller instead of ending in a silently
-    "successful" state with no condition name.
+    Non-terminal: on failure it returns success=False so the graph falls through
+    to the HuggingFace lesion classifier instead of dead-ending here.
     """
     photo_uri = state.get("photo_data_uri")
     attempts = state.get("attempts", [])
     openai_client = _get_openai_client()
     if not openai_client:
-        raise RuntimeError(
-            f"Vision detection failed and no fallback provider is configured: {attempts[-1] if attempts else 'Gemini unavailable'}"
-        )
+        return {"success": False, "attempts": attempts + ["OpenAI: OPENAI_API_KEY not configured"]}
     try:
         res = await openai_client.chat.completions.create(
             model="gpt-4o",
@@ -184,23 +214,47 @@ async def _detect_try_openai(state: DermatologyState) -> Dict[str, Any]:
         detected = (res.choices[0].message.content or "").strip()
         if detected:
             return {"condition_name": detected, "turn_count": 0, "success": True}
-        raise RuntimeError("OpenAI vision returned empty condition")
+        return {"success": False, "attempts": attempts + ["OpenAI: returned empty condition"]}
     except Exception as oai_err:
         print(f"[LangGraph OpenAI Vision Fallback Error]: {oai_err}")
-        combined = "; ".join(attempts + [f"OpenAI: {oai_err}"])
-        raise RuntimeError(f"Vision detection failed on all providers. {combined}") from oai_err
+        return {"success": False, "attempts": attempts + [f"OpenAI: {oai_err}"]}
+
+async def _detect_try_hf(state: DermatologyState) -> Dict[str, Any]:
+    """Node 1c: HuggingFace HAM10000 lesion classifier — real open-source
+    last-resort vision fallback when both Gemini and OpenAI are unavailable
+    (e.g. free-tier quota exhausted during testing). Terminal node: raises on
+    failure so no fabricated condition is ever returned."""
+    photo_uri = state.get("photo_data_uri")
+    attempts = state.get("attempts", [])
+
+    result = await classify_skin_lesion_bytes_hf(photo_uri)
+    if result.get("success") and result.get("top_prediction"):
+        return {
+            "condition_name": _humanize_ham10000_label(result.get("top_prediction")),
+            "turn_count": 0,
+            "success": True,
+        }
+
+    combined = "; ".join(attempts + [f"HuggingFace: {result.get('error', 'classification failed')}"])
+    raise RuntimeError(f"Vision detection failed on all providers. {combined}")
 
 def _build_detect_graph():
     workflow = StateGraph(DermatologyState)
     workflow.add_node("try_gemini", _detect_try_gemini)
     workflow.add_node("try_openai", _detect_try_openai)
+    workflow.add_node("try_hf", _detect_try_hf)
     workflow.set_entry_point("try_gemini")
     workflow.add_conditional_edges(
         "try_gemini",
         lambda s: "done" if s.get("success") else "fallback",
         {"done": END, "fallback": "try_openai"},
     )
-    workflow.add_edge("try_openai", END)
+    workflow.add_conditional_edges(
+        "try_openai",
+        lambda s: "done" if s.get("success") else "fallback",
+        {"done": END, "fallback": "try_hf"},
+    )
+    workflow.add_edge("try_hf", END)
     return workflow.compile()
 
 detect_graph = _build_detect_graph()
