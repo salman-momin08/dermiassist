@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { StreamChat } from 'stream-chat';
-import { novu } from '@/lib/novu/client';
+import { getNovu } from '@/lib/novu/client';
 import { RateLimitMiddleware } from '@/lib/redis/middleware';
 
 export const dynamic = 'force-dynamic';
@@ -92,7 +92,7 @@ export const POST = RateLimitMiddleware.strict(async (request: NextRequest) => {
                     .single(),
             ]);
 
-            await novu.trigger('connection-request', {
+            await getNovu().trigger('connection-request', {
                 to: {
                     subscriberId: doctorId,
                     ...(doctorProfile?.email && { email: doctorProfile.email }),
@@ -195,7 +195,7 @@ export const PATCH = RateLimitMiddleware.strict(async (request: NextRequest) => 
                     .single(),
             ]);
 
-            await novu.trigger('connection-response', {
+            await getNovu().trigger('connection-response', {
                 to: {
                     subscriberId: connection.patient_id,
                     ...(patientProfile?.email && { email: patientProfile.email }),

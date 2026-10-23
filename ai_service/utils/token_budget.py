@@ -5,7 +5,21 @@ and calculates estimated LLM billing costs.
 """
 
 import math
+import logging
 from typing import Dict, Any, List
+
+import tiktoken
+
+logger = logging.getLogger("TokenBudget")
+
+# cl100k_base is the tokenizer used by GPT-4o/GPT-4/GPT-3.5 family models — the
+# encoding referenced elsewhere in this project's docs. Loaded once at import
+# time; encoding lookups are cheap after that.
+try:
+    _ENCODING = tiktoken.get_encoding("cl100k_base")
+except Exception as e:  # pragma: no cover - defensive, should not happen once installed
+    logger.warning(f"Failed to load tiktoken cl100k_base encoding: {e}")
+    _ENCODING = None
 
 # Agent Role Token Budgets
 ROLE_TOKEN_BUDGETS = {
@@ -24,14 +38,18 @@ MODEL_PRICING = {
 
 def estimate_token_count(text: str) -> int:
     """
-    Estimate sub-word token count based on 1 token ~ 3.8 characters for English/Medical text.
-    Medical terms (e.g. 'Erythematotelangiectatic') cause 1.4x token expansion.
+    Real sub-word token count using tiktoken's cl100k_base encoding (the encoding
+    used by the GPT-4/GPT-4o family). Falls back to the old chars/3.8 heuristic
+    only if the tokenizer failed to load (e.g. missing/corrupt tiktoken install),
+    so a diagnostic-only environment issue degrades gracefully instead of crashing
+    every caller that budgets tokens.
     """
     if not text:
         return 0
+    if _ENCODING is not None:
+        return len(_ENCODING.encode(text, disallowed_special=()))
     words = text.split()
     char_count = len(text)
-    # Subword tokenization estimation with medical term expansion multiplier
     estimated_tokens = math.ceil(char_count / 3.8)
     return max(len(words), estimated_tokens)
 
@@ -39,6 +57,8 @@ def truncate_to_token_budget(text: str, max_tokens: int) -> Dict[str, Any]:
     """
     Truncate prompt cleanly at sentence boundaries to fit within specified max_tokens budget.
     """
+    if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or max_tokens < 0:
+        raise ValueError("max_tokens must be a non-negative integer")
     tokens_before = estimate_token_count(text)
     if tokens_before <= max_tokens:
         return {
@@ -64,8 +84,15 @@ def truncate_to_token_budget(text: str, max_tokens: int) -> Dict[str, Any]:
 
     if not current_text:
         # Hard truncate if a single sentence exceeds budget
-        max_chars = int(max_tokens * 3.5)
-        current_text = text[:max_chars] + "..."
+        suffix = "..." if estimate_token_count("...") <= max_tokens else ""
+        low, high = 0, len(text)
+        while low < high:
+            mid = (low + high + 1) // 2
+            if estimate_token_count(text[:mid] + suffix) <= max_tokens:
+                low = mid
+            else:
+                high = mid - 1
+        current_text = text[:low] + suffix
         current_tokens = estimate_token_count(current_text)
 
     return {

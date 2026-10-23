@@ -44,16 +44,39 @@ export function getDetectDiseaseNameCacheKey(imageHash: string): string {
  */
 export function getFinalEvaluationCacheKey(
     imageHash: string,
-    userAnswers: string
+    userAnswers: string,
+    initialCondition: string
 ): string {
     // Hash the user answers to create a unique key
     const answersHash = crypto
         .createHash('sha256')
-        .update(userAnswers)
+        .update(JSON.stringify([initialCondition, userAnswers]))
         .digest('hex')
         .substring(0, 16); // Use first 16 chars for brevity
 
-    return `ai:final-eval:${imageHash}:${answersHash}`;
+    return `ai:final-eval:v2:${imageHash}:${answersHash}`;
+}
+
+export function getProformaQuestionCacheKey(conditionName: string, conversationHistory: string): string {
+    const contextHash = crypto
+        .createHash('sha256')
+        .update(JSON.stringify([conditionName.trim().replace(/\s+/g, ' ').toLowerCase(), conversationHistory]))
+        .digest('hex');
+
+    return `ai:proforma-question:v1:${contextHash}`;
+}
+
+export function getQuestionSuggestionsCacheKey(
+    question: string,
+    conditionName = '',
+    conversationHistory = ''
+): string {
+    const contextHash = crypto
+        .createHash('sha256')
+        .update(JSON.stringify([conditionName.trim().replace(/\s+/g, ' ').toLowerCase(), question, conversationHistory]))
+        .digest('hex');
+
+    return `ai:question-suggestions:v1:${contextHash}`;
 }
 
 /**

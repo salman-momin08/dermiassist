@@ -25,6 +25,7 @@ import {
 import { useState } from "react";
 
 import { useToast } from "@/hooks/use-toast";
+import { generateReportHTML } from '@/lib/pdf-generator';
 
 export default function MyAnalysesPage() {
     const { analyses, deleteAnalysis, isLoading } = useAnalyses();
@@ -32,9 +33,13 @@ export default function MyAnalysesPage() {
     const [isDownloading, setIsDownloading] = useState<string | null>(null);
     const { toast } = useToast();
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (!user) return;
-        deleteAnalysis(user.id, id);
+        try {
+            await deleteAnalysis(user.id, id);
+        } catch (error) {
+            toast({ title: 'Delete failed', description: error instanceof Error ? error.message : 'Could not delete report.', variant: 'destructive' });
+        }
     };
 
     const cleanText = (text: string) => {
@@ -51,39 +56,31 @@ export default function MyAnalysesPage() {
         setIsDownloading(analysis.id);
 
         try {
-            const { generateReportHTML } = await import('@/lib/pdf-generator');
-            
             const htmlContent = generateReportHTML({
                 analysisId: analysis.id,
-                patientName: userData.displayName || 'Khwajamainuddin Momin',
+                patientName: userData.displayName || 'Not provided',
                 date: new Date(analysis.date).toLocaleDateString(),
                 conditionName: analysis.conditionName,
-                icdCode: (analysis as any).icdCode || 'L40.0',
-                severity: (analysis as any).severity || 'Moderate',
-                confidenceScore: (analysis as any).confidenceScore || 94,
-                summary: analysis.recommendations || 'Clinical analysis indicates characteristic cutaneous lesions. Grounded guidelines recommend targeted topical therapy.',
+                icdCode: analysis.icd10Code || 'Not assigned',
+                severity: analysis.severity,
+                confidenceScore: analysis.confidenceScore,
+                summary: analysis.condition,
                 keyFindings: [
-                    analysis.conditionName ? `Primary differential: ${analysis.conditionName}` : 'Cutaneous plaque with erythema',
-                    analysis.submittedInfo?.otherConsiderations ? cleanText(analysis.submittedInfo.otherConsiderations).substring(0, 150) + '...' : 'Erythematous scaly plaque with clear demarcation'
+                    `Primary differential: ${analysis.conditionName}`,
+                    ...(analysis.submittedInfo?.otherConsiderations ? [cleanText(analysis.submittedInfo.otherConsiderations)] : [])
                 ],
-                recommendedTreatments: analysis.dos?.slice(0, 3) || [
-                    'Apply prescribed topical corticosteroid / emollient twice daily',
-                    'Maintain skin hydration and avoid known flare triggers',
-                    'Schedule follow-up evaluation with a board-certified dermatologist'
-                ],
-                citationsUsed: [
-                    'American Academy of Dermatology (AAD) Practice Guidelines 2024',
-                    'Journal of the European Academy of Dermatology and Venereology (JEADV)',
-                    'National Psoriasis Foundation Clinical Practice Framework'
-                ],
+                recommendedTreatments: [analysis.recommendations, ...analysis.dos].filter(Boolean),
+                citationsUsed: [],
+                doctorNotes: analysis.reviewerNotes,
                 disclaimer: 'DermiAssist-AI provides preliminary informational analysis using artificial intelligence and does NOT provide definitive medical diagnoses or replace evaluation by a licensed dermatologist. Always consult a qualified healthcare professional for medical advice.',
-                modelArchitecture: 'Gemini 2.5 Flash + HAM10000 ResNet + Supabase pgvector RAG (HNSW)',
-                generationLatencyMs: 1840,
                 patientImage: analysis.image,
+                verificationSignature: analysis.verificationSignature,
             });
 
             // Open print window with formatted HTML for pixel-perfect PDF export
-            const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) throw new Error('Allow popups to print this report.');
+            printWindow.opener = null;
             if (printWindow) {
                 printWindow.document.write(`
                     <!DOCTYPE html>
@@ -113,7 +110,7 @@ export default function MyAnalysesPage() {
 
             toast({
                 title: "Report Generated",
-                description: "PDF export ready with QR code verification.",
+                description: "Print view ready with an online verification link.",
             });
             setIsDownloading(null);
         } catch (error) {

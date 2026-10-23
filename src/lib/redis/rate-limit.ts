@@ -21,7 +21,28 @@ export interface RateLimitResult {
     remaining: number;
     reset: number;        // Timestamp when limit resets
     retryAfter?: number;  // Seconds until can retry (if limited)
+    unavailable?: boolean;
 }
+
+const SLIDING_WINDOW_SCRIPT = `
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window)
+local count = redis.call('ZCARD', key)
+local allowed = 0
+if count < limit then
+    redis.call('ZADD', key, now, ARGV[4])
+    redis.call('PEXPIRE', key, window)
+    count = count + 1
+    allowed = 1
+end
+local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+local reset = now + window
+if #oldest > 0 then reset = tonumber(oldest[2]) + window end
+return {allowed, count, reset}
+`;
 
 /**
  * Check rate limit for a request
@@ -33,75 +54,37 @@ export interface RateLimitResult {
 export async function checkRateLimit(config: RateLimitConfig): Promise<RateLimitResult> {
     const { limit, window, identifier, endpoint } = config;
 
-    // If Redis not configured, allow all requests (graceful degradation)
+    const unavailable: RateLimitResult = {
+        success: false, unavailable: true, limit, remaining: 0,
+        reset: Date.now() + 60000, retryAfter: 60,
+    };
     if (!isRedisConfigured()) {
-        logger.warn('[Rate Limit] Redis not configured, allowing request');
-        return {
-            success: true,
-            limit,
-            remaining: limit,
-            reset: Date.now() + window * 1000,
-        };
+        logger.error('[Rate Limit] Redis not configured; refusing unmetered requests');
+        return unavailable;
     }
 
     const key = `ratelimit:${endpoint}:${identifier}`;
     const now = Date.now();
-    const windowStart = now - window * 1000;
-
     try {
-        // Use Redis pipeline for atomic operations
-        const pipeline = redis.pipeline();
-
-        // Remove old entries outside the window
-        pipeline.zremrangebyscore(key, 0, windowStart);
-
-        // Count requests in current window
-        pipeline.zcard(key);
-
-        // Add current request with score (timestamp) and member (unique ID)
-        pipeline.zadd(key, { score: now, member: `${now}-${Math.random()}` });
-
-        // Set expiry on the key
-        pipeline.expire(key, window);
-
-        const results = await pipeline.exec() as Array<[Error | null, any]> | null;
-
-        // Extract count from results (index 1 is zcard result)
-        // Pipeline results format: [[error, result], [error, result], ...]
-        const count = (results && results[1] && typeof results[1][1] === 'number') ? results[1][1] : 0;
-        const remaining = Math.max(0, limit - count - 1);
-        const reset = now + window * 1000;
-
-        if (count >= limit) {
-            logger.info(`[Rate Limit] ❌ LIMIT EXCEEDED - ${endpoint} for ${identifier.substring(0, 8)}... (${count}/${limit})`);
-
-            return {
-                success: false,
-                limit,
-                remaining: 0,
-                reset,
-                retryAfter: Math.ceil(window),
-            };
+        const result = await redis.eval<[number, number, number, string], [number, number, number]>(
+            SLIDING_WINDOW_SCRIPT, [key], [now, window * 1000, limit, crypto.randomUUID()]
+        );
+        if (!Array.isArray(result) || result.length !== 3 || !result.every(Number.isFinite)
+            || (result[0] !== 0 && result[0] !== 1) || result[1] < 0 || result[2] < now) {
+            throw new Error('Invalid rate-limit response from Redis');
         }
-
-        logger.info(`[Rate Limit] ✅ ALLOWED - ${endpoint} for ${identifier.substring(0, 8)}... (${count + 1}/${limit})`);
-
+        const [allowed, count, reset] = result;
         return {
-            success: true,
+            success: allowed === 1,
             limit,
-            remaining,
+            remaining: Math.max(0, limit - count),
             reset,
+            ...(allowed === 0 ? { retryAfter: Math.max(1, Math.ceil((reset - now) / 1000)) } : {}),
         };
     } catch (error) {
         logger.error('[Rate Limit] Error checking rate limit:', error);
 
-        // On error, allow request (fail open for better UX)
-        return {
-            success: true,
-            limit,
-            remaining: limit,
-            reset: now + window * 1000,
-        };
+        return unavailable;
     }
 }
 

@@ -1,25 +1,30 @@
 import { NextRequest } from 'next/server';
 import { executeMultiAgentPipeline } from '@/ai/orchestrator';
 import { checkRateLimit, RateLimitPresets } from '@/lib/redis/rate-limit';
+import { createClient } from '@/lib/supabase/server';
+import { AnalysisRequestSchema } from '@/ai/analysis-request';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
+export const maxDuration = 300;
 
 /**
- * Server-Sent Events (SSE) Endpoint for Real-Time AI Report Token Streaming.
- * Delivers diagnostic tokens live to the UI chunk-by-chunk for <100ms TTFT.
+ * SSE endpoint for connection status and the completed, safety-checked report.
+ * This is not provider token streaming: results are emitted after synthesis.
  */
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { symptoms, imageUrl, bodyLocation, userId } = body;
-
-        if (!symptoms || typeof symptoms !== 'string') {
-            return new Response('Missing symptoms parameter.', { status: 400 });
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return new Response('Unauthorized', { status: 401 });
         }
+        const body = AnalysisRequestSchema.safeParse(await request.json());
+        if (!body.success) return Response.json({ error: 'Invalid analysis parameters.' }, { status: 400 });
+        const { symptoms, imageUrl, bodyLocation, durationDays } = body.data;
 
         // Same pipeline cost as /api/ai/analyze — apply the same rate limit.
-        const forwardedFor = request.headers.get('x-forwarded-for');
-        const identifier = userId || forwardedFor?.split(',')[0].trim() || 'unknown';
+        const identifier = user.id;
         const rateLimitResult = await checkRateLimit({
             limit: RateLimitPresets.AI_ANALYSIS.limit,
             window: RateLimitPresets.AI_ANALYSIS.window,
@@ -27,50 +32,51 @@ export async function POST(request: NextRequest) {
             endpoint: '/api/ai/stream-analysis',
         });
         if (!rateLimitResult.success) {
-            return new Response('Rate limit exceeded. Please try again later.', {
-                status: 429,
+            return new Response(rateLimitResult.unavailable ? 'Request protection is temporarily unavailable.' : 'Rate limit exceeded. Please try again later.', {
+                status: rateLimitResult.unavailable ? 503 : 429,
                 headers: { 'Retry-After': String(rateLimitResult.retryAfter ?? 3600) },
             });
         }
 
         const encoder = new TextEncoder();
+        let cancelled = false;
 
         const stream = new ReadableStream({
             async start(controller) {
+                const send = (data: Record<string, unknown>) => {
+                    if (!cancelled && !request.signal.aborted) {
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+                    }
+                };
                 // Send initial connection event
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ event: 'start', message: 'Orchestrating multi-agent pipeline...' })}\n\n`));
+                send({ event: 'start', message: 'Orchestrating multi-agent pipeline...' });
 
                 try {
                     // Execute pipeline
-                    const result = await executeMultiAgentPipeline({ symptoms, imageUrl, bodyLocation });
+                    const result = await executeMultiAgentPipeline({ symptoms, imageUrl, bodyLocation, durationDays, userId: user.id });
 
                     // Stream agent trace steps
                     if (result.agentTrace) {
                         for (const step of result.agentTrace) {
-                            controller.enqueue(
-                                encoder.encode(`data: ${JSON.stringify({ event: 'agent_step', agent: step.agent, durationMs: step.durationMs })}\n\n`)
-                            );
-                            await new Promise((r) => setTimeout(r, 100));
+                            send({ event: 'agent_step', agent: step.agent, durationMs: step.durationMs });
                         }
                     }
 
                     // Stream generated summary tokens chunk by chunk
                     const summary = result.report?.summary || '';
-                    const words = summary.split(' ');
-                    for (let i = 0; i < words.length; i++) {
-                        const tokenChunk = (i === 0 ? '' : ' ') + words[i];
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ event: 'token', chunk: tokenChunk })}\n\n`));
-                        await new Promise((r) => setTimeout(r, 40));
-                    }
+                    send({ event: 'token', chunk: summary });
 
                     // Stream final report payload
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ event: 'complete', report: result.report, executionTimeMs: result.executionTimeMs })}\n\n`));
+                    send({ event: 'complete', report: result.report, executionTimeMs: result.executionTimeMs });
                 } catch (err: unknown) {
-                    const message = err instanceof Error ? err.message : 'Streaming error';
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ event: 'error', error: message })}\n\n`));
+                    logger.error('ai.stream.failed', { error: String(err) });
+                    send({ event: 'error', error: 'Analysis is unavailable. Please try again later.' });
                 } finally {
-                    controller.close();
+                    if (!cancelled) controller.close();
                 }
+            },
+            cancel() {
+                cancelled = true;
             },
         });
 
@@ -82,7 +88,8 @@ export async function POST(request: NextRequest) {
             },
         });
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Internal streaming error';
-        return new Response(message, { status: 500 });
+        if (err instanceof SyntaxError) return new Response('Invalid JSON body.', { status: 400 });
+        logger.error('ai.stream.request_failed', { error: String(err) });
+        return new Response('Analysis is unavailable.', { status: 503 });
     }
 }

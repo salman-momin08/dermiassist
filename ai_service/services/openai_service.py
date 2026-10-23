@@ -10,10 +10,42 @@ from typing import Dict, Any, Optional
 import httpx
 from dotenv import load_dotenv
 
+from ai_service.utils.circuit_breaker import (
+    openai_circuit_breaker,
+    with_circuit_breaker,
+    CircuitBreakerOpenException,
+)
+
 load_dotenv()
 logger = logging.getLogger("OpenAIService")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+
+async def _call_openai_chat_completion(system_prompt: str, user_prompt: str) -> Dict[str, Any]:
+    """Raw OpenAI Chat Completions call. Raises on any failure."""
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY}"
+    }
+
+    payload = {
+        "model": "gpt-4o",
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"},
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+    }
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+        return json.loads(content)
+
 
 async def analyze_disease_with_openai(
     symptoms: str,
@@ -24,7 +56,7 @@ async def analyze_disease_with_openai(
     Analyzes dermatological disease using OpenAI GPT-4o.
     """
     logger.info(f"Analyzing disease with OpenAI GPT-4o (Symptoms len: {len(symptoms)})")
-    
+
     if OPENAI_API_KEY:
         try:
             system_prompt = (
@@ -47,33 +79,24 @@ async def analyze_disease_with_openai(
                 "Generate clinical assessment JSON:"
             )
             
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {OPENAI_API_KEY}"
-            }
-            
-            payload = {
+            parsed = await with_circuit_breaker(
+                openai_circuit_breaker, _call_openai_chat_completion, system_prompt, user_prompt
+            )
+            return {
+                "success": True,
+                "provider": "OpenAI (GPT-4o)",
                 "model": "gpt-4o",
-                "temperature": 0.2,
-                "response_format": {"type": "json_object"},
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ]
+                "data": parsed
             }
-            
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-                resp.raise_for_status()
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                parsed = json.loads(content)
-                return {
-                    "success": True,
-                    "provider": "OpenAI (GPT-4o)",
-                    "model": "gpt-4o",
-                    "data": parsed
-                }
+        except CircuitBreakerOpenException as e:
+            logger.error(f"OpenAI circuit breaker open: {e}")
+            return {
+                "success": False,
+                "provider": "OpenAI (GPT-4o)",
+                "model": "gpt-4o",
+                "error": str(e),
+                "data": None
+            }
         except Exception as e:
             logger.error(f"OpenAI API exception: {e}")
             # Honest failure — do NOT fabricate a diagnosis. Surface the error so

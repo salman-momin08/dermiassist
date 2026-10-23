@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { detectDiseaseNameCached as detectDiseaseName } from "@/ai/flows/cached";
-import { finalEvaluationCached as finalEvaluation } from "@/ai/flows/cached";
+import { finalEvaluationAction as finalEvaluation } from "@/ai/flows/cached";
 import { proformaChat } from "@/ai/flows/proforma-chat";
 import { useToast } from "@/hooks/use-toast";
 import { getSafeErrorMessage } from "@/lib/errors";
@@ -216,12 +216,19 @@ export default function AnalyzeClient() {
         }
       }
 
-      const result = await finalEvaluation({
+      const evaluation = await finalEvaluation({
         photoDataUri: preview,
         initialCondition: detectedCondition,
         userAnswers: answersString,
       }, user?.id);
 
+      if (!evaluation.success) {
+        setError(evaluation.error);
+        setStep('error');
+        return;
+      }
+
+      const result = evaluation.data;
       const newReport = await addAnalysis(user.id, userData.displayName || "Patient", {
         condition: result.condition,
         conditionName: result.conditionName,
@@ -254,6 +261,7 @@ export default function AnalyzeClient() {
     currentHistory: ChatMessage[]
   ) => {
     setIsLoading(true);
+    setDynamicSuggestions([]);
     try {
       const { nextQuestion, suggestedAnswers, isComplete, confidenceScore: modelConfidence } = await proformaChat({
         conditionName: conditionName,
@@ -353,14 +361,6 @@ export default function AnalyzeClient() {
     setChatHistory([welcomeMsg]);
     setQuestionCount(0);
     setConfidenceScore(45);
-    generateQuestionSuggestions({
-      question: `Initial consultation for ${conditionName}`,
-      conditionName,
-    }).then((res) => {
-      if (res?.suggestions && res.suggestions.length > 0) {
-        setDynamicSuggestions(res.suggestions);
-      }
-    }).catch((err) => console.warn("Suggestions agent initial error:", err));
     getNextQuestion(conditionName, `AI: Initial detection is ${conditionName}.`, [welcomeMsg]);
   };
 

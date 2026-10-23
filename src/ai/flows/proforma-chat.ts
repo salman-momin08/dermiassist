@@ -12,6 +12,9 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
 import { AIOutputError } from '@/lib/errors';
+import { getCacheOrSet } from '@/lib/redis/cache';
+import { CacheTTL } from '@/lib/redis/keys';
+import { getProformaQuestionCacheKey } from '@/lib/redis/ai-cache';
 
 const ProformaChatInputSchema = z.object({
   conditionName: z.string().describe('The name of the detected skin condition.'),
@@ -32,6 +35,15 @@ import { callPythonLangGraphNextQuestion } from '@/lib/python-ai-client';
 export async function proformaChat(
   input: ProformaChatInput
 ): Promise<ProformaChatOutput> {
+  const validatedInput = ProformaChatInputSchema.parse(input);
+  return getCacheOrSet<ProformaChatOutput>(
+    getProformaQuestionCacheKey(validatedInput.conditionName, validatedInput.conversationHistory),
+    () => generateProformaQuestion(validatedInput),
+    { ttl: CacheTTL.DAY }
+  );
+}
+
+async function generateProformaQuestion(input: ProformaChatInput): Promise<ProformaChatOutput> {
   // 1. Prioritize Python LangGraph Multi-Agent Engine
   const langgraphRes = await callPythonLangGraphNextQuestion(input.conditionName, input.conversationHistory);
   if (langgraphRes && langgraphRes.next_question && langgraphRes.next_question.trim().length > 5) {

@@ -27,6 +27,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { releaseCaseReport } from "@/lib/case-review-actions";
 
 const COMMON_DIAGNOSES = [
   { name: "Tinea Corporis (Ringworm)", icd: "B35.4", severity: "Moderate" },
@@ -51,6 +52,7 @@ export default function DoctorCaseReviewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [caseData, setCaseData] = useState<any>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Optical specimen controls
   const [isPolarized, setIsPolarized] = useState(false);
@@ -69,6 +71,7 @@ export default function DoctorCaseReviewPage() {
   useEffect(() => {
     async function loadCase() {
       setIsLoading(true);
+      setLoadError(null);
       try {
         const { data, error } = await supabase
           .from('analyses')
@@ -81,47 +84,20 @@ export default function DoctorCaseReviewPage() {
         if (data) {
           setCaseData(data);
           const overrides = data.clinician_overrides || {};
-          const initialCondition = overrides.conditionName || data.condition_name || "Tinea Corporis";
+          const initialCondition = overrides.conditionName || data.condition_name || "";
           setSelectedCondition(initialCondition);
-          setIcd10Code(overrides.icd10Code || data.icd10_code || "B35.4");
-          setSeverity(overrides.severity || data.severity || "Moderate");
-          setRecommendations(overrides.recommendations || data.recommendations || "Apply prescribed topical antifungal twice daily to the affected lesion and 2cm of surrounding skin.");
+          setIcd10Code(overrides.icd10Code || data.icd10_code || "");
+          setSeverity(overrides.severity || data.severity || "");
+          setRecommendations(overrides.recommendations || data.recommendations || "");
           setClinicianNotes(data.reviewer_notes || "");
-          setDos(overrides.dos || data.dos || ["Apply topical antifungal cream twice daily", "Keep affected region dry and well-ventilated"]);
-          setDonts(overrides.donts || data.donts || ["Avoid topical corticosteroid monotherapy", "Do not scratch active erythematous border"]);
+          setDos(overrides.dos || data.dos || []);
+          setDonts(overrides.donts || data.donts || []);
         } else {
-          // Fallback mock specimen for live review simulation
-          const mock = {
-            id,
-            user_name: "Salman Momin",
-            condition_name: "Tinea Corporis",
-            condition_description: "Superficial dermatophyte infection characterized by an expanding annular erythematous plaque with central clearing and raised, scaly margins.",
-            confidence_score: 88,
-            severity: "Moderate",
-            icd10_code: "B35.4",
-            image: "https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?w=600&auto=format&fit=crop&q=80",
-            recommendations: "Topical Terbinafine 1% cream BID x 14 days. Re-evaluate if margins continue to expand after 7 days.",
-            dos: ["Apply thin layer of topical antifungal covering 2cm past lesion margin", "Keep skin dry and clean"],
-            donts: ["Avoid topical corticosteroid monotherapy (risk of tinea incognito)", "Do not share towels or personal athletic gear"],
-            submitted_info: {
-              proformaAnswers: [
-                { question: "How long has this lesion been present?", answer: "Started 2 to 3 weeks ago" },
-                { question: "Are you experiencing itching or burning?", answer: "Intense localized itching" },
-                { question: "Any prior treatments attempted?", answer: "Applied OTC hydrocortisone with no relief" },
-              ]
-            },
-            review_status: "pending_review",
-            created_at: new Date(Date.now() - 45 * 60000).toISOString(),
-          };
-          setCaseData(mock);
-          setSelectedCondition(mock.condition_name);
-          setIcd10Code(mock.icd10_code);
-          setRecommendations(mock.recommendations);
-          setDos(mock.dos);
-          setDonts(mock.donts);
+          setLoadError('Case not found or you do not have permission to review it.');
         }
       } catch (err: any) {
         console.error("Error loading case:", err);
+        setLoadError('Could not load the clinical case. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -145,24 +121,19 @@ export default function DoctorCaseReviewPage() {
         biopsyOrdered: decisionMode === 'biopsy',
       };
 
-      const reviewerName = userData?.displayName || user?.email || "Dr. Sarah Jenkins, MD";
-      const reviewerBadge = "NY-MED-88219";
+      // Releasing a case computes an HMAC verification signature (needs
+      // REPORT_SIGNING_SECRET, a server-only secret) alongside the
+      // review_status/reviewer_*/reviewed_at fields, so this write goes
+      // through a Server Action instead of a direct client-side Supabase
+      // update. See src/lib/case-review-actions.ts.
+      const releaseResult = await releaseCaseReport({
+        analysisId: id,
+        reviewerNotes: clinicianNotes,
+        overrides,
+      });
 
-      const { error } = await supabase
-        .from('analyses')
-        .update({
-          review_status: 'released',
-          reviewer_id: user?.id,
-          reviewer_name: reviewerName,
-          reviewer_badge_number: reviewerBadge,
-          reviewer_notes: clinicianNotes,
-          clinician_overrides: overrides,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-
-      if (error) {
-        console.warn("DB update note:", error.message);
+      if (!releaseResult.success) {
+        throw new Error(releaseResult.message);
       }
 
       toast({
@@ -191,7 +162,7 @@ export default function DoctorCaseReviewPage() {
   }
 
   if (!caseData) {
-    return null;
+    return <div role="alert" className="container mx-auto p-8">{loadError || 'Case unavailable.'}</div>;
   }
 
   return (
@@ -291,7 +262,7 @@ export default function DoctorCaseReviewPage() {
                 <span>AI Automated Differential (LangGraph CDS)</span>
               </h3>
               <Badge variant="secondary" className="font-clinical-mono text-[11px] font-bold">
-                Certainty: {caseData.confidence_score || 88}%
+                Model confidence: {caseData.confidence_score == null ? 'Not assessed' : `${caseData.confidence_score}%`}
               </Badge>
             </div>
 
@@ -301,11 +272,11 @@ export default function DoctorCaseReviewPage() {
                   1. {caseData.condition_name}
                 </p>
                 <span className="font-clinical-mono text-xs font-bold text-primary">
-                  ICD-10: {caseData.icd10_code || 'B35.4'}
+                  ICD-10: {caseData.icd10_code || 'Not assigned'}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                {caseData.condition_description || "Characteristic annular erythematous lesion with raised scaly margins and central clearing."}
+                {caseData.condition_description || 'No description recorded.'}
               </p>
             </div>
 
@@ -315,10 +286,7 @@ export default function DoctorCaseReviewPage() {
                 <Sparkles className="h-3.5 w-3.5" />
                 <span>Clinical Reference Citations:</span>
               </p>
-              <ul className="list-disc pl-4 space-y-1 text-muted-foreground text-[11px]">
-                <li>American Academy of Dermatology (AAD) Practice Guidelines 2024</li>
-                <li>Journal of the European Academy of Dermatology and Venereology (JEADV)</li>
-              </ul>
+              <p className="text-muted-foreground">No source citations are stored with this assessment. Independently verify clinical guidance.</p>
             </div>
           </div>
 
@@ -505,10 +473,10 @@ export default function DoctorCaseReviewPage() {
                 <ShieldCheck className="h-4 w-4 text-emerald-500" />
                 <div>
                   <p className="font-bold text-foreground">
-                    {userData?.displayName || user?.email || "Dr. Sarah Jenkins, MD"}
+                    {userData?.displayName || user?.email || "Profile incomplete"}
                   </p>
                   <p className="text-[10.5px] font-clinical-mono text-muted-foreground">
-                    LIC: NY-MED-88219 · Board Certified Dermatology
+                    Reviewer identity is verified server-side on release
                   </p>
                 </div>
               </div>

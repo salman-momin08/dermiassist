@@ -134,9 +134,9 @@ export async function middleware(request: NextRequest) {
 
         if (!result.success) {
             return NextResponse.json(
-                { error: 'Too Many Requests', message: 'Rate limit exceeded. Please slow down.' },
+                { error: result.unavailable ? 'Service Unavailable' : 'Too Many Requests', message: result.unavailable ? 'Request protection is temporarily unavailable.' : 'Rate limit exceeded. Please slow down.' },
                 {
-                    status: 429,
+                    status: result.unavailable ? 503 : 429,
                     headers: { 'Retry-After': String(result.retryAfter ?? 60) },
                 }
             );

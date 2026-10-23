@@ -1,7 +1,13 @@
 """
-Redis Async Task Worker Pool for Background AI Job Processing.
-Decouples heavy multi-agent synthesis and multi-photo vision analysis from HTTP requests.
-Jobs transition through: queued -> processing -> completed / failed
+DEAD CODE — superseded by ai_service/queue/redis_queue.py.
+
+This module's job store was an in-memory Python dict (this docstring used to
+admit it was "Simulating Redis Task Queue") — no real Redis, no durability,
+and every queued job vanished on process restart. `redis_queue.py` replaces it
+with a real Upstash Redis REST-backed queue (durable HSET/RPUSH job metadata,
+a polling background worker, and TTL'd job records). main.py now imports from
+`redis_queue` instead of this module. Left in place only for reference /
+in case anything still imports it directly; do not wire this into new code.
 """
 
 import time

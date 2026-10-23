@@ -3,6 +3,7 @@
 
 import { RtcTokenBuilder, RtcRole } from "agora-token";
 import { createClient } from "@/lib/supabase/server";
+import { uuidToAgoraUid } from "@/lib/agora-uid";
 
 // `channelName` is always an appointments.id UUID (see src/app/video/[roomId]/*
 // where roomId is set to appointment.id) — so authorizing the token means
@@ -42,12 +43,12 @@ export async function generateToken(channelName: string, uid: string) {
     const currentTimestamp = Math.floor(Date.now() / 1000);
     const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
 
-    // IMPORTANT: The UID for token generation must be a number.
-    // The Agora SDK on the client side can use a string UID, but the token generation library requires a number.
-    // If your user IDs are strings, you must map them to integers for token generation.
-    // For this prototype, we'll parse the string UID, assuming it's a number.
-    // In a production app, you would need a more robust mapping system.
-    const numericUid = isNaN(Number(uid)) ? 0 : Number(uid);
+    // Agora's token/UID field is a 32-bit integer, but Supabase user ids are
+    // UUID strings. `uuidToAgoraUid` deterministically hashes the UUID into a
+    // stable positive int32 so the UID minted into the token here always
+    // matches the UID the client joins with (see agora-conference.tsx),
+    // instead of every user colliding onto UID 0.
+    const numericUid = uuidToAgoraUid(uid);
 
     const token = RtcTokenBuilder.buildTokenWithUid(
         appId,
