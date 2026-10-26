@@ -21,6 +21,10 @@ interface LoosePart {
   media?: { url?: string };
 }
 
+type HFContentPart =
+  | { type: 'image_url'; image_url: { url: string } }
+  | { type: 'text'; text: string };
+
 ai.defineModel(
   {
     name: HF_MODEL_NAME,
@@ -46,7 +50,7 @@ ai.defineModel(
 
       if (mediaParts.length > 0) {
         hasMedia = true;
-        const content = parts.flatMap((p) => {
+        const content = parts.flatMap((p): HFContentPart[] => {
           if (p.media?.url) return [{ type: 'image_url', image_url: { url: p.media.url } }];
           if (p.text) return [{ type: 'text', text: p.text }];
           return [];
