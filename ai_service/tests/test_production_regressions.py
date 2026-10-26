@@ -155,10 +155,9 @@ class ProviderFallbackTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(dermatology_graph._humanize_ham10000_label("some_new_label"), "Some New Label")
         self.assertEqual(dermatology_graph._humanize_ham10000_label(None), "Dermatological Condition")
 
-    async def test_detection_falls_back_to_huggingface_when_gemini_and_openai_are_down(self):
+    async def test_detection_falls_back_to_huggingface_classifier_when_vision_model_is_down(self):
         hf = AsyncMock(return_value={"success": True, "top_prediction": "melanoma", "confidence_score": 91.2})
-        with patch.object(dermatology_graph, "_get_gemini_model", return_value=None), \
-             patch.object(dermatology_graph, "_get_openai_client", return_value=None), \
+        with patch.object(dermatology_graph, "hf_token_configured", return_value=False), \
              patch.object(dermatology_graph, "classify_skin_lesion_bytes_hf", hf):
             result = await dermatology_graph.execute_langgraph_detect("data:image/jpeg;base64,QUJD")
         self.assertEqual(result["condition_name"], "Melanoma")
@@ -166,8 +165,7 @@ class ProviderFallbackTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_detection_raises_when_every_provider_including_huggingface_fails(self):
         hf = AsyncMock(return_value={"success": False, "error": "HF serverless cold"})
-        with patch.object(dermatology_graph, "_get_gemini_model", return_value=None), \
-             patch.object(dermatology_graph, "_get_openai_client", return_value=None), \
+        with patch.object(dermatology_graph, "hf_token_configured", return_value=False), \
              patch.object(dermatology_graph, "classify_skin_lesion_bytes_hf", hf):
             with self.assertRaises(Exception) as ctx:
                 await dermatology_graph.execute_langgraph_detect("data:image/jpeg;base64,QUJD")

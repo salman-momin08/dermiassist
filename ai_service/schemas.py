@@ -12,7 +12,7 @@ class AnalysisRequest(BaseModel):
     symptoms: str = Field(..., description="Detailed patient symptoms, onset, and duration.", example="Itchy red elevated rash on inner elbows for 3 weeks")
     image_url: Optional[str] = Field(None, description="Cloudinary URL of lesion photo")
     body_location: Optional[str] = Field(None, description="Body location of lesion", example="inner arms")
-    provider: Optional[str] = Field("gemini", description="Preferred LLM provider: 'gemini' or 'openai'")
+    provider: Optional[str] = Field("huggingface", description="Preferred inference provider (Hugging Face open-source models). Accepted for backward compatibility; all values route to Hugging Face.")
 
 class DiagnosticReport(BaseModel):
     primary_condition_name: str

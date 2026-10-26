@@ -7,7 +7,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15.5-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-19.2-blue?style=flat-square&logo=react)](https://reactjs.org/)
-[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o-412991?style=flat-square&logo=openai)](https://openai.com/)
+[![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Qwen2.5%20%2F%20Llama%203.2-FFD21E?style=flat-square&logo=huggingface)](https://huggingface.co/)
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-HAM10000-FFD21E?style=flat-square&logo=huggingface)](https://huggingface.co/)
 [![MCP Protocol](https://img.shields.io/badge/MCP-JSON--RPC%202.0-purple?style=flat-square)](https://modelcontextprotocol.io)
 [![Supabase](https://img.shields.io/badge/Supabase-pgvector-green?style=flat-square&logo=supabase)](https://supabase.com/)
@@ -27,7 +27,7 @@ This repository is **not clinically validated or certified production-ready**. P
 - Run `npm ci`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, and `python -m unittest discover -s ai_service/tests -v`. Public Supabase configuration is required at build time. Test-only placeholders can check compilation, but cannot verify integrations.
 - The deployment interpreter is Python **3.14**, a [supported Vercel runtime](https://vercel.com/docs/functions/runtimes/python#python-version). Dependency installation, service import and regression tests have been checked locally on Python 3.14.7. Python 3.11 was not available for local revalidation; no newer-only application syntax was introduced. [CI](.github/workflows/ci.yml) tests Python 3.11/3.14 and the frontend on Node 22; those remote jobs must pass before release.
 - Rehearse migrations 33-37 on a backed-up Supabase staging branch. Migration 34 takes exclusive locks and swaps a live table; verify row counts, RLS, foreign keys, realtime subscriptions, account deletion and restore procedures. If earlier versions of these migrations were already applied, reconcile the deployed schema with a forward migration rather than blindly replaying table renames. The revised verification RPC must be deployed with the application.
-- Configure every required service using [.env.example](.env.example), including `REPORT_SIGNING_SECRET`, `PYTHON_AI_SERVICE_API_KEY`, `OPENAI_API_KEY`, `NOVU_API_SECRET` and Redis. API rate limiting now fails closed if Redis is missing or unavailable.
+- Configure every required service using [.env.example](.env.example), including `REPORT_SIGNING_SECRET`, `PYTHON_AI_SERVICE_API_KEY`, `HF_TOKEN`, `NOVU_API_SECRET` and Redis. API rate limiting now fails closed if Redis is missing or unavailable.
 - On Vercel, async job submission returns **503** and the in-process worker is disabled. Use synchronous analysis until a durable request-driven job runner is integrated. The local Redis polling worker is not an exactly-once or crash-recovering queue.
 - Point `PYTHON_AI_SERVICE_URL` at the actual deployed Python service, not `localhost`. Verify routing, deployment protection, function durations, cold starts, request-size limits and Python bundle contents in a Vercel preview deployment.
 - Exercise patient/doctor/admin authorization, complete analysis-to-review-to-verification workflows, printing, video/audio, notifications and failure recovery against staging. Complete authorization coverage for all exported Server Actions and assess the clinical, privacy and retention requirements before releasing.
@@ -76,7 +76,7 @@ Behavioral safeguards: full diagnostic reports are not reused based on semantic 
 
 ## 1. Executive Summary & Value Proposition
 
-**DermiAssist-AI** is an AI engineering project focused on the system-design problems that sit around a production LLM application: **multi-agent orchestration**, **retrieval-augmented generation (vector + hybrid BM25/RRF search)**, **evaluation (LLM-as-a-judge)**, **resilience (circuit breakers, async task workers)**, **cost/latency control (dynamic token budgeting, semantic caching)**, and **interoperability (a Model Context Protocol server)**. These patterns are implemented against a real, non-trivial domain — dermatology triage and telemedicine — rather than a toy demo, using **Next.js 15 (App Router)**, **FastAPI (Python AI Engine)**, **React 19**, **Google Gemini 2.5 Flash / Vision**, **Hugging Face Open-Source Lesion Classifier (HAM10000)**, and **Supabase (pgvector)**.
+**DermiAssist-AI** is an AI engineering project focused on the system-design problems that sit around a production LLM application: **multi-agent orchestration**, **retrieval-augmented generation (vector + hybrid BM25/RRF search)**, **evaluation (LLM-as-a-judge)**, **resilience (circuit breakers, async task workers)**, **cost/latency control (dynamic token budgeting, semantic caching)**, and **interoperability (a Model Context Protocol server)**. These patterns are implemented against a real, non-trivial domain — dermatology triage and telemedicine — rather than a toy demo, using **Next.js 15 (App Router)**, **FastAPI (Python AI Engine)**, **React 19**, **Hugging Face Open-Source Models (Qwen2.5-7B, Llama 3.2 Vision, Mistral-7B)**, the **Hugging Face Open-Source Lesion Classifier (HAM10000)**, **Google Gemini embeddings (`text-embedding-004`)**, and **Supabase (pgvector)**.
 
 The telemedicine surface is the application that exercises this AI engine and serves three primary user personas:
 - **👤 Patients**: Submit skin lesion photos, complete an interactive proforma, receive grounded differential reports with citations, track longitudinal healing over time, search verified doctors, book appointments, and launch WebRTC video calls.
@@ -170,7 +170,7 @@ graph LR
     
     subgraph Parallel Execution
         ParallelExecution --> Triage[Triage Agent: Risk Stratification]
-        ParallelExecution --> Vision[Multimodal Vision Agent: Gemini 2.5 + Hugging Face HAM10000]
+        ParallelExecution --> Vision[Multimodal Vision Agent: Hugging Face Llama 3.2 Vision + HAM10000 Classifier]
     end
     
     Triage --> HybridRAG[5. Hybrid RAG Search: BM25 + pgvector RRF]
@@ -200,9 +200,8 @@ graph TB
     end
     
     subgraph External AI & Telehealth Infrastructure
-        GeminiAPI[Google Gemini 2.5 Flash / Vision API]
-        OpenAIAPI[OpenAI GPT-4o Clinical Reasoning API]
-        HuggingFaceAPI[Hugging Face Inference API - HAM10000 / BGE]
+        HuggingFaceAPI[Hugging Face Inference Providers - Qwen2.5 / Llama 3.2 Vision / Mistral / HAM10000 / BGE]
+        GeminiAPI[Google Gemini API - text-embedding-004 & media TTS/Video only]
         AgoraAPI[Agora RTC WebRTC Infrastructure]
         StreamAPI[Stream Chat Infrastructure]
     end
@@ -210,9 +209,8 @@ graph TB
     Vercel <--> VercelFastAPI
     Vercel <--> SupabaseDB
     Vercel <--> Upstash
-    VercelFastAPI --> GeminiAPI
-    VercelFastAPI --> OpenAIAPI
     VercelFastAPI --> HuggingFaceAPI
+    VercelFastAPI --> GeminiAPI
     VercelFastAPI <--> SupabaseDB
     Vercel --> CloudinaryCDN
     Vercel --> StreamAPI
@@ -229,7 +227,7 @@ Architectural design decisions in DermiAssist-AI prioritize **accuracy, sub-seco
 |------------------------|-----------------|----------------------|--------------------------------|
 | **Grounding Strategy** | Hybrid RAG (BM25 + `pgvector` RRF) | Pure Vector Cosine Distance | Combines full-text keyword match with dense vector search using Reciprocal Rank Fusion ($RRF = \frac{1}{60 + r_1} + \frac{1}{60 + r_2}$); ensures $100\%$ recall on rare clinical codes (`L20.9`, `ICD-10`). |
 | **Tokenization Strategy** | Dynamic Token Budget Allocator | Unconstrained Prompting | BPE (`cl100k_base`) causes sub-word token explosion on complex medical terms (1 word $\rightarrow$ 5 tokens). Enforcing role-based token budgets reduces billing by $\approx 40\%$ and eliminates context overflow. |
-| **Fault Resilience** | Circuit Breaker Pattern | Naive API Retries | Tracks external API failures (Gemini / Hugging Face); trips from `CLOSED` $\rightarrow$ `OPEN` after 3 errors with 30s reset timeout, preventing cascading thread exhaustion during outages. |
+| **Fault Resilience** | Circuit Breaker Pattern | Naive API Retries | Tracks external API failures (Hugging Face Inference); trips from `CLOSED` $\rightarrow$ `OPEN` after 3 errors with 30s reset timeout, preventing cascading thread exhaustion during outages. |
 | **Task Concurrency** | Async Task Worker Queue | Synchronous Blocking HTTP | Offloads heavy multi-agent synthesis to background Redis workers (`POST /api/v1/jobs/submit`), returning immediate `job_id` for polling. |
 | **Database Scalability**| PostgreSQL Range Partitioning | Monolithic Unpartitioned Table | Range partitions `analyses` logs by `date` (`supabase_migrations/30_partitioning_sharding.sql`), maintaining sub-10ms B-Tree index scans at scale (>1,000,000 records). |
 | **Open-Source ML** | Hugging Face HAM10000 Classifier | Proprietary Vision API Only | Integrates `Anwarkh1/Skin_Cancer-Image_Classification` (HAM10000 7-class) for open-source lesion classification via Hugging Face Inference Providers, with `BAAI/bge-small-en-v1.5` available as a standalone BGE embedding demo. |
@@ -443,7 +441,7 @@ uvicorn main:app --reload --port 8000
 Integrated into the Python FastAPI microservice:
 - **Dermatological Vision Lesion Classifier (`Anwarkh1/Skin_Cancer-Image_Classification`)**: A HAM10000-based 7-class open-source classifier (melanoma, basal cell carcinoma, actinic keratoses, melanocytic nevi, benign keratosis-like lesions, vascular lesions, dermatofibroma) scoring uploaded lesion photos. Served via Hugging Face Inference Providers (`hf-inference`); fails closed when the model is not warm, never fabricating a prediction.
 - **Open-Source Vector Embedding Engine (`BAAI/bge-small-en-v1.5`)**: A standalone 384-dimensional BGE embedding demo exposed at `POST /api/v1/huggingface/embed`. Note: the production pgvector store is populated with Google `text-embedding-004` (768-dim), so this BGE route is a separate showcase and is **not** used for live retrieval.
-- **Open-Source LLM Completion Fallback (`mistralai/Mistral-7B-Instruct-v0.3`)**: Used by the LangGraph suggestion/evaluation paths as an open-source completion fallback when Gemini/OpenAI are unavailable. Reachability depends on the model being served by Hugging Face Inference Providers.
+- **Open-Source LLM Completion Fallback (`mistralai/Mistral-7B-Instruct-v0.3`)**: Used by the LangGraph suggestion/evaluation paths as the open-source completion fallback tier behind the primary open-source chat/reasoning models. Reachability depends on the model being served by Hugging Face Inference Providers.
 
 ---
 
@@ -535,7 +533,7 @@ Configure `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` to enable pers
 ```mermaid
 graph TD
     BenchmarkData[Ground Truth Dataset: dermatology-benchmarks.json] --> CaseRunner[Eval Runner: ai_service/services/eval_harness.py]
-    CaseRunner --> PipelineExec[Real Multi-Agent Pipeline Execution - Gemini/OpenAI]
+    CaseRunner --> PipelineExec[Real Multi-Agent Pipeline Execution - Hugging Face Open-Source Models]
     PipelineExec --> OutputEval[Output Evaluation Engine - honest per-case model status]
     
     subgraph Metric Scorers
@@ -709,8 +707,9 @@ npx tsx scripts/debug-channels.ts
 2. **Python**: `v3.10` or higher (for FastAPI microservice)
 3. **npm**: `v9.x` or higher
 4. **Supabase Account**: PostgreSQL database instance with `pgvector`
-5. **Google AI Studio Key**: Gemini API key
-6. **Cloudinary Account**: For document uploads
+5. **Hugging Face Access Token**: `HF_TOKEN` (primary — all LLM/vision/reasoning inference)
+6. **Google AI Studio Key**: Gemini API key (RAG embeddings + TTS/video media only)
+7. **Cloudinary Account**: For document uploads
 
 ---
 
@@ -764,8 +763,8 @@ Vercel natively supports deploying Python FastAPI microservices alongside Next.j
    - `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon key.
    - `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key.
-   - `GEMINI_API_KEY`: Google AI Studio Gemini key.
-   - `HUGGINGFACE_API_KEY`: Hugging Face user access token.
+   - `HF_TOKEN`: Hugging Face user access token (primary — all LLM/vision/reasoning inference).
+   - `GEMINI_API_KEY`: Google AI Studio key (RAG embeddings + TTS/video media only).
    - `UPSTASH_REDIS_REST_URL` & `UPSTASH_REDIS_REST_TOKEN`: Upstash Redis credentials.
 
 4. **Verify resilience and configuration**:

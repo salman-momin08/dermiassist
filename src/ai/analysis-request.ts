@@ -9,5 +9,7 @@ export const AnalysisRequestSchema = z.object({
     ).optional(),
     bodyLocation: z.string().trim().max(200).optional(),
     durationDays: z.number().int().min(0).max(36500).optional(),
-    provider: z.enum(['gemini', 'openai']).optional(),
+    // Accepted for backward compatibility; the engine routes every value to the
+    // open-source Hugging Face models.
+    provider: z.enum(['huggingface', 'gemini', 'openai']).optional(),
 });

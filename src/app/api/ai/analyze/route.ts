@@ -40,9 +40,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 1. Primary engine: FastAPI Python Microservice — REAL Gemini/OpenAI
-        //    inference with honest failure (no fabricated diagnosis). Both
-        //    providers route here so model health is reported consistently.
+        // 1. Primary engine: FastAPI Python Microservice — REAL open-source
+        //    Hugging Face inference with honest failure (no fabricated
+        //    diagnosis). Model health is reported consistently.
         try {
             const fastApiUrl = process.env.PYTHON_AI_SERVICE_URL || process.env.FASTAPI_SERVICE_URL || 'http://localhost:8000';
             const fastApiResponse = await fetch(`${fastApiUrl}/api/v1/analyze`, {
@@ -55,9 +55,8 @@ export async function POST(request: NextRequest) {
                     symptoms,
                     image_url: imageUrl,
                     body_location: bodyLocation,
-                    // Detection/analysis defaults to OpenAI (dedicated diagnostic-reasoning
-                    // engine); Gemini is only used for this path if explicitly requested.
-                    provider: provider === 'gemini' ? 'gemini' : 'openai',
+                    // All diagnosis runs on the open-source Hugging Face engine.
+                    provider: 'huggingface',
                 }),
                 // Real model calls take time; allow the pipeline to complete.
                 signal: AbortSignal.timeout(30000),

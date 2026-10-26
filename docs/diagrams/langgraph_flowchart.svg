@@ -54,7 +54,7 @@
   <!-- 4. Node 1: Vision Diagnostic Agent -->
   <rect x="250" y="345" width="400" height="54" rx="10" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
   <text x="450" y="369" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="700">Node 1: Multimodal Vision Diagnostic Agent</text>
-  <text x="450" y="388" text-anchor="middle" fill="#94a3b8" font-size="11">Gemini 2.5 Flash Vision / Ensemble Lesion Classifier</text>
+  <text x="450" y="388" text-anchor="middle" fill="#94a3b8" font-size="11">Hugging Face Llama 3.2 Vision / Ensemble Lesion Classifier</text>
 
   <!-- Arrow -->
   <line x1="450" y1="399" x2="450" y2="435" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrow)"/>

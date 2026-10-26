@@ -47,9 +47,9 @@
   <text x="500" y="104" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">Python LangGraph Engine</text>
   <line x1="500" y1="118" x2="500" y2="660" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
 
-  <!-- 4. Gemini 2.5 Flash -->
+  <!-- 4. Hugging Face Vision -->
   <rect x="630" y="80" width="140" height="38" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
-  <text x="700" y="104" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">Gemini 2.5 Flash</text>
+  <text x="700" y="104" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">Hugging Face</text>
   <line x1="700" y1="118" x2="700" y2="660" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
 
   <!-- 5. Supabase pgvector -->
@@ -68,7 +68,7 @@
   <line x1="300" y1="210" x2="495" y2="210" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#seqArrow)"/>
   <text x="400" y="203" text-anchor="middle" fill="#cbd5e1" font-size="10">2. POST /api/v1/langgraph/detect</text>
 
-  <!-- Step 3: Call Gemini Vision -->
+  <!-- Step 3: Call Hugging Face Vision -->
   <line x1="500" y1="240" x2="695" y2="240" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#seqArrow)"/>
   <text x="600" y="233" text-anchor="middle" fill="#cbd5e1" font-size="10">3. Multimodal Vision Analysis</text>
 

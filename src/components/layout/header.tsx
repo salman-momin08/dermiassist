@@ -31,6 +31,7 @@ export function AppHeader() {
           { href: "/doctor/review-queue", label: "Triage Queue" },
           { href: "/doctor/appointments", label: "Appointments" },
           { href: "/doctor/cases", label: "Patient Cases" },
+          { href: "/doctor/patient-history", label: "Patient History" },
           { href: "/chat", label: "Patients" },
           { href: "/my-requests", label: "Requests" },
           { href: "/contact", label: "Contact" },
@@ -38,6 +39,7 @@ export function AppHeader() {
       case 'admin':
         return [
           { href: "/admin/dashboard", label: "Dashboard" },
+          { href: "/admin/patient-history", label: "Patient History" },
           { href: "/admin/requests", label: "Requests" },
           { href: "/admin/ai-engineering", label: "AI Control Center" },
         ];
@@ -46,6 +48,7 @@ export function AppHeader() {
         return [
           { href: "/dashboard", label: "Dashboard" },
           { href: "/my-analyses", label: "Analyses" },
+          { href: "/medical-history", label: "Medical History" },
           { href: "/appointments", label: "Appointments" },
           { href: "/doctors", label: "Doctors" },
           { href: "/chat", label: "Chat" },

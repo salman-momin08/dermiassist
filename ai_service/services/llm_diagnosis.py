@@ -15,16 +15,15 @@ Design principles (per product decision):
     so a broken model is caught and fixed on priority instead of silently serving
     fake clinical output.
 
-Provider order: OpenAI GPT-4o (primary) -> Google Gemini (secondary).
-GPT-4o is the dedicated clinical-reasoning engine for differential diagnosis;
-Gemini is kept only as a fallback so the app still returns a report if OpenAI
-errors or rate-limits, rather than depending on a single always-on-call
-generalist model for the diagnostic path. Both are attempted only with a
-configured API key; the circuit breaker short-circuits providers that are
-repeatedly failing.
+Provider order: Hugging Face reasoning model (primary) -> Hugging Face fallback
+model (secondary). Both are open-source instruct models served through Hugging
+Face Inference Providers and keyed by a single HF_TOKEN; the reasoning model is
+the dedicated clinical-reasoning engine for differential diagnosis, and the
+fallback keeps the app returning a report if the primary errors or rate-limits.
+Both are attempted only with a configured token; the circuit breaker
+short-circuits a provider that is repeatedly failing.
 """
 
-import os
 import re
 import json
 import time
@@ -32,30 +31,27 @@ import logging
 import math
 from typing import Dict, Any, Optional, List
 
-import httpx
 from dotenv import load_dotenv
 
 from ai_service.utils.circuit_breaker import (
-    gemini_circuit_breaker,
-    openai_circuit_breaker,
+    huggingface_circuit_breaker,
     with_circuit_breaker,
     CircuitBreakerOpenException,
+)
+from ai_service.services.hf_client import (
+    HF_TOKEN,
+    HF_REASONING_MODEL,
+    HF_REASONING_FALLBACK_MODEL,
+    hf_chat_completion,
 )
 from ai_service.utils.token_budget import ROLE_TOKEN_BUDGETS, truncate_to_token_budget
 
 load_dotenv()
 logger = logging.getLogger("LLMDiagnosis")
 
-GEMINI_API_KEY = (
-    os.getenv("GEMINI_API_KEY")
-    or os.getenv("GOOGLE_GENAI_API_KEY")
-    or os.getenv("GOOGLE_API_KEY")
-    or ""
-)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-
-GEMINI_MODEL = "gemini-2.5-flash"
-OPENAI_MODEL = "gpt-4o"
+# Primary and fallback open-source models for the diagnostic path.
+HF_PRIMARY_MODEL = HF_REASONING_MODEL
+HF_FALLBACK_MODEL = HF_REASONING_FALLBACK_MODEL
 
 # Required keys the model must return for a diagnosis to count as well-formed.
 _REQUIRED_FIELDS = {"condition", "icd_code", "confidence", "severity", "summary"}
@@ -138,7 +134,7 @@ def _sanitize_error(message: str) -> str:
     this is defense-in-depth on top of never putting keys in URLs.
     """
     sanitized = message
-    for secret in (GEMINI_API_KEY, OPENAI_API_KEY):
+    for secret in (HF_TOKEN,):
         if secret:
             sanitized = sanitized.replace(secret, "[REDACTED]")
     # Catch any remaining `key=<value>` query-param style leaks (e.g. from a
@@ -184,51 +180,23 @@ def _validate_diagnosis(data: Dict[str, Any]) -> Dict[str, Any]:
     return data
 
 
-async def _call_gemini(user_prompt: str) -> Dict[str, Any]:
-    """Call Gemini via the REST API. Raises on any failure."""
-    # Key goes in a header, never the URL query string — httpx's auto-generated
-    # error messages (and any logs/UI that surface them) include the request
-    # URL verbatim, so a `?key=...` query param would leak the secret on every
-    # failed call.
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-    payload = {
-        "system_instruction": {"parts": [{"text": _SYSTEM_INSTRUCTION}]},
-        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
-        "generationConfig": {
-            "temperature": 0.2,
-            "responseMimeType": "application/json",
-        },
-    }
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        resp = await client.post(url, json=payload, headers={"x-goog-api-key": GEMINI_API_KEY})
-        resp.raise_for_status()
-        data = resp.json()
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
-    return _validate_diagnosis(_extract_json(text))
+async def _call_hf(user_prompt: str, model_id: str) -> Dict[str, Any]:
+    """Call an open-source Hugging Face chat model. Raises on any failure.
 
-
-async def _call_openai(user_prompt: str) -> Dict[str, Any]:
-    """Call OpenAI Chat Completions. Raises on any failure."""
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-    }
-    payload = {
-        "model": OPENAI_MODEL,
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"},
-        "messages": [
+    The HuggingFace circuit breaker is applied inside ``hf_chat_completion``, so
+    this helper is passed straight to the provider loop below like the previous
+    Gemini/OpenAI callables were.
+    """
+    text = await hf_chat_completion(
+        [
             {"role": "system", "content": _SYSTEM_INSTRUCTION},
             {"role": "user", "content": user_prompt},
         ],
-    }
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        resp = await client.post(
-            "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        text = data["choices"][0]["message"]["content"]
+        model=model_id,
+        temperature=0.2,
+        max_tokens=1200,
+        response_format={"type": "json_object"},
+    )
     return _validate_diagnosis(_extract_json(text))
 
 
@@ -268,29 +236,23 @@ async def generate_differential_diagnosis(
     user_prompt = _build_user_prompt(symptoms, vision_findings, rag_grounding, body_location)
     attempts: List[Dict[str, Any]] = []
 
-    # Order providers by caller preference, but always keep the other as backup.
-    provider_plan = (
-        [("Google Gemini", GEMINI_MODEL), ("OpenAI", OPENAI_MODEL)]
-        if preferred_provider != "openai"
-        else [("OpenAI", OPENAI_MODEL), ("Google Gemini", GEMINI_MODEL)]
-    )
+    # Primary open-source reasoning model with a second open model as backup.
+    # `preferred_provider` is accepted for backward compatibility with callers
+    # that still pass 'gemini'/'openai'; both now map onto Hugging Face models.
+    provider_plan = [
+        ("Hugging Face", HF_PRIMARY_MODEL),
+        ("Hugging Face", HF_FALLBACK_MODEL),
+    ]
 
     for provider_name, model_id in provider_plan:
-        if provider_name == "Google Gemini":
-            if not GEMINI_API_KEY:
-                attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": "GEMINI_API_KEY not configured"})
-                continue
-            breaker = gemini_circuit_breaker
-            call_fn = _call_gemini
-        else:  # OpenAI
-            if not OPENAI_API_KEY:
-                attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": "OPENAI_API_KEY not configured"})
-                continue
-            breaker = openai_circuit_breaker
-            call_fn = _call_openai
+        if not HF_TOKEN:
+            attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": "HF_TOKEN not configured"})
+            continue
 
         try:
-            data = await with_circuit_breaker(breaker, call_fn, user_prompt)
+            data = await with_circuit_breaker(
+                huggingface_circuit_breaker, _call_hf, user_prompt, model_id
+            )
             attempts.append({"provider": provider_name, "model": model_id, "ok": True})
             return {
                 "success": True,

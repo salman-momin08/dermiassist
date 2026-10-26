@@ -29,6 +29,7 @@ export function AppSidebar() {
   const patientLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/my-analyses", label: "Analyses", icon: Activity },
+    { href: "/medical-history", label: "Medical History", icon: ClipboardList },
     { href: "/appointments", label: "Appointments", icon: Calendar },
     { href: "/doctors", label: "Doctors", icon: Users },
     { href: "/chat", label: "Chat", icon: MessageSquare },
@@ -41,6 +42,7 @@ export function AppSidebar() {
     { href: "/doctor/review-queue", label: "Triage Queue", icon: ClipboardList },
     { href: "/doctor/appointments", label: "Appointments", icon: Calendar },
     { href: "/doctor/cases", label: "Patient Cases", icon: UserCheck },
+    { href: "/doctor/patient-history", label: "Patient History", icon: ClipboardList },
     { href: "/chat", label: "Patients", icon: MessageSquare },
     { href: "/my-requests", label: "Requests", icon: FileCheck2 },
     { href: "/doctor/profile", label: "Settings", icon: Settings },
@@ -48,6 +50,7 @@ export function AppSidebar() {
 
   const adminLinks = [
     { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/admin/patient-history", label: "Patient History", icon: ClipboardList },
     { href: "/admin/requests", label: "Requests", icon: FileCheck2 },
     { href: "/admin/ai-engineering", label: "AI Control Center", icon: Sparkles },
     { href: "/admin/profile", label: "Settings", icon: Settings },

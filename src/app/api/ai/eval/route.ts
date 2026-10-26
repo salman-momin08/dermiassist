@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        const provider = request.nextUrl.searchParams.get('provider') || 'openai';
-        if (provider !== 'openai' && provider !== 'gemini') {
+        const provider = request.nextUrl.searchParams.get('provider') || 'huggingface';
+        if (provider !== 'huggingface' && provider !== 'openai' && provider !== 'gemini') {
             return NextResponse.json({ error: 'Invalid model provider.' }, { status: 400 });
         }
         const fastApiUrl =

@@ -24,6 +24,162 @@ function load(relativePath, mocks = {}) {
     return module.exports;
 }
 
+test('patient history validates UUIDs and authenticates before requesting records', async () => {
+    let authenticated = false;
+    let calls = 0;
+    let request;
+    const history = { patient: { id: 'patient', name: 'Patient' }, entries: [], hasMore: false };
+    const { getPatientHistory } = load('src\\lib\\patient-history-actions.ts', {
+        '@/lib/supabase/server': { createClient: async () => ({
+            auth: { getUser: async () => ({ data: { user: authenticated ? { id: 'signed-in-user' } : null } }) },
+            rpc: async (name, args) => {
+                calls++;
+                assert.equal(name, 'get_patient_history');
+                request = args;
+                return { data: history, error: null };
+            },
+        }) },
+    });
+    assert.equal((await getPatientHistory({ patientId: 'invalid' })).success, false);
+    assert.equal((await getPatientHistory()).success, false);
+    assert.equal(calls, 0);
+    authenticated = true;
+    assert.deepEqual(await getPatientHistory(), { success: true, history });
+    assert.deepEqual(request, { target_patient_id: 'signed-in-user', page_number: 0 });
+    const patientId = '12345678-1234-4234-8234-123456789abc';
+    await getPatientHistory({ patientId, page: 2 });
+    assert.deepEqual(request, { target_patient_id: patientId, page_number: 2 });
+    assert.equal((await getPatientHistory({ patientId, page: -1 })).success, false);
+    assert.equal(calls, 2);
+});
+
+test('patient history database enforces access, archives records and audits reads', async () => {
+    const { PGlite } = require('@electric-sql/pglite');
+    const database = new PGlite();
+    const identifiers = {
+        patient: '00000000-0000-4000-8000-000000000001',
+        otherPatient: '00000000-0000-4000-8000-000000000002',
+        doctor: '00000000-0000-4000-8000-000000000003',
+        otherDoctor: '00000000-0000-4000-8000-000000000004',
+        unverified: '00000000-0000-4000-8000-000000000005',
+        admin: '00000000-0000-4000-8000-000000000006',
+        consultation: '00000000-0000-4000-8000-000000000007',
+        clinicalCase: '00000000-0000-4000-8000-000000000008',
+        analysis: '00000000-0000-4000-8000-000000000009',
+    };
+    async function asUser(actor, query, parameters = []) {
+        await database.exec('SET ROLE authenticated');
+        await database.query("SELECT set_config('request.jwt.claim.sub', $1, false)", [actor ?? '']);
+        try {
+            return await database.query(query, parameters);
+        } finally {
+            await database.exec('RESET ROLE');
+        }
+    }
+    async function history(actor, patient = identifiers.patient, page = 0) {
+        const result = await asUser(actor, 'SELECT public.get_patient_history($1, $2) AS history', [patient, page]);
+        return result.rows[0].history;
+    }
+    try {
+        await database.exec(`
+            CREATE ROLE anon;
+            CREATE ROLE authenticated;
+            CREATE SCHEMA auth;
+            CREATE FUNCTION auth.uid() RETURNS UUID LANGUAGE sql STABLE AS
+                $$ SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::UUID $$;
+            GRANT USAGE ON SCHEMA public, auth TO anon, authenticated;
+            CREATE TABLE profiles (id UUID PRIMARY KEY, display_name TEXT, role TEXT, verified BOOLEAN, specialization TEXT, photo_url TEXT);
+            CREATE TABLE appointments (id UUID PRIMARY KEY, patient_id UUID, doctor_id UUID, date DATE, time TEXT, type TEXT, status TEXT, notes TEXT, agora_token TEXT, appointment_date TIMESTAMPTZ, prescription JSONB);
+            CREATE TABLE doctor_cases (id UUID PRIMARY KEY, patient_id UUID, doctor_id UUID, diagnosis TEXT, treatment_plan TEXT, notes TEXT, status TEXT, created_at TIMESTAMPTZ DEFAULT now());
+            CREATE TABLE analyses (id UUID PRIMARY KEY, user_id UUID, condition_name TEXT, report_data JSONB, review_status TEXT, reviewer_id UUID, reviewer_notes TEXT, created_at TIMESTAMPTZ DEFAULT now());
+            CREATE TABLE connection_requests (patient_id UUID, doctor_id UUID, status TEXT);
+            GRANT SELECT ON profiles TO authenticated;
+            INSERT INTO profiles (id, display_name, role, verified, specialization) VALUES
+                ('${identifiers.patient}', 'Patient One', 'patient', false, NULL),
+                ('${identifiers.otherPatient}', 'Patient Two', 'patient', false, NULL),
+                ('${identifiers.doctor}', 'Doctor One', 'doctor', true, 'Dermatology'),
+                ('${identifiers.otherDoctor}', 'Doctor Two', 'doctor', true, 'Dermatology'),
+                ('${identifiers.unverified}', 'Unverified Doctor', 'doctor', false, NULL),
+                ('${identifiers.admin}', 'Administrator', 'admin', false, NULL);
+            INSERT INTO appointments VALUES ('${identifiers.consultation}', '${identifiers.patient}', '${identifiers.doctor}', NULL, '09:00', 'online', 'Confirmed', 'Consultation notes', 'private-video-token', '2026-10-20T09:00:00Z', '{"medication":"Recorded prescription"}');
+            INSERT INTO doctor_cases (id, patient_id, doctor_id, diagnosis, treatment_plan, notes, status) VALUES
+                ('${identifiers.clinicalCase}', '${identifiers.patient}', '${identifiers.otherDoctor}', 'Recorded condition', 'Recorded care plan', 'Clinical notes', 'active');
+            INSERT INTO analyses (id, user_id, condition_name, report_data, review_status) VALUES
+                ('${identifiers.analysis}', '${identifiers.patient}', 'Preliminary finding', '{"summary":"Model-generated report"}', 'pending_review');
+        `);
+        await database.exec(fs.readFileSync(path.join(root, 'supabase_migrations', '37_patient_history.sql'), 'utf8'));
+
+        await assert.rejects(history(null), /Authentication required/);
+        await assert.rejects(history(identifiers.otherPatient), /access denied/);
+        await assert.rejects(history(identifiers.otherDoctor), /access denied/);
+        await database.exec(`INSERT INTO connection_requests VALUES ('${identifiers.patient}', '${identifiers.unverified}', 'accepted')`);
+        await assert.rejects(history(identifiers.unverified), /access denied/);
+        await assert.rejects(history(identifiers.patient, identifiers.patient, -1), /Invalid history request/);
+
+        const ownHistory = await history(identifiers.patient);
+        assert.equal(ownHistory.entries.length, 3);
+        assert.equal(ownHistory.hasMore, false);
+        assert.equal(JSON.stringify(ownHistory).includes('private-video-token'), false);
+        const consultation = ownHistory.entries.find(entry => entry.kind === 'consultation');
+        assert.equal(Date.parse(consultation.occurredAt), Date.parse('2026-10-20T09:00:00Z'));
+        assert.ok(consultation.details.some(detail => detail.label === 'Prescription' && detail.value.includes('Recorded prescription')));
+        assert.equal((await history(identifiers.doctor)).entries.length, 3);
+        assert.equal((await history(identifiers.admin)).entries.length, 3);
+        const recordedCase = ownHistory.entries.find(entry => entry.kind === 'case');
+        assert.equal(recordedCase.doctor.id, identifiers.otherDoctor);
+        assert.equal(recordedCase.doctor.name, 'Doctor Two');
+        assert.equal(recordedCase.doctor.specialization, 'Dermatology');
+
+        await database.exec(`UPDATE appointments SET status = 'pending' WHERE id = '${identifiers.consultation}'`);
+        await assert.rejects(history(identifiers.doctor), /access denied/);
+        await database.exec(`UPDATE appointments SET status = 'cancelled' WHERE id = '${identifiers.consultation}'`);
+        await assert.rejects(history(identifiers.doctor), /access denied/);
+        await database.exec(`INSERT INTO connection_requests VALUES ('${identifiers.patient}', '${identifiers.doctor}', 'accepted')`);
+        assert.equal((await history(identifiers.doctor)).entries.length, 3);
+
+        await database.exec(`UPDATE doctor_cases SET treatment_plan = 'Updated care plan' WHERE id = '${identifiers.clinicalCase}'`);
+        await database.exec(`DELETE FROM doctor_cases WHERE id = '${identifiers.clinicalCase}'`);
+        await database.exec(`UPDATE profiles SET display_name = 'Renamed Doctor' WHERE id = '${identifiers.otherDoctor}'`);
+        const archived = (await history(identifiers.patient)).entries.find(entry => entry.kind === 'case');
+        assert.equal(archived.doctor.name, 'Doctor Two');
+        assert.ok(archived.details.some(detail => detail.value === 'Updated care plan'));
+        const versions = await database.query('SELECT count(*)::int AS count FROM patient_record_versions WHERE record_id = $1', [identifiers.clinicalCase]);
+        assert.equal(versions.rows[0].count, 3);
+
+        for (let index = 10; index < 40; index++) {
+            await database.query('INSERT INTO doctor_cases (id, patient_id, doctor_id, diagnosis, status) VALUES ($1, $2, $3, $4, $5)', [
+                `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`, identifiers.patient, identifiers.doctor, `Case ${index}`, 'completed',
+            ]);
+        }
+        const firstPage = await history(identifiers.patient);
+        const secondPage = await history(identifiers.patient, identifiers.patient, 1);
+        assert.equal(firstPage.entries.length, 25);
+        assert.equal(firstPage.hasMore, true);
+        assert.equal(secondPage.entries.length, 8);
+        assert.equal(secondPage.hasMore, false);
+        assert.equal(new Set([...firstPage.entries, ...secondPage.entries].map(entry => `${entry.kind}-${entry.id}`)).size, 33);
+
+        await assert.rejects(asUser(identifiers.patient, 'SELECT * FROM patient_record_versions'), /permission denied/);
+        await assert.rejects(asUser(identifiers.admin, 'DELETE FROM patient_record_versions'), /permission denied/);
+        await assert.rejects(asUser(identifiers.admin, "SELECT archive_patient_record('case', '{}'::jsonb, 'INSERT')"), /permission denied/);
+        assert.equal((await asUser(identifiers.patient, 'SELECT * FROM patient_history_access_log')).rows.length, 0);
+        const audit = await asUser(identifiers.admin, 'SELECT * FROM patient_history_access_log');
+        assert.equal(audit.rows.length, 7);
+        assert.ok(audit.rows.every(entry => entry.patient_id === identifiers.patient && entry.actor_id));
+        await assert.rejects(asUser(identifiers.admin, 'DELETE FROM patient_history_access_log'), /permission denied/);
+        await database.exec('SET ROLE anon');
+        await assert.rejects(database.query('SELECT get_patient_history($1, 0)', [identifiers.patient]), /permission denied/);
+        await database.exec('RESET ROLE');
+
+        await database.exec(`DELETE FROM profiles WHERE id IN ('${identifiers.patient}', '${identifiers.otherDoctor}')`);
+        const retained = await history(identifiers.admin);
+        assert.equal(retained.patient.name, 'Patient One');
+        assert.equal(retained.entries.length, 25);
+    } finally {
+        await database.close();
+    }
+});
+
 test('SSE emits completed report events and tolerates client cancellation', async () => {
     const result = { report: { summary: 'Safety-checked summary' }, executionTimeMs: 10, agentTrace: [] };
     const errors = [];

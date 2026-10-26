@@ -33,9 +33,9 @@ graph TB
     
     subgraph AI Engine & Multi-Agent Orchestration
         AI_ORCHESTRATOR[Master Multi-Agent Orchestrator - Fast-Path & Parallel Engine]
-        GEMINI_ENGINE[Google Gemini 2.5 Flash Multimodal Vision & Triage]
-        OPENAI_ENGINE[OpenAI GPT-4o Clinical Reasoning & Consensus Engine]
-        HF_SERVICE[Hugging Face Open-Source Model Engine - HAM10000 / BGE]
+        HF_REASONING[Hugging Face Qwen2.5-7B Clinical Reasoning & JSON Synthesis]
+        HF_VISION[Hugging Face Llama 3.2 Vision Multimodal Analysis & Triage]
+        HF_SERVICE[Hugging Face Open-Source Model Engine - HAM10000 / BGE / Mistral]
         GUARDRAILS_IN[Input Guardrail & PII Redactor]
         GUARDRAILS_OUT[Output Guardrail & Disclaimer Enforcer]
         TOKEN_BUDGET[Dynamic Token Budget Allocator]
@@ -89,7 +89,7 @@ sequenceDiagram
     participant FastAPI as FastAPI Microservice (Port 8000)
     participant Guard as PII Input Guardrail
     participant Triage as Clinical Triage Agent
-    participant Vision as Vision Agent (Gemini + Hugging Face HAM10000)
+    participant Vision as Vision Agent (Hugging Face Llama 3.2 Vision + HAM10000)
     participant RAG as Hybrid RAG Search (BM25 + pgvector RRF)
     participant DB as Supabase PostgreSQL
     participant Synth as Differential Synthesis Agent
@@ -104,7 +104,7 @@ sequenceDiagram
     
     par Concurrent Agent Execution
         FastAPI->>Triage: Risk stratification (Emergency vs Urgent vs Routine)
-        FastAPI->>Vision: Classify photo via Hugging Face HAM10000 + Gemini Vision
+        FastAPI->>Vision: Classify photo via Hugging Face Llama 3.2 Vision + HAM10000
     end
     
     Triage-->>FastAPI: Risk level payload
@@ -159,7 +159,7 @@ To prevent context window overflow and reduce LLM billing by $\approx 40\%$, the
 
 ### 3.3. API Resilience: Circuit Breaker Pattern
 
-External API calls (Gemini API, Hugging Face API) are wrapped in a **Circuit Breaker** ([`ai_service/utils/circuit_breaker.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/utils/circuit_breaker.py)) to prevent cascading thread exhaustion:
+External API calls (Hugging Face Inference API) are wrapped in a **Circuit Breaker** ([`ai_service/utils/circuit_breaker.py`](file:///c:/Users/salma/Downloads/dermiassist/ai_service/utils/circuit_breaker.py)) to prevent cascading thread exhaustion:
 
 ```mermaid
 stateDiagram-v2
@@ -204,8 +204,9 @@ CREATE TABLE analyses_y2026_q4 PARTITION OF analyses_partitioned FOR VALUES FROM
 |-------|------------|----------|
 | **Web Frontend** | Next.js 15 (App Router), React 19, Tailwind CSS, ShadCN UI | Client presentation, UI components & Edge routing |
 | **Microservice Backend** | FastAPI, Python 3.10, Uvicorn, Pydantic | Machine learning microservice & async task API |
-| **Primary LLM** | Google Gemini 2.5 Flash & Gemini 2.5 Vision | Multimodal visual analysis & report synthesis |
-| **Open-Source ML** | Hugging Face (`nateraw/skin-cancer-mnist-ham10000`, `BAAI/bge-small-en-v1.5`) | Open-source HAM10000 lesion classifier & BGE embeddings |
+| **Primary LLM** | Hugging Face Qwen2.5-7B-Instruct & Llama 3.2 Vision (open-source) | Multimodal visual analysis & report synthesis |
+| **Embeddings & Media** | Google Gemini `text-embedding-004` (RAG) & Gemini media (TTS/video) | 768-dim retrieval vectors & voice/video generation only |
+| **Open-Source ML** | Hugging Face (`Anwarkh1/Skin_Cancer-Image_Classification`, `BAAI/bge-small-en-v1.5`) | Open-source HAM10000 lesion classifier & BGE embeddings |
 | **Interoperability** | Model Context Protocol (MCP) JSON-RPC 2.0 | Standardized tool protocol for Claude & Cursor |
 | **Vector Database** | Supabase PostgreSQL + `pgvector` (`vector(768)`) | Vector storage, IVFFlat indexing & cosine distance RAG |
 | **Rate Limiter & Cache** | Upstash Redis | Sliding-window Edge rate limiting & vector semantic cache |

@@ -1,0 +1,47 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Verify patient history",
+			"type": "shell",
+			"command": "$runtime = Get-ChildItem \"$env:TEMP\\dermiassist-node-runtime\" -Filter node.exe -Recurse -ErrorAction Stop | Select-Object -First 1 -ExpandProperty FullName; & $runtime --version; & $runtime --test --test-name-pattern='patient history' tests/production-regressions.test.cjs; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; & $runtime node_modules/typescript/bin/tsc --noEmit --incremental false; exit $LASTEXITCODE",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Verify patient history database",
+			"type": "shell",
+			"command": "$runtime = Get-ChildItem \"$env:TEMP\\dermiassist-node-runtime\" -Filter node.exe -Recurse -ErrorAction Stop | Select-Object -First 1 -ExpandProperty FullName; $env:Path = \"$(Split-Path $runtime);$env:Path\"; & $runtime \"$(Split-Path $runtime)\\node_modules\\npm\\bin\\npm-cli.js\" install --save-dev --ignore-scripts --package-lock=false --no-audit --no-fund @electric-sql/pglite; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; & $runtime --test --test-name-pattern='patient history' tests/production-regressions.test.cjs; exit $LASTEXITCODE",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Test patient history PostgreSQL rules",
+			"type": "shell",
+			"command": "$runtimeFolder = Join-Path $env:TEMP 'dermiassist-node-runtime'; $runtime = Get-ChildItem $runtimeFolder -Filter node.exe -Recurse -ErrorAction Stop | Select-Object -First 1 -ExpandProperty FullName; $runtimeRoot = Split-Path $runtime; $env:Path = $runtimeRoot + ';' + $env:Path; $npm = Join-Path $runtimeRoot 'node_modules\\npm\\bin\\npm-cli.js'; & $runtime $npm install --save-dev --ignore-scripts --package-lock=false --no-audit --no-fund @electric-sql/pglite; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; & $runtime --test --test-name-pattern='patient history' tests/production-regressions.test.cjs; exit $LASTEXITCODE",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Run isolated history database regression",
+			"type": "shell",
+			"command": "$runtimeFolder = Join-Path $env:TEMP 'dermiassist-node-runtime'; $runtime = Get-ChildItem $runtimeFolder -Filter node.exe -Recurse -ErrorAction Stop | Select-Object -First 1 -ExpandProperty FullName; Get-CimInstance Win32_Process -Filter \"Name = 'node.exe'\" | Where-Object { $_.CommandLine -like '*npm-cli.js*install --save-dev*electric-sql/pglite*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -ErrorAction SilentlyContinue }; $npm = Join-Path (Split-Path $runtime) 'node_modules\\npm\\bin\\npm-cli.js'; $prefix = Join-Path $env:TEMP 'dermiassist-history-test-deps'; & $runtime $npm install --prefix $prefix --ignore-scripts --no-audit --no-fund --fetch-retries=0 --fetch-timeout=30000 @electric-sql/pglite@0.3.15; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $env:NODE_PATH = Join-Path $prefix 'node_modules'; & $runtime --test --test-name-pattern='patient history' tests/production-regressions.test.cjs; exit $LASTEXITCODE",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Check history permissions",
+			"type": "shell",
+			"command": "$runtimeFolder = Join-Path $env:TEMP 'dermiassist-node-runtime'; $runtime = Get-ChildItem $runtimeFolder -Filter node.exe -Recurse -ErrorAction Stop | Select-Object -First 1 -ExpandProperty FullName; $prefix = Join-Path $env:TEMP 'dermiassist-history-test-deps'; $env:NODE_PATH = Join-Path $prefix 'node_modules'; & $runtime --test --test-name-pattern='patient history' tests/production-regressions.test.cjs; exit $LASTEXITCODE",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Verify history integration",
+			"type": "shell",
+			"command": "$runtimeFolder = Join-Path $env:TEMP 'dermiassist-node-runtime'; $runtime = Get-ChildItem $runtimeFolder -Filter node.exe -Recurse -ErrorAction Stop | Select-Object -First 1 -ExpandProperty FullName; & $runtime --test tests/production-regressions.test.cjs; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; & $runtime node_modules/typescript/bin/tsc --noEmit --incremental false; exit $LASTEXITCODE",
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

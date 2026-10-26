@@ -28,6 +28,7 @@ const PROTECTED_PREFIXES = [
     '/dashboard',
     '/analyze',
     '/my-analyses',
+    '/medical-history',
     '/doctors',
     '/profile',
     '/doctor',

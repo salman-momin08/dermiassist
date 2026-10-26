@@ -42,6 +42,41 @@ ALTER TABLE analyses_partitioned
   ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP WITH TIME ZONE,
   ADD COLUMN IF NOT EXISTS verification_signature TEXT;
 
+-- ── 1b. Reconcile source `analyses` drift ───────────────────────────────────
+-- The backfill SELECT below reads these columns from `analyses`. On a drifted
+-- project (table created ad hoc, or where 33_fix_analyses_schema_drift.sql was
+-- never applied) one or more can be absent, failing the SELECT with "column does
+-- not exist". Codify them all here (idempotent) so the backfill resolves
+-- regardless of drift. Types mirror 02_analyses_table.sql and 33_*; the FK/CHECK
+-- refinements on the review columns are left to 33 and are not required here.
+ALTER TABLE analyses
+  -- baseline columns from 02_analyses_table.sql
+  ADD COLUMN IF NOT EXISTS severity TEXT,
+  ADD COLUMN IF NOT EXISTS confidence_score DECIMAL(5,2),
+  ADD COLUMN IF NOT EXISTS image_url TEXT,
+  ADD COLUMN IF NOT EXISTS image_public_id TEXT,
+  ADD COLUMN IF NOT EXISTS report_data JSONB,
+  ADD COLUMN IF NOT EXISTS date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  -- review / reviewer columns from 33_fix_analyses_schema_drift.sql
+  ADD COLUMN IF NOT EXISTS user_name TEXT,
+  ADD COLUMN IF NOT EXISTS condition_description TEXT,
+  ADD COLUMN IF NOT EXISTS image TEXT,
+  ADD COLUMN IF NOT EXISTS recommendations TEXT,
+  ADD COLUMN IF NOT EXISTS dos JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS donts JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS submitted_info JSONB DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS explanations JSONB DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS icd10_code TEXT,
+  ADD COLUMN IF NOT EXISTS verification_signature TEXT,
+  ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'pending_review',
+  ADD COLUMN IF NOT EXISTS reviewer_id UUID,
+  ADD COLUMN IF NOT EXISTS reviewer_name TEXT,
+  ADD COLUMN IF NOT EXISTS reviewer_badge TEXT,
+  ADD COLUMN IF NOT EXISTS reviewer_notes TEXT,
+  ADD COLUMN IF NOT EXISTS clinician_overrides JSONB,
+  ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP WITH TIME ZONE;
+
 -- ── 2. Backfill existing rows ───────────────────────────────────────────────
 INSERT INTO analyses_partitioned (
   id, user_id, condition_name, severity, confidence_score, image_url, report_data,
@@ -73,14 +108,22 @@ END; $$;
 -- ── 3. Composite-FK plumbing ─────────────────────────────────────────────────
 -- Postgres requires FK targets on a partitioned table to include the partition
 -- key (created_at), so referencing tables need a paired *_created_at column.
-ALTER TABLE appointments ADD COLUMN IF NOT EXISTS attached_report_created_at TIMESTAMP WITH TIME ZONE;
+-- `appointments.attached_report_id` comes from 19_*; guard it too in case that
+-- migration was never applied on a drifted project.
+ALTER TABLE appointments
+  ADD COLUMN IF NOT EXISTS attached_report_id UUID,
+  ADD COLUMN IF NOT EXISTS attached_report_created_at TIMESTAMP WITH TIME ZONE;
 UPDATE appointments a
   SET attached_report_created_at = an.created_at
   FROM analyses an
   WHERE an.id = a.attached_report_id AND a.attached_report_created_at IS NULL;
 ALTER TABLE appointments DROP CONSTRAINT IF EXISTS appointments_attached_report_id_fkey;
 
-ALTER TABLE doctor_cases ADD COLUMN IF NOT EXISTS analysis_created_at TIMESTAMP WITH TIME ZONE;
+-- `doctor_cases.analysis_id` is documented in the README ERD and required by the
+-- trigger + composite FK below, but was never added by 04_*; codify it (drift).
+ALTER TABLE doctor_cases
+  ADD COLUMN IF NOT EXISTS analysis_id UUID,
+  ADD COLUMN IF NOT EXISTS analysis_created_at TIMESTAMP WITH TIME ZONE;
 UPDATE doctor_cases dc
   SET analysis_created_at = an.created_at
   FROM analyses an

@@ -22,11 +22,11 @@ from ai_service.ingestion.ingest_knowledge_base import ingest as ingest_knowledg
 from ai_service.services.huggingface_service import classify_skin_lesion_hf, generate_bge_embedding_hf
 from ai_service.services.healing_tracker import track_longitudinal_healing
 from ai_service.services.hybrid_search import search_hybrid_rrf
-from ai_service.services.openai_service import analyze_disease_with_openai
+from ai_service.services.hf_disease_service import analyze_disease_with_hf
 from ai_service.services.eval_harness import run_eval_harness
 from ai_service.services.drug_interaction_service import check_drug_interaction
 from ai_service.utils.token_budget import estimate_token_count, truncate_to_token_budget, calculate_llm_cost
-from ai_service.utils.circuit_breaker import gemini_circuit_breaker, huggingface_circuit_breaker, openai_circuit_breaker
+from ai_service.utils.circuit_breaker import huggingface_circuit_breaker
 from ai_service.queue.redis_queue import (
     submit_async_job,
     get_job_status,
@@ -37,7 +37,7 @@ from ai_service.queue.redis_queue import (
 
 app = FastAPI(
     title="DermiAssist-AI Polyglot Python Microservice",
-    description="Enterprise AI Engineering Microservice providing Multi-Agent Orchestration, Vector RAG Retrieval, MCP Protocol, Agent Tools, Hugging Face Models, OpenAI GPT-4o, and Distributed System Design Architecture.",
+    description="Enterprise AI Engineering Microservice providing Multi-Agent Orchestration, Vector RAG Retrieval, MCP Protocol, Agent Tools, Hugging Face Open-Source Models, and Distributed System Design Architecture.",
     version="4.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -126,18 +126,16 @@ async def health_check():
         "version": "4.0.0",
         "architecture": "Polyglot Microservice (FastAPI + Next.js 15)",
         "circuit_breakers": {
-            "gemini": gemini_circuit_breaker.get_status(),
-            "openai": openai_circuit_breaker.get_status(),
             "huggingface": huggingface_circuit_breaker.get_status()
         },
         "docs": "/docs"
     }
 
-@app.post("/api/v1/analyze/openai", tags=["AI Diagnostic Engine"], dependencies=_auth)
-async def analyze_symptoms_openai(request: AnalysisRequest):
-    """Trigger disease analysis using OpenAI GPT-4o clinical reasoning engine."""
+@app.post("/api/v1/analyze/hf", tags=["AI Diagnostic Engine"], dependencies=_auth)
+async def analyze_symptoms_hf(request: AnalysisRequest):
+    """Trigger disease analysis using the open-source Hugging Face clinical reasoning engine."""
     try:
-        res = await analyze_disease_with_openai(
+        res = await analyze_disease_with_hf(
             symptoms=request.symptoms,
             vision_findings={"body_location": request.body_location, "image_url": request.image_url} if request.image_url else None
         )

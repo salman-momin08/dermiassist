@@ -35,7 +35,7 @@ graph TB
 
     subgraph LangGraph Layer [4. Multi-Agent AI Engine & LangGraph State Machine]
         LG_ENGINE[LangGraph State Machine<br/>DermatologyDiagnosticState]
-        VISION_AGENT[Vision Diagnostic Agent<br/>Gemini 2.5 Flash / GPT-4o Vision]
+        VISION_AGENT[Vision Diagnostic Agent<br/>Hugging Face Llama 3.2 Vision]
         PROFORMA_AGENT[Dynamic Proforma Agent<br/>Contextual Question Branching]
         SYNTHESIS_AGENT[Differential Synthesis Agent<br/>ICD-10 & Treatment Pathways]
         HF_AGENT[Hugging Face Open-Source Agent<br/>HAM10000 Skin Lesion Classifier]
@@ -245,7 +245,7 @@ sequenceDiagram
     participant UI as Next.js Client App
     participant NextServer as Next.js Server Action / API
     participant LangGraph as Python FastAPI (LangGraph Engine)
-    participant Gemini as Google Gemini 2.5 Flash
+    participant HF as Hugging Face Open-Source Models
     participant DB as Supabase PostgreSQL + pgvector
     participant Cloudinary as Cloudinary CDN
 
@@ -253,16 +253,16 @@ sequenceDiagram
     UI->>UI: Client-Side Canvas Compression (<250KB JPEG)
     UI->>NextServer: POST /api/ai/analyze (photoDataUri)
     NextServer->>LangGraph: POST /api/v1/langgraph/detect
-    LangGraph->>Gemini: Vision Multimodal Analysis
-    Gemini-->>LangGraph: Primary Differential (e.g. "Psoriasis")
+    LangGraph->>HF: Vision Multimodal Analysis
+    HF-->>LangGraph: Primary Differential (e.g. "Psoriasis")
     LangGraph-->>NextServer: { condition_name: "Psoriasis" }
     NextServer-->>UI: Display Condition & Initiate Proforma
 
     loop Dynamic Clinical Proforma Inquiry (Up to 5 Turns)
         UI->>NextServer: Request next clinical follow-up question
         NextServer->>LangGraph: POST /api/v1/langgraph/next-question (History & Condition)
-        LangGraph->>Gemini: Contextual Question Generation
-        Gemini-->>LangGraph: Dynamic Clinical Question
+        LangGraph->>HF: Contextual Question Generation
+        HF-->>LangGraph: Dynamic Clinical Question
         LangGraph-->>NextServer: { next_question: "..." }
         NextServer-->>UI: Render message bubble in chat
         Patient->>UI: Types or dictates voice symptom reply
@@ -273,8 +273,8 @@ sequenceDiagram
     NextServer->>LangGraph: POST /api/v1/langgraph/evaluate
     LangGraph->>DB: Search pgvector Hybrid RAG for clinical guidelines
     DB-->>LangGraph: Matched Treatment Chunks & ICD-10 Coding
-    LangGraph->>Gemini: Generate Final Synthesis Report
-    Gemini-->>LangGraph: JSON Medical Assessment
+    LangGraph->>HF: Generate Final Synthesis Report
+    HF-->>LangGraph: JSON Medical Assessment
     LangGraph-->>NextServer: Structured Clinical Report
     NextServer->>Cloudinary: Store verified specimen
     NextServer->>DB: INSERT INTO analyses (Report, Transcripts, ICD-10)
@@ -369,7 +369,7 @@ graph LR
 | :--- | :--- | :--- |
 | **Frontend UI/UX** | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, Lucide Icons, Radix UI | Responsive patient dashboard, dynamic proforma chat, doctor portal, real-time charts |
 | **Microservices Backend** | Python 3.12, FastAPI, Uvicorn, Pydantic v2 | High-throughput AI microservice, REST API endpoints, OpenAPI documentation |
-| **Multi-Agent AI Engine** | LangGraph, LangChain, Google GenAI SDK (Gemini 2.5 Flash), OpenAI GPT-4o | Stateful clinical graphs, vision diagnostic agents, proforma question branching, clinical synthesis |
+| **Multi-Agent AI Engine** | LangGraph, LangChain, Hugging Face Inference Providers (Qwen2.5-7B-Instruct, Llama 3.2 Vision, Mistral-7B-Instruct) | Stateful clinical graphs, vision diagnostic agents, proforma question branching, clinical synthesis |
 | **Open-Source ML** | Hugging Face Transformers, HAM10000 Dataset, BAAI/bge-small-en-v1.5 | Open-source skin lesion classification and dense medical embeddings |
 | **Database & Vector RAG**| Supabase PostgreSQL, `pgvector`, Row Level Security (RLS) | Relational case history, patient records, 768-dimensional clinical knowledge search |
 | **Caching & Rate Limiting**| Upstash Redis, Python in-memory circuit breakers | Sliding-window DDoS mitigation, LLM cost budgeting, failover routing |

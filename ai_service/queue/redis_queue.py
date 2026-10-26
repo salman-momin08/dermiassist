@@ -222,7 +222,7 @@ async def _process_job(job_id: str, job: Dict[str, str]) -> None:
                 symptoms=payload.get("symptoms", ""),
                 image_url=payload.get("image_url"),
                 body_location=payload.get("body_location"),
-                provider=payload.get("provider", "openai"),
+                provider=payload.get("provider", "huggingface"),
             )
         else:
             raise ValueError(f"Unknown job_type: {job_type}")

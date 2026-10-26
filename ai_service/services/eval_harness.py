@@ -23,13 +23,15 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List
-import httpx
 from pydantic import BaseModel, Field, StrictBool
 
 from ai_service.services.orchestrator_service import run_multi_agent_pipeline
-from ai_service.services.llm_diagnosis import (
-    OPENAI_API_KEY, OPENAI_MODEL, GEMINI_API_KEY, GEMINI_MODEL,
-    _extract_json, _sanitize_error,
+from ai_service.services.llm_diagnosis import _sanitize_error
+from ai_service.services.hf_client import (
+    HF_TOKEN,
+    HF_REASONING_MODEL,
+    hf_chat_completion,
+    extract_json,
 )
 
 logger = logging.getLogger("Evaluation")
@@ -54,38 +56,21 @@ async def judge_report_quality(case: Dict[str, Any], report: Dict[str, Any], pro
         "(boolean), disclaimerPresent (boolean), and rationale (string)."
     )
     content = json.dumps({"benchmark": case, "report": report}, ensure_ascii=False)
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        if provider == "openai":
-            if not OPENAI_API_KEY:
-                raise RuntimeError("OpenAI judge is not configured")
-            response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-                json={
-                    "model": OPENAI_MODEL,
-                    "messages": [{"role": "system", "content": instruction}, {"role": "user", "content": content}],
-                    "response_format": {"type": "json_object"}, "temperature": 0, "max_tokens": 512,
-                },
-            )
-            response.raise_for_status()
-            text = response.json()["choices"][0]["message"]["content"]
-        elif provider == "gemini":
-            if not GEMINI_API_KEY:
-                raise RuntimeError("Gemini judge is not configured")
-            response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent",
-                headers={"x-goog-api-key": GEMINI_API_KEY},
-                json={
-                    "system_instruction": {"parts": [{"text": instruction}]},
-                    "contents": [{"parts": [{"text": content}]}],
-                    "generationConfig": {"temperature": 0, "maxOutputTokens": 1024, "responseMimeType": "application/json"},
-                },
-            )
-            response.raise_for_status()
-            text = "".join(part.get("text", "") for part in response.json()["candidates"][0]["content"]["parts"])
-        else:
-            raise ValueError("Unsupported evaluation provider")
-    return JudgeVerdict.model_validate(_extract_json(text))
+    if not HF_TOKEN:
+        raise RuntimeError("Hugging Face judge is not configured")
+    # `provider` is retained for API compatibility; the judge is a single
+    # open-source Hugging Face model regardless of the requested label.
+    text = await hf_chat_completion(
+        [
+            {"role": "system", "content": instruction},
+            {"role": "user", "content": content},
+        ],
+        model=HF_REASONING_MODEL,
+        temperature=0,
+        max_tokens=512,
+        response_format={"type": "json_object"},
+    )
+    return JudgeVerdict.model_validate(extract_json(text))
 
 # Benchmark dataset is shared with the TS side to avoid drift.
 _BENCHMARKS_PATH = os.path.join(

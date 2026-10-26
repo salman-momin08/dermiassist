@@ -10,7 +10,7 @@ import { Cpu, Database, Zap, Award, Activity, RefreshCw, CheckCircle2, AlertTria
 
 export default function AIEngineeringDashboard() {
     const [symptomsInput, setSymptomsInput] = useState('Itchy red elevated rash on inner elbows for 3 weeks, dry skin');
-    const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'openai'>('openai');
+    const [selectedProvider, setSelectedProvider] = useState<'huggingface'>('huggingface');
     const [loading, setLoading] = useState(false);
     const [evalLoading, setEvalLoading] = useState(false);
     const [mcpLoading, setMcpLoading] = useState(false);
@@ -18,7 +18,7 @@ export default function AIEngineeringDashboard() {
     const [evalReport, setEvalReport] = useState<any>(null);
     const [mcpResult, setMcpResult] = useState<any>(null);
 
-    const handleRunPipeline = async (providerOverride?: 'gemini' | 'openai') => {
+    const handleRunPipeline = async (providerOverride?: 'huggingface') => {
         const provider = providerOverride || selectedProvider;
         setLoading(true);
         setPipelineResult(null);
@@ -99,7 +99,7 @@ export default function AIEngineeringDashboard() {
                     </p>
                 </div>
                 <Badge variant="outline" className="text-xs px-3 py-1 bg-primary/10 text-primary border-primary/30">
-                    Genkit + Gemini 2.5 + MCP JSON-RPC 2.0
+                    Genkit + Hugging Face Open-Source + MCP JSON-RPC 2.0
                 </Badge>
             </div>
 
@@ -143,25 +143,16 @@ export default function AIEngineeringDashboard() {
                             </div>
 
                             <div>
-                                <label className="text-sm font-semibold mb-2 block">AI Reasoning Engine & Provider</label>
+                                <label className="text-sm font-semibold mb-2 block">AI Reasoning Engine</label>
                                 <div className="flex flex-wrap gap-2">
                                     <Button
                                         type="button"
                                         size="sm"
-                                        variant={selectedProvider === 'gemini' ? 'default' : 'outline'}
-                                        onClick={() => setSelectedProvider('gemini')}
+                                        variant={selectedProvider === 'huggingface' ? 'default' : 'outline'}
+                                        onClick={() => setSelectedProvider('huggingface')}
                                         className="text-xs"
                                     >
-                                        ⚡ Google Gemini 2.5 Flash (Default)
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant={selectedProvider === 'openai' ? 'default' : 'outline'}
-                                        onClick={() => setSelectedProvider('openai')}
-                                        className="text-xs"
-                                    >
-                                        🟢 OpenAI GPT-4o (Clinical Reasoning)
+                                        🤗 Hugging Face Open-Source Models
                                     </Button>
                                 </div>
                             </div>
@@ -170,11 +161,11 @@ export default function AIEngineeringDashboard() {
                                 {loading ? (
                                     <>
                                         <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                        Synthesizing with {selectedProvider === 'openai' ? 'OpenAI GPT-4o' : 'Google Gemini'}...
+                                        Synthesizing with Hugging Face...
                                     </>
                                 ) : (
                                     <>
-                                        <Zap className="mr-2 h-4 w-4" /> Execute Multi-Agent Pipeline ({selectedProvider === 'openai' ? 'GPT-4o' : 'Gemini'})
+                                        <Zap className="mr-2 h-4 w-4" /> Execute Multi-Agent Pipeline (Hugging Face)
                                     </>
                                 )}
                             </Button>
