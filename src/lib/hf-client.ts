@@ -20,7 +20,7 @@ export const HF_MODELS = {
   /** Structured JSON / reasoning / report synthesis. */
   reasoning: () => process.env.HF_REASONING_MODEL || 'Qwen/Qwen2.5-7B-Instruct',
   /** Vision / multimodal image analysis. */
-  vision: () => process.env.HF_VISION_MODEL || 'meta-llama/Llama-3.2-11B-Vision-Instruct',
+  vision: () => process.env.HF_VISION_MODEL || 'Qwen/Qwen2.5-VL-3B-Instruct',
 };
 
 export type HFChatRole = 'system' | 'user' | 'assistant' | 'tool';
