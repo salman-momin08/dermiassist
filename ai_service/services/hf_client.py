@@ -48,7 +48,7 @@ HF_REASONING_MODEL = os.getenv("HF_REASONING_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 HF_REASONING_FALLBACK_MODEL = os.getenv(
     "HF_REASONING_FALLBACK_MODEL", "meta-llama/Meta-Llama-3-8B-Instruct"
 )
-HF_VISION_MODEL = os.getenv("HF_VISION_MODEL", "meta-llama/Llama-3.2-11B-Vision-Instruct")
+HF_VISION_MODEL = os.getenv("HF_VISION_MODEL", "Qwen/Qwen2.5-VL-3B-Instruct")
 
 
 class HFTokenMissingError(RuntimeError):
