@@ -26,7 +26,11 @@ from ai_service.services.hf_disease_service import analyze_disease_with_hf
 from ai_service.services.eval_harness import run_eval_harness
 from ai_service.services.drug_interaction_service import check_drug_interaction
 from ai_service.utils.token_budget import estimate_token_count, truncate_to_token_budget, calculate_llm_cost
-from ai_service.utils.circuit_breaker import huggingface_circuit_breaker
+from ai_service.utils.circuit_breaker import (
+    gemini_circuit_breaker,
+    openai_circuit_breaker,
+    huggingface_circuit_breaker,
+)
 from ai_service.queue.redis_queue import (
     submit_async_job,
     get_job_status,
