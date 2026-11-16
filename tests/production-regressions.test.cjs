@@ -290,7 +290,7 @@ test('proforma cache keys normalize disease names without merging different pati
     assert.notEqual(key, getProformaQuestionCacheKey('Psoriasis', history));
     assert.notEqual(key, getProformaQuestionCacheKey('atopic dermatitis', 'User: Pain started yesterday'));
     assert.notEqual(key, getProformaQuestionCacheKey('atopic dermatitis', history + '\nAI: Any bleeding?'));
-    assert.match(key, /^ai:proforma-question:v1:[a-f0-9]{64}$/);
+    assert.match(key, /^ai:proforma-question:v1:[a-f0-9]{16}:[a-f0-9]{64}$/);
     assert.equal(key.includes(history), false);
 });
 
@@ -374,7 +374,7 @@ test('suggestions KV cache includes the actual question and history and never st
     assert.notEqual(key, getQuestionSuggestionsCacheKey('Any pain?', 'Eczema', 'User: Two days'));
     assert.notEqual(key, getQuestionSuggestionsCacheKey('Any itching?', 'Psoriasis', 'User: Two days'));
     assert.notEqual(key, getQuestionSuggestionsCacheKey('Any itching?', 'Eczema', 'User: Two months'));
-    assert.match(key, /^ai:question-suggestions:v1:[a-f0-9]{64}$/);
+    assert.match(key, /^ai:question-suggestions:v1:[a-f0-9]{16}:[a-f0-9]{64}$/);
 
     let modelAvailable = true;
     let pythonCalls = 0;
@@ -410,6 +410,237 @@ test('suggestions KV cache includes the actual question and history and never st
     modelAvailable = true;
     assert.deepEqual(await generateQuestionSuggestions(failedInput), first);
     assert.equal(pythonCalls, 3);
+});
+
+test('Hugging Face client preserves model configuration and exposes typed upstream failures', async t => {
+    const errors = load('src\\lib\\errors.ts');
+    const { hfChatCompletion } = load('src\\lib\\hf-client.ts', { '@/lib/errors': errors });
+    const previous = {
+        HF_TOKEN: process.env.HF_TOKEN,
+        HUGGINGFACE_API_KEY: process.env.HUGGINGFACE_API_KEY,
+        INFERENCE_PROVIDER: process.env.INFERENCE_PROVIDER,
+    };
+    t.after(() => {
+        for (const [key, value] of Object.entries(previous)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+        }
+    });
+    const requests = [];
+    process.env.INFERENCE_PROVIDER = 'huggingface';
+    let unavailable = true;
+    t.mock.method(globalThis, 'fetch', async (url, options) => {
+        requests.push({ url, body: JSON.parse(options.body) });
+        return unavailable
+            ? new Response(JSON.stringify({ error: { code: 'model_not_supported', message: 'Model not enabled' } }), { status: 400 })
+            : new Response(JSON.stringify({ choices: [{ message: { content: '{"conditionName":"Assessment"}' } }] }));
+    });
+    const options = {
+        model: 'Qwen/Qwen2.5-VL-3B-Instruct:featherless-ai',
+        messages: [{ role: 'user', content: [
+            { type: 'text', text: 'Analyze this image' },
+            { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AA==' } },
+        ] }],
+        json: true,
+    };
+
+    delete process.env.HF_TOKEN;
+    delete process.env.HUGGINGFACE_API_KEY;
+    await assert.rejects(hfChatCompletion(options), error => error.code === 'HF_NOT_CONFIGURED');
+    assert.equal(requests.length, 0);
+
+    process.env.HF_TOKEN = 'test-token';
+    await assert.rejects(hfChatCompletion(options), error => {
+        assert.equal(error.code, 'HF_INFERENCE_FAILED');
+        assert.equal(error.statusCode, 503);
+        assert.deepEqual(error.context, { provider: 'huggingface', model: options.model, upstreamStatus: 400 });
+        assert.match(error.message, /model_not_supported/);
+        return true;
+    });
+    assert.equal(requests.length, 1); // No retry with a different model or fabricated result.
+    assert.equal(requests[0].url, 'https://router.huggingface.co/v1/chat/completions');
+    assert.equal(requests[0].body.model, options.model);
+    assert.deepEqual(requests[0].body.messages, options.messages);
+    assert.deepEqual(requests[0].body.response_format, { type: 'json_object' });
+
+    unavailable = false;
+    assert.equal(await hfChatCompletion(options), '{"conditionName":"Assessment"}');
+});
+
+test('Groq mode uses direct image/JSON inference and never falls back to Hugging Face', async t => {
+    const keys = ['INFERENCE_PROVIDER', 'GROQ_API_KEY', 'GROQ_MODEL', 'HF_TOKEN'];
+    const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+    t.after(() => {
+        for (const [key, value] of Object.entries(previous)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+        }
+    });
+    process.env.INFERENCE_PROVIDER = 'groq';
+    process.env.GROQ_MODEL = 'qwen/qwen3.8-27b';
+    process.env.HF_TOKEN = 'unused-test-hf-token';
+    delete process.env.GROQ_API_KEY;
+    const { hfChatCompletion, HF_MODELS } = load('src\\lib\\hf-client.ts');
+    let status = 200;
+    const requests = [];
+    t.mock.method(globalThis, 'fetch', async (url, options) => {
+        requests.push({ url, options, body: JSON.parse(options.body) });
+        return new Response(JSON.stringify(status === 200
+            ? { choices: [{ message: { content: '{"conditionName":"Assessment"}' } }] }
+            : { error: { message: 'Free-tier rate limit', code: 'rate_limit_exceeded' } }), { status });
+    });
+    const messages = [{ role: 'user', content: [
+        { type: 'text', text: 'Return a JSON object describing the image' },
+        { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AA==' } },
+    ] }];
+    await assert.rejects(hfChatCompletion({ model: HF_MODELS.vision(), messages }), error => error.code === 'GROQ_NOT_CONFIGURED');
+    assert.equal(requests.length, 0);
+    process.env.GROQ_API_KEY = 'test-groq-token';
+    for (const model of [HF_MODELS.vision(), HF_MODELS.reasoning(), HF_MODELS.chat()]) {
+        assert.equal(await hfChatCompletion({ model, messages, json: true }), '{"conditionName":"Assessment"}');
+    }
+    for (const { url, options, body } of requests) {
+        assert.equal(url, 'https://api.groq.com/openai/v1/chat/completions');
+        assert.equal(options.headers.Authorization, 'Bearer test-groq-token');
+        assert.equal(body.model, 'qwen/qwen3.8-27b');
+        assert.deepEqual(body.messages, messages);
+        assert.deepEqual(body.response_format, { type: 'json_object' });
+        assert.equal(body.reasoning_effort, 'none');
+    }
+    status = 429;
+    await assert.rejects(hfChatCompletion({ model: HF_MODELS.vision(), messages }), error => {
+        assert.equal(error.code, 'GROQ_INFERENCE_FAILED');
+        assert.deepEqual(error.context, { provider: 'groq', model: 'qwen/qwen3.8-27b', upstreamStatus: 429 });
+        return true;
+    });
+    assert.equal(requests.length, 4);
+    process.env.INFERENCE_PROVIDER = 'invalid';
+    await assert.rejects(hfChatCompletion({ model: 'unused', messages }), error => error.code === 'INFERENCE_PROVIDER_INVALID');
+    assert.equal(requests.length, 4);
+});
+
+test('Groq Genkit adapter preserves images and parses structured analysis output', async t => {
+    const keys = ['INFERENCE_PROVIDER', 'GROQ_API_KEY', 'GROQ_MODEL', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENAI_API_KEY'];
+    const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+    t.after(() => {
+        for (const [key, value] of Object.entries(previous)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+        }
+    });
+    process.env.INFERENCE_PROVIDER = 'groq';
+    process.env.GROQ_API_KEY = 'test-groq-token';
+    process.env.GROQ_MODEL = 'qwen/qwen3.8-27b';
+    for (const key of ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENAI_API_KEY']) delete process.env[key];
+    let body;
+    t.mock.method(globalThis, 'fetch', async (url, options) => {
+        assert.equal(url, 'https://api.groq.com/openai/v1/chat/completions');
+        body = JSON.parse(options.body);
+        return new Response(JSON.stringify({ choices: [{ message: { content: '{"conditionName":"Synthetic assessment"}' } }] }));
+    });
+    const { ai } = load('src\\ai\\genkit.ts');
+    const { z } = require('zod');
+    const response = await ai.generate({
+        messages: [{ role: 'user', content: [
+            { text: 'Return a JSON object for this synthetic test image' },
+            { media: { url: 'data:image/jpeg;base64,AA==', contentType: 'image/jpeg' } },
+        ] }],
+        output: { schema: z.object({ conditionName: z.string() }) },
+    });
+    assert.deepEqual(response.output, { conditionName: 'Synthetic assessment' });
+    assert.equal(body.model, 'qwen/qwen3.8-27b');
+    const promptText = body.messages.map(message => typeof message.content === 'string'
+        ? message.content
+        : message.content.map(part => part.text || '').join('\n')).join('\n');
+    assert.match(promptText, /Output should be in JSON format/);
+    assert.match(promptText, /"conditionName"/);
+    const image = body.messages.flatMap(message => Array.isArray(message.content) ? message.content : [])
+        .find(part => part.type === 'image_url');
+    assert.deepEqual(image.image_url, { url: 'data:image/jpeg;base64,AA==' });
+});
+
+test('AI caches cannot reuse results from a different inference provider or model', t => {
+    const keys = ['INFERENCE_PROVIDER', 'GROQ_MODEL'];
+    const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+    t.after(() => {
+        for (const [key, value] of Object.entries(previous)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+        }
+    });
+    const cache = load('src\\lib\\redis\\ai-cache.ts');
+    const cacheKeys = () => [
+        cache.getDetectDiseaseNameCacheKey('image'),
+        cache.getFinalEvaluationCacheKey('image', 'answers', 'condition'),
+        cache.getProformaQuestionCacheKey('condition', 'history'),
+        cache.getQuestionSuggestionsCacheKey('question', 'condition', 'history'),
+    ];
+    process.env.INFERENCE_PROVIDER = 'huggingface';
+    const hfKeys = cacheKeys();
+    process.env.INFERENCE_PROVIDER = 'groq';
+    process.env.GROQ_MODEL = 'qwen/qwen3.8-27b';
+    const groqKeys = cacheKeys();
+    assert.deepEqual(cacheKeys(), groqKeys);
+    process.env.GROQ_MODEL = 'another-model';
+    const changedKeys = cacheKeys();
+    for (let index = 0; index < hfKeys.length; index++) {
+        assert.notEqual(hfKeys[index], groqKeys[index]);
+        assert.notEqual(groqKeys[index], changedKeys[index]);
+    }
+});
+
+test('image detection action returns safe failures and only caches successful model output', async () => {
+    const errors = load('src\\lib\\errors.ts');
+    const input = { photoDataUri: 'data:image/jpeg;base64,AA==' };
+    const diagnosis = { conditionName: 'Assessment' };
+    const cache = new Map();
+    const logs = [];
+    let modelCalls = 0;
+    let modelError;
+    const { detectDiseaseNameAction } = load('src\\ai\\flows\\cached.ts', {
+        '@/lib/errors': errors,
+        '@/lib/logger': { logger: { ...logger, debug() {}, error: (...args) => logs.push(args) } },
+        '@/lib/redis': {
+            getCacheOrSet: async (key, generate) => {
+                if (cache.has(key)) return cache.get(key);
+                const value = await generate();
+                cache.set(key, value);
+                return value;
+            },
+            CacheTTL: { AI_ANALYSIS: 60 },
+        },
+        '@/lib/redis/rate-limit': {},
+        '@/lib/redis/ai-cache': {
+            hashImageDataUri: () => 'image-hash',
+            getDetectDiseaseNameCacheKey: () => 'detection',
+        },
+        '@/lib/redis/cache': { trackCacheMiss() {}, trackCacheHit() {} },
+        '@/ai/flows/detect-disease-name': { detectDiseaseName: async () => {
+            modelCalls++;
+            if (modelError) throw modelError;
+            return diagnosis;
+        } },
+        '@/ai/flows/final-evaluation': {},
+    });
+    for (const error of [
+        new errors.AppError('private provider response: model_not_supported', { code: 'HF_INFERENCE_FAILED' }),
+        new errors.AppError('private token configuration', { code: 'HF_NOT_CONFIGURED' }),
+        new Error('private upstream error'),
+    ]) {
+        modelError = error;
+        const result = await detectDiseaseNameAction(input, 'patient');
+        assert.equal(result.success, false);
+        assert.equal(result.code, error.code || 'AI_DETECTION_FAILED');
+        assert.match(result.error, /No condition was identified/);
+        assert.equal(JSON.stringify(result).includes('private'), false);
+        assert.equal(Object.hasOwn(result, 'data'), false);
+        assert.equal(cache.size, 0);
+    }
+    assert.ok(logs.some(([event]) => event === 'ai_cache.detect_disease.action_failed'));
+    modelError = undefined;
+    assert.deepEqual(await detectDiseaseNameAction(input, 'patient'), { success: true, data: diagnosis });
+    assert.deepEqual(await detectDiseaseNameAction(input, 'patient'), { success: true, data: diagnosis });
+    assert.equal(modelCalls, 4);
 });
 
 test('final evaluation action returns safe failures instead of throwing production-redacted errors', async () => {

@@ -16,7 +16,9 @@ from dotenv import load_dotenv
 
 from ai_service.utils.circuit_breaker import CircuitBreakerOpenException
 from ai_service.services.hf_client import (
-    HF_TOKEN,
+    INFERENCE_TOKEN,
+    PROVIDER_NAME,
+    TOKEN_ENV,
     HF_REASONING_MODEL,
     hf_chat_completion,
     extract_json,
@@ -49,9 +51,9 @@ async def analyze_disease_with_hf(
     """
     Analyzes dermatological disease using an open-source Hugging Face model.
     """
-    logger.info(f"Analyzing disease with Hugging Face ({HF_REASONING_MODEL}) (Symptoms len: {len(symptoms)})")
+    logger.info(f"Analyzing disease with {PROVIDER_NAME} ({HF_REASONING_MODEL}) (Symptoms len: {len(symptoms)})")
 
-    if HF_TOKEN:
+    if INFERENCE_TOKEN:
         try:
             system_prompt = (
                 "You are an Expert Board-Certified Dermatologist. Output strictly valid JSON matching this schema:\n"
@@ -76,26 +78,26 @@ async def analyze_disease_with_hf(
             parsed = await _call_hf_chat_json(system_prompt, user_prompt)
             return {
                 "success": True,
-                "provider": "Hugging Face",
+                "provider": PROVIDER_NAME,
                 "model": HF_REASONING_MODEL,
                 "data": parsed
             }
         except CircuitBreakerOpenException as e:
-            logger.error(f"Hugging Face circuit breaker open: {e}")
+            logger.error(f"{PROVIDER_NAME} circuit breaker open: {e}")
             return {
                 "success": False,
-                "provider": "Hugging Face",
+                "provider": PROVIDER_NAME,
                 "model": HF_REASONING_MODEL,
                 "error": str(e),
                 "data": None
             }
         except Exception as e:
-            logger.error(f"Hugging Face API exception: {e}")
+            logger.error(f"{PROVIDER_NAME} API exception: {e}")
             # Honest failure — do NOT fabricate a diagnosis. Surface the error so
             # a broken/misconfigured model is caught and fixed on priority.
             return {
                 "success": False,
-                "provider": "Hugging Face",
+                "provider": PROVIDER_NAME,
                 "model": HF_REASONING_MODEL,
                 "error": str(e),
                 "data": None
@@ -104,8 +106,8 @@ async def analyze_disease_with_hf(
     # No token configured — this is a real, reportable failure, not a diagnosis.
     return {
         "success": False,
-        "provider": "Hugging Face",
+        "provider": PROVIDER_NAME,
         "model": HF_REASONING_MODEL,
-        "error": "HF_TOKEN not configured",
+        "error": f"{TOKEN_ENV} not configured",
         "data": None
     }

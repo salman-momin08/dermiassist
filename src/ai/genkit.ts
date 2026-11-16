@@ -2,16 +2,17 @@
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import type { GenerateResponseData } from 'genkit/model';
-import { hfChatCompletion, HF_MODELS, type HFChatMessage } from '@/lib/hf-client';
+import { hfChatCompletion, HF_MODELS, getInferenceProvider, type HFChatMessage } from '@/lib/hf-client';
 
 // Every generative Genkit call (chatbot, disease detection, proforma, report
-// generation) routes to this open-source Hugging Face model. The `googleAI`
+// generation) routes to the explicitly configured open-source provider. The `googleAI`
 // plugin is kept ONLY for the media flows (TTS, healing video) and RAG
 // embeddings, which explicitly request a `googleAI.model(...)`.
-const HF_MODEL_NAME = 'huggingface/open-source';
+const HF_MODEL_NAME = 'open-source/inference';
+const googleConfigured = Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENAI_API_KEY);
 
 export const ai = genkit({
-  plugins: [googleAI()],
+  plugins: googleConfigured ? [googleAI()] : [],
   model: HF_MODEL_NAME,
 });
 
@@ -28,7 +29,7 @@ type HFContentPart =
 ai.defineModel(
   {
     name: HF_MODEL_NAME,
-    label: 'Hugging Face (Open-Source Inference Providers)',
+    label: getInferenceProvider() === 'groq' ? 'Groq (Direct Inference)' : 'Hugging Face (Open-Source Inference Providers)',
     supports: {
       multiturn: true,
       media: true,

@@ -15,6 +15,9 @@ from ai_service.services.hf_client import (
     hf_vision_chat,
     HF_REASONING_MODEL,
     HF_VISION_MODEL,
+    INFERENCE_PROVIDER,
+    PROVIDER_NAME,
+    TOKEN_ENV,
 )
 
 load_dotenv()
@@ -122,7 +125,7 @@ async def _detect_try_hf_vision(state: DermatologyState) -> Dict[str, Any]:
     if not photo_uri:
         raise ValueError("No image provided for condition detection")
     if not hf_token_configured():
-        return {"success": False, "attempts": attempts + ["Hugging Face: HF_TOKEN not configured"]}
+        return {"success": False, "attempts": attempts + [f"{PROVIDER_NAME}: {TOKEN_ENV} not configured"]}
 
     try:
         text = await hf_vision_chat(_DETECT_PROMPT, photo_uri, model=HF_VISION_MODEL, max_tokens=50)
@@ -130,10 +133,10 @@ async def _detect_try_hf_vision(state: DermatologyState) -> Dict[str, Any]:
         condition_name = re.sub(r'^["\']|["\']$', '', condition_name).strip()
         if condition_name:
             return {"condition_name": condition_name, "turn_count": 0, "success": True}
-        return {"success": False, "attempts": attempts + ["Hugging Face: returned empty condition"]}
+        return {"success": False, "attempts": attempts + [f"{PROVIDER_NAME}: returned empty condition"]}
     except Exception as e:
-        print(f"[LangGraph Vision Node Error — Hugging Face]: {e}")
-        return {"success": False, "attempts": attempts + [f"Hugging Face: {e}"]}
+        print(f"[LangGraph Vision Node Error — {PROVIDER_NAME}]: {e}")
+        return {"success": False, "attempts": attempts + [f"{PROVIDER_NAME}: {e}"]}
 
 async def _detect_try_classifier(state: DermatologyState) -> Dict[str, Any]:
     """Node 1b: HuggingFace HAM10000 lesion classifier — real open-source
@@ -143,6 +146,8 @@ async def _detect_try_classifier(state: DermatologyState) -> Dict[str, Any]:
     photo_uri = state.get("photo_data_uri")
     attempts = state.get("attempts", [])
 
+    if INFERENCE_PROVIDER == "groq":
+        raise RuntimeError(f"Groq vision detection failed. {'; '.join(attempts)}. Paid Hugging Face fallback is disabled.")
     result = await classify_skin_lesion_bytes_hf(photo_uri)
     if result.get("success") and result.get("top_prediction"):
         return {
@@ -206,7 +211,7 @@ async def _question_try_hf_primary(state: DermatologyState) -> Dict[str, Any]:
     attempts = state.get("attempts", [])
 
     if not hf_token_configured():
-        return {"success": False, "attempts": attempts + ["Hugging Face: HF_TOKEN not configured"]}
+        return {"success": False, "attempts": attempts + [f"{PROVIDER_NAME}: {TOKEN_ENV} not configured"]}
     try:
         text = await hf_chat_completion(
             [
@@ -219,10 +224,10 @@ async def _question_try_hf_primary(state: DermatologyState) -> Dict[str, Any]:
         question = (text or "").strip().replace('"', '').replace("'", "")
         if question:
             return {"current_question": question, "turn_count": state.get("turn_count", 0) + 1, "success": True}
-        return {"success": False, "attempts": attempts + ["Hugging Face: returned empty question"]}
+        return {"success": False, "attempts": attempts + [f"{PROVIDER_NAME}: returned empty question"]}
     except Exception as e:
-        print(f"[LangGraph Proforma Question Node Error — Hugging Face]: {e}")
-        return {"success": False, "attempts": attempts + [f"Hugging Face: {e}"]}
+        print(f"[LangGraph Proforma Question Node Error — {PROVIDER_NAME}]: {e}")
+        return {"success": False, "attempts": attempts + [f"{PROVIDER_NAME}: {e}"]}
 
 async def _question_try_hf_fallback(state: DermatologyState) -> Dict[str, Any]:
     """Node 2b: secondary open-source fallback (Mistral-7B-Instruct text
@@ -232,6 +237,8 @@ async def _question_try_hf_fallback(state: DermatologyState) -> Dict[str, Any]:
     condition_name = state.get("condition_name") or "Dermatological Condition"
     history = state.get("conversation_history") or ""
     attempts = state.get("attempts", [])
+    if INFERENCE_PROVIDER == "groq":
+        raise RuntimeError(f"Groq question generation failed. {'; '.join(attempts)}. Paid Hugging Face fallback is disabled.")
     combined_prompt = f"{_question_system_instruction(condition_name)}\n\n{_question_user_prompt(history, condition_name)}"
 
     try:
@@ -310,7 +317,7 @@ async def _eval_try_hf_primary(state: DermatologyState) -> Dict[str, Any]:
     attempts = state.get("attempts", [])
 
     if not hf_token_configured():
-        return {"success": False, "attempts": attempts + ["Hugging Face: HF_TOKEN not configured"]}
+        return {"success": False, "attempts": attempts + [f"{PROVIDER_NAME}: {TOKEN_ENV} not configured"]}
     try:
         if photo_uri and "," in photo_uri:
             content: List[Any] = [
@@ -332,8 +339,8 @@ async def _eval_try_hf_primary(state: DermatologyState) -> Dict[str, Any]:
         data = _extract_json_block(text)
         return {"final_evaluation": data, "success": True}
     except Exception as e:
-        print(f"[LangGraph Final Eval Error — Hugging Face]: {e}")
-        return {"success": False, "attempts": attempts + [f"Hugging Face: {e}"]}
+        print(f"[LangGraph Final Eval Error — {PROVIDER_NAME}]: {e}")
+        return {"success": False, "attempts": attempts + [f"{PROVIDER_NAME}: {e}"]}
 
 async def _eval_try_hf_fallback(state: DermatologyState) -> Dict[str, Any]:
     """Node 3b: secondary open-source fallback — Mistral-7B text completion,
@@ -343,6 +350,8 @@ async def _eval_try_hf_fallback(state: DermatologyState) -> Dict[str, Any]:
     condition_name = state.get("condition_name") or "Dermatological Condition"
     user_answers = state.get("user_answers") or state.get("conversation_history") or ""
     attempts = state.get("attempts", [])
+    if INFERENCE_PROVIDER == "groq":
+        raise RuntimeError(f"Groq evaluation failed. {'; '.join(attempts)}. Paid Hugging Face fallback is disabled.")
     prompt = _eval_prompt(condition_name, user_answers)
 
     try:

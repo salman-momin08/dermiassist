@@ -2,7 +2,9 @@ import copy
 import unittest
 import asyncio
 import os
-from unittest.mock import AsyncMock, patch
+import json
+import importlib.util
+from unittest.mock import AsyncMock, Mock, patch
 import httpx
 
 from ai_service.services.llm_diagnosis import _validate_diagnosis
@@ -10,6 +12,7 @@ from ai_service.utils.token_budget import estimate_token_count, truncate_to_toke
 from ai_service.utils.circuit_breaker import CircuitBreaker, with_circuit_breaker
 from ai_service.services import eval_harness
 from ai_service.services import dermatology_graph
+from ai_service.services import hf_client, llm_diagnosis, hf_disease_service, orchestrator_service
 from ai_service.queue import redis_queue
 from ai_service import main
 from ai_service.utils.input_guard import sanitize_clinical_input
@@ -77,6 +80,175 @@ class CircuitBreakerTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(asyncio.CancelledError):
             await with_circuit_breaker(breaker, AsyncMock(side_effect=asyncio.CancelledError))
         self.assertEqual(breaker.state, "OPEN")
+
+
+class GroqClientTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("test_groq_client", hf_client.__file__)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        self.client = importlib.util.module_from_spec(spec)
+        with patch.dict(os.environ, {
+            "INFERENCE_PROVIDER": "groq",
+            "GROQ_API_KEY": "test-groq-token",
+            "GROQ_MODEL": "qwen/qwen3.8-27b",
+            "HF_TOKEN": "unused-test-hf-token",
+        }):
+            spec.loader.exec_module(self.client)
+        self.client.inference_circuit_breaker = CircuitBreaker("test-groq", failure_threshold=10)
+
+    async def test_hf_mode_keeps_existing_sdk_routing(self):
+        self.client.INFERENCE_PROVIDER = "huggingface"
+        self.client.PROVIDER_NAME = "Hugging Face"
+        sdk = Mock()
+        sdk.chat_completion.return_value = Mock(choices=[Mock(message={"content": "Model response"})])
+        messages = [{"role": "user", "content": "Synthetic test"}]
+        with patch.object(self.client, "get_hf_client", return_value=sdk), \
+             patch.object(self.client.httpx, "AsyncClient") as groq_http:
+            self.assertEqual(await self.client.hf_chat_completion(messages, model="test-hf-model"), "Model response")
+        sdk.chat_completion.assert_called_once_with(
+            model="test-hf-model", messages=messages, max_tokens=1000, temperature=0.2,
+        )
+        groq_http.assert_not_called()
+
+    async def test_image_and_json_requests_use_groq_only(self):
+        requests = []
+
+        def respond(request):
+            requests.append(request)
+            return httpx.Response(200, json={"choices": [{"message": {"content": '{"condition":"Assessment"}'}}]})
+
+        original_client = httpx.AsyncClient
+        transport = httpx.MockTransport(respond)
+        with patch.object(self.client, "get_hf_client", side_effect=AssertionError("HF must not be called")), \
+             patch.object(self.client.httpx, "AsyncClient", side_effect=lambda **kwargs: original_client(transport=transport, **kwargs)):
+            image_result = await self.client.hf_vision_chat("Describe the image", "data:image/jpeg;base64,AA==")
+            self.assertEqual(image_result, '{"condition":"Assessment"}')
+            result = await self.client.hf_chat_json("Return a JSON object", "Synthetic test")
+            self.assertEqual(result, {"condition": "Assessment"})
+        self.assertEqual(len(requests), 2)
+        for request in requests:
+            self.assertEqual(str(request.url), "https://api.groq.com/openai/v1/chat/completions")
+            self.assertEqual(request.headers["Authorization"], "Bearer test-groq-token")
+            body = json.loads(request.content)
+            self.assertEqual(body["model"], "qwen/qwen3.8-27b")
+            self.assertEqual(body["reasoning_effort"], "none")
+        self.assertEqual(json.loads(requests[0].content)["messages"][0]["content"][1],
+                         {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AA=="}})
+        self.assertEqual(json.loads(requests[1].content)["response_format"], {"type": "json_object"})
+
+    async def test_missing_groq_key_does_not_use_an_available_hf_token(self):
+        self.client.INFERENCE_TOKEN = ""
+        with patch.object(self.client, "get_hf_client") as hf, patch.object(self.client.httpx, "AsyncClient") as http:
+            with self.assertRaisesRegex(self.client.HFTokenMissingError, "GROQ_API_KEY"):
+                await self.client.hf_chat_completion([{"role": "user", "content": "Synthetic test"}])
+            hf.assert_not_called()
+            http.assert_not_called()
+
+    async def test_rate_limits_and_bad_output_fail_without_provider_fallback(self):
+        original_client = httpx.AsyncClient
+        for status, body, message in (
+            (429, {"error": {"message": "Free-tier rate limit"}}, "HTTP 429"),
+            (200, {"choices": []}, "Missing completion"),
+            (200, {"choices": [{"message": {"content": ""}}]}, "Empty completion"),
+        ):
+            with self.subTest(status=status, body=body):
+                requests = []
+
+                def respond(request):
+                    requests.append(request)
+                    return httpx.Response(status, json=body)
+
+                transport = httpx.MockTransport(respond)
+                with patch.object(self.client, "get_hf_client", side_effect=AssertionError("HF must not be called")), \
+                     patch.object(self.client.httpx, "AsyncClient", side_effect=lambda **kwargs: original_client(transport=transport, **kwargs)):
+                    with self.assertRaisesRegex(RuntimeError, message):
+                        await self.client.hf_chat_completion([{"role": "user", "content": "Synthetic test"}])
+                self.assertEqual(len(requests), 1)
+
+
+class GroqRoutingTests(unittest.IsolatedAsyncioTestCase):
+    def test_failure_messages_redact_both_provider_tokens(self):
+        with patch.object(llm_diagnosis, "INFERENCE_TOKEN", "test-groq-secret"), \
+             patch.object(llm_diagnosis, "HF_TOKEN", "test-hf-secret"):
+            message = llm_diagnosis._sanitize_error("test-groq-secret test-hf-secret")
+        self.assertEqual(message, "[REDACTED] [REDACTED]")
+
+    async def test_graph_failures_never_invoke_paid_hf_fallbacks(self):
+        classifier = AsyncMock()
+        completion = AsyncMock()
+        with patch.object(dermatology_graph, "INFERENCE_PROVIDER", "groq"), \
+             patch.object(dermatology_graph, "PROVIDER_NAME", "Groq"), \
+             patch.object(dermatology_graph, "TOKEN_ENV", "GROQ_API_KEY"), \
+             patch.object(dermatology_graph, "hf_token_configured", return_value=True), \
+             patch.object(dermatology_graph, "hf_vision_chat", AsyncMock(side_effect=RuntimeError("429 free-tier limit"))), \
+             patch.object(dermatology_graph, "hf_chat_completion", AsyncMock(side_effect=RuntimeError("429 free-tier limit"))), \
+             patch.object(dermatology_graph, "classify_skin_lesion_bytes_hf", classifier), \
+             patch.object(dermatology_graph, "generate_llm_completion_hf", completion):
+            for execute, arguments in (
+                (dermatology_graph.execute_langgraph_detect, ("data:image/jpeg;base64,AA==",)),
+                (dermatology_graph.execute_langgraph_question, ("Assessment", "Synthetic answers")),
+                (dermatology_graph.execute_langgraph_evaluation, ("Assessment", "Synthetic answers")),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "Paid Hugging Face fallback is disabled"):
+                    await execute(*arguments)
+        classifier.assert_not_awaited()
+        completion.assert_not_awaited()
+
+    async def test_diagnosis_reports_groq_metadata_and_does_not_retry_with_hf(self):
+        diagnosis = {"condition": "Assessment", "icd_code": "L30.9", "confidence": 0, "severity": "Mild", "summary": "Clinician review"}
+        call = AsyncMock(return_value=diagnosis)
+        with patch.object(llm_diagnosis, "PROVIDER_NAME", "Groq"), \
+             patch.object(llm_diagnosis, "INFERENCE_TOKEN", "test-token"), \
+             patch.object(llm_diagnosis, "HF_PRIMARY_MODEL", "qwen/qwen3.8-27b"), \
+             patch.object(llm_diagnosis, "HF_FALLBACK_MODEL", "qwen/qwen3.8-27b"), \
+             patch.object(llm_diagnosis, "_call_hf", call):
+            result = await llm_diagnosis.generate_differential_diagnosis("Synthetic rash")
+            self.assertTrue(result["success"])
+            self.assertEqual(result["provider"], "Groq")
+            self.assertEqual(result["model"], "qwen/qwen3.8-27b")
+            self.assertEqual(len(result["attempts"]), 1)
+            call.reset_mock()
+            call.side_effect = RuntimeError("429 free-tier limit")
+            result = await llm_diagnosis.generate_differential_diagnosis("Synthetic rash")
+            self.assertFalse(result["success"])
+            self.assertIsNone(result["data"])
+            self.assertEqual(len(result["attempts"]), 1)
+            call.assert_awaited_once()
+
+    async def test_structured_analysis_and_judge_accept_groq_without_hf_token(self):
+        verdict = {
+            "conditionCorrectness": 90, "citationGroundingQuality": 90,
+            "clinicallySafe": True, "disclaimerPresent": True, "rationale": "Synthetic test",
+        }
+        for service in (hf_disease_service, eval_harness):
+            with patch.object(service, "INFERENCE_TOKEN", "test-groq-token"), \
+                 patch.object(service, "PROVIDER_NAME", "Groq"):
+                if service is hf_disease_service:
+                    with patch.object(service, "_call_hf_chat_json", AsyncMock(return_value={"condition": "Assessment"})):
+                        result = await service.analyze_disease_with_hf("Synthetic rash")
+                    self.assertTrue(result["success"])
+                    self.assertEqual(result["provider"], "Groq")
+                else:
+                    with patch.object(service, "hf_chat_completion", AsyncMock(return_value=json.dumps(verdict))):
+                        result = await service.judge_report_quality({}, {}, "huggingface")
+                    self.assertEqual(result.rationale, "Synthetic test")
+
+    async def test_pipeline_vision_uses_groq_without_inventing_confidence(self):
+        detector = AsyncMock(return_value={"condition_name": "Assessment"})
+        classifier = AsyncMock()
+        with patch.object(orchestrator_service, "INFERENCE_PROVIDER", "groq"), \
+             patch.object(orchestrator_service, "PROVIDER_NAME", "Groq"), \
+             patch.object(orchestrator_service, "assert_public_http_url") as validate_url, \
+             patch.object(orchestrator_service, "execute_langgraph_detect", detector), \
+             patch.object(orchestrator_service, "classify_skin_lesion_hf", classifier):
+            result = await orchestrator_service._run_vision("https://example.com/image.jpg")
+        self.assertTrue(result["success"])
+        self.assertEqual(result["provider"], "Groq")
+        self.assertIsNone(result["confidence_score"])
+        validate_url.assert_called_once_with("https://example.com/image.jpg")
+        detector.assert_awaited_once()
+        classifier.assert_not_awaited()
 
 
 class EvaluationTests(unittest.IsolatedAsyncioTestCase):

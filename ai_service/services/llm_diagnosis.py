@@ -34,12 +34,13 @@ from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
 
 from ai_service.utils.circuit_breaker import (
-    huggingface_circuit_breaker,
-    with_circuit_breaker,
     CircuitBreakerOpenException,
 )
 from ai_service.services.hf_client import (
     HF_TOKEN,
+    INFERENCE_TOKEN,
+    PROVIDER_NAME,
+    TOKEN_ENV,
     HF_REASONING_MODEL,
     HF_REASONING_FALLBACK_MODEL,
     hf_chat_completion,
@@ -134,7 +135,7 @@ def _sanitize_error(message: str) -> str:
     this is defense-in-depth on top of never putting keys in URLs.
     """
     sanitized = message
-    for secret in (HF_TOKEN,):
+    for secret in (INFERENCE_TOKEN, HF_TOKEN):
         if secret:
             sanitized = sanitized.replace(secret, "[REDACTED]")
     # Catch any remaining `key=<value>` query-param style leaks (e.g. from a
@@ -181,12 +182,7 @@ def _validate_diagnosis(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 async def _call_hf(user_prompt: str, model_id: str) -> Dict[str, Any]:
-    """Call an open-source Hugging Face chat model. Raises on any failure.
-
-    The HuggingFace circuit breaker is applied inside ``hf_chat_completion``, so
-    this helper is passed straight to the provider loop below like the previous
-    Gemini/OpenAI callables were.
-    """
+    """Call the selected provider; ``hf_chat_completion`` owns its circuit breaker."""
     text = await hf_chat_completion(
         [
             {"role": "system", "content": _SYSTEM_INSTRUCTION},
@@ -214,7 +210,7 @@ async def generate_differential_diagnosis(
       On success:
         {
           "success": True,
-          "provider": "Google Gemini" | "OpenAI",
+          "provider": "Hugging Face" | "Groq",
           "model": "<model id>",
           "latency_ms": float,
           "attempts": [ {provider, model, ok, error?} , ... ],
@@ -236,23 +232,16 @@ async def generate_differential_diagnosis(
     user_prompt = _build_user_prompt(symptoms, vision_findings, rag_grounding, body_location)
     attempts: List[Dict[str, Any]] = []
 
-    # Primary open-source reasoning model with a second open model as backup.
-    # `preferred_provider` is accepted for backward compatibility with callers
-    # that still pass 'gemini'/'openai'; both now map onto Hugging Face models.
-    provider_plan = [
-        ("Hugging Face", HF_PRIMARY_MODEL),
-        ("Hugging Face", HF_FALLBACK_MODEL),
-    ]
+    # The environment selects the provider. Groq uses one model and no paid fallback.
+    provider_plan = [(PROVIDER_NAME, model) for model in dict.fromkeys((HF_PRIMARY_MODEL, HF_FALLBACK_MODEL))]
 
     for provider_name, model_id in provider_plan:
-        if not HF_TOKEN:
-            attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": "HF_TOKEN not configured"})
+        if not INFERENCE_TOKEN:
+            attempts.append({"provider": provider_name, "model": model_id, "ok": False, "error": f"{TOKEN_ENV} not configured"})
             continue
 
         try:
-            data = await with_circuit_breaker(
-                huggingface_circuit_breaker, _call_hf, user_prompt, model_id
-            )
+            data = await _call_hf(user_prompt, model_id)
             attempts.append({"provider": provider_name, "model": model_id, "ok": True})
             return {
                 "success": True,

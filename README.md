@@ -708,6 +708,14 @@ npx tsx scripts/debug-channels.ts
 3. **npm**: `v9.x` or higher
 4. **Supabase Account**: PostgreSQL database instance with `pgvector`
 5. **Hugging Face Access Token**: `HF_TOKEN` (primary — all LLM/vision/reasoning inference)
+   - The token needs **Inference Providers** permission, and the model's provider must be enabled in [Hugging Face provider settings](https://huggingface.co/settings/inference-providers). A model existing on the Hub does not guarantee hosted inference access.
+   - The default `HF_VISION_MODEL=Qwen/Qwen2.5-VL-3B-Instruct` is currently served by Featherless AI. Enable it, or choose a hosted vision model available from a provider enabled for your account. Check the model's Inference Providers panel because availability changes.
+   - HTTP 400 `model_not_supported` is a model/provider configuration failure, not a photo-quality problem. Update `HF_VISION_MODEL` in both the Next.js and Python deployments if overriding it, then redeploy. Failed analysis requests return a safe error without an invented condition; detailed upstream errors remain in server logs.
+   - **Zero-payment generative testing with Groq:** create a key at [Groq Console](https://console.groq.com/keys) and stay on its **Free** plan. In both deployments (or local `.env.local` for Next.js and `.env` for Python), set `INFERENCE_PROVIDER=groq`, `GROQ_API_KEY=<your private key>`, and optionally `GROQ_MODEL=qwen/qwen3.8-27b`. Restart local services or redeploy. Do not paste keys into chat or expose them as `NEXT_PUBLIC_*` variables.
+   - Groq mode calls `api.groq.com` directly, not the Hugging Face router. The multimodal model handles chat, image analysis, JSON synthesis and the evaluation judge. HF model overrides are ignored in this mode, and failures never invoke paid HF model/classifier fallbacks. Explicit Hugging Face demo endpoints, Google embeddings/media, and other infrastructure remain separate services; this does not make those integrations free.
+   - AI cache keys include the configured provider and models, so switching to Groq cannot reuse older Hugging Face analysis/question results.
+   - A Google API key is not required for basic Groq image analysis, questions or report synthesis. The Google Genkit plugin is registered only when a Google key is configured; embeddings and media features still need that separate key.
+   - Check [Groq account limits](https://console.groq.com/settings/limits) before testing. Free-tier rate limits can interrupt a multi-step analysis; HTTP 429 is an honest failure, not a reason to upgrade automatically. Use non-sensitive sample images and synthetic histories, not patient data. The model is a preview model and its availability can change; a `GROQ_MODEL` override must support images and JSON output. This is integration testing, not validation of clinical accuracy.
 6. **Google AI Studio Key**: Gemini API key (RAG embeddings + TTS/video media only)
 7. **Cloudinary Account**: For document uploads
 

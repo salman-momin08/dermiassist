@@ -33,7 +33,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import Image from "next/image";
-import { detectDiseaseNameCached as detectDiseaseName } from "@/ai/flows/cached";
+import { detectDiseaseNameAction as detectDiseaseName } from "@/ai/flows/cached";
 import { finalEvaluationAction as finalEvaluation } from "@/ai/flows/cached";
 import { proformaChat } from "@/ai/flows/proforma-chat";
 import { useToast } from "@/hooks/use-toast";
@@ -412,14 +412,19 @@ export default function AnalyzeClient() {
     setError(null);
 
     try {
-      const { conditionName } = await detectDiseaseName({ photoDataUri: preview }, user?.id);
-      const sanitizedName = sanitizeConditionName(conditionName);
+      const result = await detectDiseaseName({ photoDataUri: preview }, user?.id);
+      if (!result.success) {
+        setError(result.error);
+        setStep('error');
+        return;
+      }
+      const sanitizedName = sanitizeConditionName(result.data.conditionName);
       setDetectedCondition(sanitizedName);
       setStep('proforma');
       startProforma(sanitizedName);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Initial analysis failed:", err);
-      const errorMessage = getSafeErrorMessage(err, "Failed to analyze the image. The AI may be unable to identify a condition. Please try another clear photo.");
+      const errorMessage = getSafeErrorMessage(err, "The analysis request failed. No condition was identified. Please try again later.");
       setError(errorMessage);
       setStep('error');
     } finally {

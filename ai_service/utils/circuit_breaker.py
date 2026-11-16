@@ -63,6 +63,7 @@ class CircuitBreaker:
 # Pre-instantiated Circuit Breakers for AI Services
 gemini_circuit_breaker = CircuitBreaker("Gemini-API", failure_threshold=3, reset_timeout_seconds=30.0)
 huggingface_circuit_breaker = CircuitBreaker("HuggingFace-API", failure_threshold=3, reset_timeout_seconds=30.0)
+groq_circuit_breaker = CircuitBreaker("Groq-API", failure_threshold=3, reset_timeout_seconds=30.0)
 openai_circuit_breaker = CircuitBreaker("OpenAI-API", failure_threshold=3, reset_timeout_seconds=30.0)
 
 

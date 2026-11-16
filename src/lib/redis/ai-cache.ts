@@ -1,11 +1,18 @@
 import crypto from 'crypto';
+import { getInferenceProvider, HF_MODELS } from '@/lib/hf-client';
 
 /**
  * AI Analysis Cache Utilities
  * 
- * Functions for caching AI analysis results to reduce Gemini API costs
+ * Functions for caching AI analysis results to reduce inference usage
  * and improve response times for duplicate analyses.
  */
+
+function inferenceNamespace(): string {
+    return crypto.createHash('sha256')
+        .update(JSON.stringify([getInferenceProvider(), HF_MODELS.vision(), HF_MODELS.reasoning()]))
+        .digest('hex').substring(0, 16);
+}
 
 /**
  * Generate a hash from an image data URI
@@ -32,7 +39,7 @@ export function hashImageDataUri(dataUri: string): string {
  * @param imageHash - Hash of the image
  */
 export function getDetectDiseaseNameCacheKey(imageHash: string): string {
-    return `ai:detect-disease:${imageHash}`;
+    return `ai:detect-disease:${inferenceNamespace()}:${imageHash}`;
 }
 
 /**
@@ -54,7 +61,7 @@ export function getFinalEvaluationCacheKey(
         .digest('hex')
         .substring(0, 16); // Use first 16 chars for brevity
 
-    return `ai:final-eval:v2:${imageHash}:${answersHash}`;
+    return `ai:final-eval:v2:${inferenceNamespace()}:${imageHash}:${answersHash}`;
 }
 
 export function getProformaQuestionCacheKey(conditionName: string, conversationHistory: string): string {
@@ -63,7 +70,7 @@ export function getProformaQuestionCacheKey(conditionName: string, conversationH
         .update(JSON.stringify([conditionName.trim().replace(/\s+/g, ' ').toLowerCase(), conversationHistory]))
         .digest('hex');
 
-    return `ai:proforma-question:v1:${contextHash}`;
+    return `ai:proforma-question:v1:${inferenceNamespace()}:${contextHash}`;
 }
 
 export function getQuestionSuggestionsCacheKey(
@@ -76,7 +83,7 @@ export function getQuestionSuggestionsCacheKey(
         .update(JSON.stringify([conditionName.trim().replace(/\s+/g, ' ').toLowerCase(), question, conversationHistory]))
         .digest('hex');
 
-    return `ai:question-suggestions:v1:${contextHash}`;
+    return `ai:question-suggestions:v1:${inferenceNamespace()}:${contextHash}`;
 }
 
 /**

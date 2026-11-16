@@ -2,8 +2,8 @@
 Multi-Agent Orchestrator Service for FastAPI Microservice.
 
 Coordinates the Triage Agent (deterministic risk stratification), Vision Agent
-(Hugging Face HAM10000), RAG Specialist (vector search), and the Differential
-Synthesis Agent (a REAL Gemini/OpenAI call via llm_diagnosis).
+(Hugging Face HAM10000 or Groq vision), RAG Specialist (vector search), and the
+Differential Synthesis Agent (the configured provider via llm_diagnosis).
 
 The synthesis step is dynamic — the diagnosis comes from the model, never from a
 hardcoded template. If the model is unavailable, the pipeline returns
@@ -13,13 +13,39 @@ surfaces immediately instead of being masked by canned clinical output.
 
 import time
 import asyncio
+import logging
 from typing import Dict, Any, Optional
 
 from ai_service.services.rag_service import search_vector_rag
 from ai_service.services.huggingface_service import classify_skin_lesion_hf
 from ai_service.services.llm_diagnosis import generate_differential_diagnosis
+from ai_service.services.hf_client import INFERENCE_PROVIDER, PROVIDER_NAME, HF_VISION_MODEL
+from ai_service.services.dermatology_graph import execute_langgraph_detect
+from ai_service.utils.url_safety import assert_public_http_url
 from ai_service.utils.token_budget import ROLE_TOKEN_BUDGETS, truncate_to_token_budget
 from ai_service.utils.input_guard import sanitize_clinical_input
+
+logger = logging.getLogger("Orchestrator")
+
+
+async def _run_vision(image_url: Optional[str]) -> Dict[str, Any]:
+    if INFERENCE_PROVIDER != "groq":
+        return await classify_skin_lesion_hf(image_url)
+    if not image_url:
+        return {"success": False, "error": "No image provided", "model_used": HF_VISION_MODEL}
+    try:
+        assert_public_http_url(image_url)
+        result = await execute_langgraph_detect(image_url)
+        return {
+            "success": True,
+            "provider": PROVIDER_NAME,
+            "model_used": HF_VISION_MODEL,
+            "top_prediction": result["condition_name"],
+            "confidence_score": None,
+        }
+    except Exception as error:
+        logger.error("Groq vision analysis failed: %s", error)
+        return {"success": False, "error": str(error), "model_used": HF_VISION_MODEL}
 
 
 async def run_multi_agent_pipeline(
@@ -49,16 +75,16 @@ async def run_multi_agent_pipeline(
         triage_risk = "urgent"
     trace.append({"agent": "TriageAgent", "duration_ms": round((time.time() - t1) * 1000, 2), "status": "completed"})
 
-    # 3 + 4. Vision (Hugging Face) and RAG (vector search) are independent I/O —
+    # 3 + 4. Vision and RAG (vector search) are independent I/O —
     # run them concurrently to cut a full round-trip.
     t_parallel = time.time()
     hf_vision_result, rag_result = await asyncio.gather(
-        classify_skin_lesion_hf(image_url),
+        _run_vision(image_url),
         search_vector_rag(sanitized_symptoms, match_count=3),
     )
     parallel_ms = round((time.time() - t_parallel) * 1000, 2)
     trace.append({
-        "agent": "HuggingFaceVisionAgent",
+        "agent": "GroqVisionAgent" if INFERENCE_PROVIDER == "groq" else "HuggingFaceVisionAgent",
         "duration_ms": parallel_ms,
         "status": "completed" if hf_vision_result.get("success") else "failed",
         "model": hf_vision_result.get("model_used", "Anwarkh1/Skin_Cancer-Image_Classification"),
@@ -134,9 +160,10 @@ async def run_multi_agent_pipeline(
     ]
     # Only report the vision classification if the vision model actually ran.
     if hf_vision_result.get("success"):
+        score = hf_vision_result.get("confidence_score")
+        score_text = f" ({score}% score)" if score is not None else ""
         key_findings.append(
-            f"Hugging Face Vision Classification: {hf_vision_result.get('top_prediction')} "
-            f"({hf_vision_result.get('confidence_score')}% score)"
+            f"{PROVIDER_NAME} Vision Classification: {hf_vision_result.get('top_prediction')}{score_text}"
         )
     else:
         key_findings.append(f"Vision classification unavailable: {hf_vision_result.get('error')}")

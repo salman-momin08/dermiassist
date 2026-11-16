@@ -20,6 +20,32 @@ import { logger } from '@/lib/logger';
 import { trackCacheHit, trackCacheMiss } from '@/lib/redis/cache';
 import { AppError, RateLimitError } from '@/lib/errors';
 
+export type DetectDiseaseNameResult =
+    | { success: true; data: DetectDiseaseNameOutput }
+    | { success: false; error: string; code: string };
+
+export async function detectDiseaseNameAction(
+    input: DetectDiseaseNameInput,
+    userId?: string
+): Promise<DetectDiseaseNameResult> {
+    try {
+        return { success: true, data: await detectDiseaseNameCached(input, userId) };
+    } catch (error) {
+        logger.error('ai_cache.detect_disease.action_failed', {
+            userId,
+            name: error instanceof Error ? error.name : typeof error,
+            message: error instanceof Error ? error.message : String(error),
+            code: error instanceof AppError ? error.code : 'AI_DETECTION_FAILED',
+        });
+
+        return {
+            success: false,
+            error: 'The AI service could not analyze your image. No condition was identified. Please try again later. If this persists, contact support to check the AI model and provider configuration.',
+            code: error instanceof AppError ? error.code : 'AI_DETECTION_FAILED',
+        };
+    }
+}
+
 export type FinalEvaluationResult =
     | { success: true; data: FinalEvaluationOutput }
     | { success: false; error: string; code: string; retryAfter?: number };

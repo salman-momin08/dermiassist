@@ -28,7 +28,8 @@ from pydantic import BaseModel, Field, StrictBool
 from ai_service.services.orchestrator_service import run_multi_agent_pipeline
 from ai_service.services.llm_diagnosis import _sanitize_error
 from ai_service.services.hf_client import (
-    HF_TOKEN,
+    INFERENCE_TOKEN,
+    PROVIDER_NAME,
     HF_REASONING_MODEL,
     hf_chat_completion,
     extract_json,
@@ -56,10 +57,9 @@ async def judge_report_quality(case: Dict[str, Any], report: Dict[str, Any], pro
         "(boolean), disclaimerPresent (boolean), and rationale (string)."
     )
     content = json.dumps({"benchmark": case, "report": report}, ensure_ascii=False)
-    if not HF_TOKEN:
-        raise RuntimeError("Hugging Face judge is not configured")
-    # `provider` is retained for API compatibility; the judge is a single
-    # open-source Hugging Face model regardless of the requested label.
+    if not INFERENCE_TOKEN:
+        raise RuntimeError(f"{PROVIDER_NAME} judge is not configured")
+    # `provider` is retained for API compatibility; the environment selects the judge.
     text = await hf_chat_completion(
         [
             {"role": "system", "content": instruction},

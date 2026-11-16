@@ -7,6 +7,8 @@ the LangGraph vision/proforma/evaluation agents and the eval judge) route their
 inference through the helpers here so the project depends on ONE open-source
 provider — Hugging Face Inference Providers via ``huggingface_hub`` — keyed by a
 single ``HF_TOKEN`` user access token.
+Explicit ``INFERENCE_PROVIDER=groq`` instead uses Groq directly with
+``GROQ_API_KEY``; provider failures never trigger a switch to paid HF inference.
 
 Design contract (inherited from the project's no-fake-fallbacks rule):
   * Every helper RAISES on failure (missing token, rate limit, bad output). No
@@ -21,12 +23,14 @@ import os
 import json
 import asyncio
 import logging
+import httpx
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
 from ai_service.utils.circuit_breaker import (
     huggingface_circuit_breaker,
+    groq_circuit_breaker,
     with_circuit_breaker,
 )
 
@@ -36,6 +40,14 @@ logger = logging.getLogger("HFClient")
 # Single Hugging Face access token for every inference call. HUGGINGFACE_API_KEY
 # is still accepted for backward compatibility with the existing deployments.
 HF_TOKEN = os.getenv("HF_TOKEN", "") or os.getenv("HUGGINGFACE_API_KEY", "")
+INFERENCE_PROVIDER = os.getenv("INFERENCE_PROVIDER", "") or "huggingface"
+if INFERENCE_PROVIDER not in ("huggingface", "groq"):
+    raise ValueError("INFERENCE_PROVIDER must be huggingface or groq")
+PROVIDER_NAME = "Groq" if INFERENCE_PROVIDER == "groq" else "Hugging Face"
+TOKEN_ENV = "GROQ_API_KEY" if INFERENCE_PROVIDER == "groq" else "HF_TOKEN"
+INFERENCE_TOKEN = os.getenv("GROQ_API_KEY", "") if INFERENCE_PROVIDER == "groq" else HF_TOKEN
+GROQ_MODEL = os.getenv("GROQ_MODEL", "") or "qwen/qwen3.8-27b"
+inference_circuit_breaker = groq_circuit_breaker if INFERENCE_PROVIDER == "groq" else huggingface_circuit_breaker
 
 # ── Open-source model matrix ─────────────────────────────────────────────────
 # Overridable via env so a deployment can pin a different open checkpoint without
@@ -49,14 +61,17 @@ HF_REASONING_FALLBACK_MODEL = os.getenv(
     "HF_REASONING_FALLBACK_MODEL", "meta-llama/Meta-Llama-3-8B-Instruct"
 )
 HF_VISION_MODEL = os.getenv("HF_VISION_MODEL", "Qwen/Qwen2.5-VL-3B-Instruct")
+if INFERENCE_PROVIDER == "groq":
+    HF_CHAT_MODEL = HF_REASONING_MODEL = HF_REASONING_FALLBACK_MODEL = HF_VISION_MODEL = GROQ_MODEL
 
 
 class HFTokenMissingError(RuntimeError):
-    """Raised when no HF_TOKEN is configured — a real, reportable failure."""
+    """Raised when the selected provider's token is missing."""
 
 
 def hf_token_configured() -> bool:
-    return bool(HF_TOKEN)
+    """Legacy helper name; checks only the explicitly selected provider."""
+    return bool(INFERENCE_TOKEN)
 
 
 def get_hf_client():
@@ -100,8 +115,35 @@ async def hf_chat_completion(
 
     Raises on missing token, circuit-open, rate limit, or any provider error.
     """
-    client = get_hf_client()
+    if not INFERENCE_TOKEN:
+        raise HFTokenMissingError(f"{TOKEN_ENV} not configured; cannot run {PROVIDER_NAME} inference")
     model_id = model or HF_CHAT_MODEL
+
+    async def _call_groq() -> str:
+        kwargs: Dict[str, Any] = {
+            "model": model_id,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "reasoning_effort": "none",
+        }
+        if response_format is not None:
+            kwargs["response_format"] = response_format
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {INFERENCE_TOKEN}"},
+                json=kwargs,
+            )
+            if not response.is_success:
+                raise RuntimeError(
+                    f"Groq inference failed (HTTP {response.status_code}): {response.text[:300]}"
+                )
+            data = response.json()
+            choices = data.get("choices")
+            if not isinstance(choices, list) or not choices:
+                raise RuntimeError(f"Missing completion from Groq model {model_id}")
+            return _content_text(choices[0].get("message", {}))
 
     def _call() -> str:
         kwargs: Dict[str, Any] = {
@@ -112,14 +154,15 @@ async def hf_chat_completion(
         }
         if response_format is not None:
             kwargs["response_format"] = response_format
-        completion = client.chat_completion(**kwargs)
+        completion = get_hf_client().chat_completion(**kwargs)
         return _content_text(completion.choices[0].message)
 
-    text = await with_circuit_breaker(
-        huggingface_circuit_breaker, asyncio.to_thread, _call
-    )
+    if INFERENCE_PROVIDER == "groq":
+        text = await with_circuit_breaker(inference_circuit_breaker, _call_groq)
+    else:
+        text = await with_circuit_breaker(inference_circuit_breaker, asyncio.to_thread, _call)
     if not isinstance(text, str) or not text.strip():
-        raise RuntimeError(f"Empty completion from Hugging Face model {model_id}")
+        raise RuntimeError(f"Empty completion from {PROVIDER_NAME} model {model_id}")
     return text
 
 
